@@ -1,20 +1,19 @@
-import unittest
-from solana.rpc.async_api import AsyncClient
+import unittest 
 from solana.keypair import Keypair
 from pyaver.enums import SolanaNetwork
-from helpers.aver_client_setup_tests import aver_client_setup_tests
-from helpers.create_market_tests import create_init_market_smoke_tests
-from helpers.user_smoke_flow_tests import user_flow_smoke_tests
 from pyaver.aver_client import AverClient
-from pyaver.constants import get_solana_endpoint, AVER_PROGRAM_ID
 from solana.rpc.types import TxOpts
 from solana.rpc.commitment import Confirmed
+from solana.rpc.async_api import AsyncClient
+from pyaver.constants import get_solana_endpoint
+from pyaver.constants import AVER_PROGRAM_ID
+from pyaver.market import AverMarket
+from helpers.settle_market import settle_market
 import base58 
-import time
 
-class BinaryMarketTest(unittest.IsolatedAsyncioTestCase):
+class SettleMarketTest(unittest.IsolatedAsyncioTestCase):
     #To run all code from an entirely new set of keypairs and markets, set this to True
-    full_test=True
+    full_test=False
 
     async def asyncSetUp(self):
         owner = Keypair()
@@ -22,8 +21,8 @@ class BinaryMarketTest(unittest.IsolatedAsyncioTestCase):
         market_authority = Keypair()
        
         if(not self.full_test): 
-            market = Keypair.from_secret_key(base58.b58decode('34AdkHPGtmbAuwDBHXLA9UPSx5XAm2asEhTVdV71UmrZroxEjBQrYC7Ztxsk5MPpWYB3GcbidiG1APqRK6gRgGbk'))
-            secret_key = base58.b58decode('2S1DDiUZuqFNPHx2uzX9pphxynV1CgpLXnT9QrwPoWwXaGrqAP88XNEh9NK7JbFByJFDsER7PQgsNyacJyCGsH8S')
+            market = Keypair.from_secret_key(base58.b58decode('5KZbYTLo2NjLMSwqFga2sdYmePhNv86Y7HMuK193Z3kVRnnY73AhfZjiJLeTLxpUzmw3VA1h7CadBtCcbATwLvdT'))
+            secret_key = base58.b58decode('5kaPbsANMg5sCbc4Uq6EkgQd8wHoNfe3Zvv8a8ERaQG5dbXoXMgPt3CDUrWecCv2a6MUExFB6bfrS3gFSwokHXgV')
             owner = Keypair.from_secret_key(secret_key)
 
         network = SolanaNetwork.DEVNET
@@ -35,6 +34,7 @@ class BinaryMarketTest(unittest.IsolatedAsyncioTestCase):
         )
         client = await AverClient.load(connection, owner, opts, SolanaNetwork.DEVNET, AVER_PROGRAM_ID)
 
+
         self.owner = owner
         self.client = client
         self.market = market
@@ -43,14 +43,8 @@ class BinaryMarketTest(unittest.IsolatedAsyncioTestCase):
         return await super().asyncSetUp()
     
     async def test_setup_tests(self):
-
-        if(self.full_test):
-            await aver_client_setup_tests(self.owner, self.client)
-            #Sleeping to prevent 'Too many requests'
-            time.sleep(10)
-            await create_init_market_smoke_tests(self.client, self.owner, 2, self.market, self.market_authority)
-            time.sleep(10)
-        await user_flow_smoke_tests(self.client, self.owner, self.market, self.full_test)
+        loaded_market = await AverMarket.load(self.client, self.market.public_key)
+        print(await settle_market(loaded_market))
 
     async def asyncTearDown(self):
         await self.client.close()
