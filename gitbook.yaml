@@ -1,4 +1,4 @@
-root: ./PY-SDK/public/docs
+root: ./PY-SDK/public/docs/
 
 ​structure:
   readme: index.html
