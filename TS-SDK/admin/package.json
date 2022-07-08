@@ -1,0 +1,24 @@
+{
+  "name": "aver-ts-admin",
+  "version": "0.0.1",
+  "description": "Aver SDK Admin",
+  "scripts": {
+    "test-binary": "jest binary-market.int.test.ts --verbose --config jestconfig.json",
+    "test-ten": "jest ten-way-market.int.test.ts --verbose --config jestconfig.json",
+    "test-void": "jest void-market-flow.int.test.ts -i --config jestconfig.json",
+    "test-close": "jest close-market-flow.int.test.ts -i --config jestconfig.json",
+    "test-fees": "jest collect-fees-flow.int.test.ts -i --config jestconfig.json"
+  },
+  "author": "Nash",
+  "license": "ISC",
+  "dependencies": {
+    "aver-ts": "file:~/aver-ts-0.0.3.tgz"
+  },
+  "devDependencies": {
+    "@tsconfig/recommended": "^1.0.1",
+    "@types/jest": "^27.4.1",
+    "jest": "^27.5.1",
+    "ts-jest": "^27.1.3",
+    "typescript": "^4.6.2"
+  }
+}
