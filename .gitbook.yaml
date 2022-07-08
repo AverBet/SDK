@@ -1,5 +1,5 @@
 root: ./PY-SDK/public/docs/
 
 ​structure:
-  readme: ./index.html
+  readme: ./src.html
   summary: ./src.html
