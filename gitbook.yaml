@@ -1,0 +1,8 @@
+root: ./PY-SDK/public/docs
+
+​structure:
+  readme: index.html
+  src: src.html
+
+redirects:
+  previous/page: new-folder/page.md
