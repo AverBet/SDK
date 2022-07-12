@@ -213,6 +213,15 @@ export class UserMarket {
       pubkey: getBestDiscountTokenAccount,
     } as AccountMeta
 
+    console.log('Creating a User Market')
+    console.log(
+      'user:', umaOwner.toString(),
+      'userHostLifetime:', userHostLifetime.toString(),
+      'userMarket:', userMarket.toString(),
+      'market:', market.pubkey.toString(),
+      'host:', host.toString()
+    )
+
     return program.instruction['initUserMarket'](numberOfOrders, umaBump, {
       accounts: {
         user: umaOwner,
@@ -574,6 +583,89 @@ export class UserMarket {
           market: this.market.pubkey,
           marketStore: this.market.marketStore,
           quoteVault: this.market.quoteVault,
+          orderbook: orderbookAccount.orderbook,
+          bids: orderbookAccount.bids,
+          asks: orderbookAccount.asks,
+          eventQueue: orderbookAccount.eventQueue,
+          splTokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        },
+      }
+    )
+  }
+
+  // need a static method to use for first place order
+  /**
+   * 
+   * @param outcomeIndex 
+   * @param side 
+   * @param limitPrice 
+   * @param size 
+   * @param sizeFormat 
+   * @param market 
+   * @param user 
+   * @param averClient 
+   * @param userHostLifetime 
+   * @param umaPubkey 
+   * @param orderType 
+   * @param selfTradeBehavior 
+   * @returns 
+   */
+  static async makePlaceOrderInstruction(
+    outcomeIndex: number,
+    side: Side,
+    limitPrice: number,
+    size: number,
+    sizeFormat: SizeFormat,
+    market: Market,
+    user: PublicKey,
+    averClient: AverClient,
+    userHostLifetime: PublicKey,
+    umaPubkey: PublicKey,
+    orderType: OrderType = OrderType.Limit,
+    selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide
+  ) {
+    const sizeU64 = new BN(Math.floor(size * Math.pow(10, market.decimals)))
+    const limitPriceU64 = new BN(Math.ceil(limitPrice * Math.pow(10, market.decimals)))
+    // consider when binary markets where there is only one order book
+    const orderbookAccountIndex =
+      market.numberOfOutcomes == 2 && outcomeIndex == 1 ? 0 : outcomeIndex
+    // @ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
+    const orderbookAccount = market.orderbookAccounts[orderbookAccountIndex]
+
+    const userQuoteTokenAta = await getAssociatedTokenAddress(market.quoteTokenMint, user)
+
+    console.log('Placing the order')
+    console.log('user:', user.toString(),
+      'userHostLifetime:', userHostLifetime.toString(),
+      'userMarket:', umaPubkey.toString(),
+      'userQuoteTokenAta:', userQuoteTokenAta.toString(),
+      'market:', market.pubkey.toString(),
+      'marketStore:', market.marketStore.toString(),
+      'quoteVault:', market.quoteVault.toString(),
+      'orderbook:', orderbookAccount.orderbook.toString(),
+      'bids:', orderbookAccount.bids.toString(),
+      'asks:', orderbookAccount.asks.toString(),
+      'eventQueue:', orderbookAccount.eventQueue.toString())
+    return averClient.program.instruction['placeOrder'](
+      {
+        size: sizeU64,
+        sizeFormat,
+        limitPrice: limitPriceU64,
+        side: side,
+        orderType: orderType,
+        selfTradeBehaviour: selfTradeBehavior,
+        outcomeId: outcomeIndex,
+      },
+      {
+        accounts: {
+          user: user,
+          userHostLifetime: userHostLifetime,
+          userMarket: umaPubkey,
+          userQuoteTokenAta: userQuoteTokenAta,
+          market: market.pubkey,
+          marketStore: market.marketStore,
+          quoteVault: market.quoteVault,
           orderbook: orderbookAccount.orderbook,
           bids: orderbookAccount.bids,
           asks: orderbookAccount.asks,

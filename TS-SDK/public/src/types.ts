@@ -1,3 +1,4 @@
+import { Price } from '@bonfida/aaob'
 import { PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 
@@ -137,6 +138,7 @@ export type UserHostLifetimeState = {
   referrerFeeRateBps: BN
   lastFeeTierCheck: FeeTier
   isSelfExcluded: boolean | undefined
+  isSelfExcludedUntil: BN | undefined
   creationDate: BN
   lastBalanceUpdate: BN
   totalMarketsTraded: BN
@@ -188,3 +190,5 @@ export enum SolanaNetwork {
   Devnet = 'devnet',
   Mainnet = 'mainnet-beta',
 }
+
+export type PriceAndSide = Price & {side: Side}

@@ -2,6 +2,7 @@ import { Slab, Price, Side } from '@bonfida/aaob'
 import { AccountInfo, Connection, PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 import { AVER_PROGRAM_ID, CALLBACK_INFO_LEN } from './ids'
+import { PriceAndSide } from './types'
 import { chunkAndFetchMultiple, throwIfNull } from './utils'
 
 /**
@@ -175,8 +176,16 @@ export class Orderbook {
     return new Orderbook(orderbook, slabBids, slabAsks, bids, asks, decimals, isInverted)
   }
 
-  private static convertPrice(p: Price, decimals: number) {
+  static convertPrice(p: Price, decimals: number) {
     const exp = Math.pow(10, decimals)
+    return {
+      price: Math.round((p.price / Math.pow(2, 32)) * exp) / exp,
+      size: p.size / exp,
+    }
+  }
+
+  private convertPrice(p: Price) {
+    const exp = Math.pow(10, this.decimals)
     return {
       price: Math.round((p.price / Math.pow(2, 32)) * exp) / exp,
       size: p.size / exp,
@@ -389,6 +398,55 @@ export class Orderbook {
     }
 
     return this._isInverted ? Orderbook.invertPrice(askPrice) : askPrice
+  }
+
+  // TODO make this more efficient - tried with the new method but doesnt work for some orderIds...
+  // getPriceByOrderId(orderId: BN): PriceAndSide | undefined {
+  //   const bidPrice = this.getBidPriceByOrderId(orderId)
+  //   if (bidPrice) return {...this.convertPrice(bidPrice), side: Side.Bid}
+
+  //   const askPrice = this.getBidPriceByOrderId(orderId)
+  //   if (askPrice) return {...this.convertPrice(askPrice), side: Side.Ask}
+
+  //   return undefined
+  // }
+
+  getPriceByOrderId(orderId: BN): PriceAndSide | undefined {
+    for (const node of this._slabBids.items()) {
+      if (orderId.eq(node.key)) {
+        let bidPriceRaw = {
+          price: node.getPrice().toNumber(),
+          size: node.baseQuantity.toNumber(),
+        }
+    
+        bidPriceRaw = this._isInverted ? Orderbook.invertPrice(bidPriceRaw) : bidPriceRaw
+
+        let bidPrice = {
+          ...this.convertPrice(bidPriceRaw)
+        }
+
+        return {...bidPrice, side: Side.Bid}
+      }
+    }
+
+    for (const node of this._slabAsks.items()) {
+      if (orderId.eq(node.key)) {
+        let askPriceRaw = {
+          price: node.getPrice().toNumber(),
+          size: node.baseQuantity.toNumber(),
+        }
+    
+        askPriceRaw = this._isInverted ? Orderbook.invertPrice(askPriceRaw) : askPriceRaw
+
+        let askPrice = {
+          ...this.convertPrice(askPriceRaw)
+        }
+
+        return {...askPrice, side: Side.Ask}
+      }
+    }
+
+    return undefined
   }
 
   // NOT TESTED

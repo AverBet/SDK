@@ -477,6 +477,10 @@ export class Market {
       : undefined
   }
 
+  get volumeMatched() {
+    return this._marketState.matchedCount.toNumber()
+  }
+
   /**
    * Refresh the Market instance
    */

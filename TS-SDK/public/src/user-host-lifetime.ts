@@ -14,7 +14,7 @@ export class UserHostLifetime {
 
   private _averClient: AverClient
 
-  private constructor(
+  constructor(
     averClient: AverClient,
     pubkey: PublicKey,
     userHostLifetimeState: UserHostLifetimeState
@@ -202,7 +202,7 @@ export class UserHostLifetime {
     return (await UserHostLifetime.load(averClient, userHostLifetime)) as UserHostLifetime
   }
 
-  private static parseHostState(hostResult: TypeDef<IdlTypeDef, IdlTypes<Idl>>): UserHostLifetimeState {
+  static parseHostState(hostResult: TypeDef<IdlTypeDef, IdlTypes<Idl>>): UserHostLifetimeState {
     return hostResult as UserHostLifetimeState
   }
 
@@ -260,6 +260,10 @@ export class UserHostLifetime {
 
   get isSelfExcluded() {
     return this._userHostLifetimeState.isSelfExcluded
+  }
+
+  get selfExclusionDate() {
+    return this._userHostLifetimeState.isSelfExcludedUntil ? new Date(this._userHostLifetimeState.isSelfExcludedUntil.toNumber() * 1000): undefined
   }
 
   get creationDate() {

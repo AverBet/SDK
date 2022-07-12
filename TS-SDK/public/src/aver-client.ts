@@ -7,7 +7,7 @@ import {
   PublicKey,
   Signer,
 } from '@solana/web3.js'
-import { Program, Provider, Wallet } from '@project-serum/anchor'
+import { Program, Provider } from '@project-serum/anchor'
 import {
   getOrCreateAssociatedTokenAccount,
   createAssociatedTokenAccountInstruction,
@@ -18,6 +18,7 @@ import {
 import { AVER_PROGRAM_ID, getQuoteToken, getAverApiEndpoint } from './ids'
 import { SolanaNetwork } from './types'
 import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet'
+import { Wallet } from '@project-serum/anchor/dist/cjs/provider'
 
 export class AverClient {
   private _connection: Connection
@@ -50,17 +51,21 @@ export class AverClient {
   static async loadAverClient(
     connection: Connection,
     solanaNetwork: SolanaNetwork,
-    owner: Wallet | Keypair,
+    owner:  null | Keypair | Wallet,
     opts?: ConfirmOptions,
     averProgramId?: PublicKey
   ) {
     let wallet: Wallet
-    if (owner instanceof Wallet) {
-      wallet = owner
+    if (owner == null) {
+      // create a dummy wallet
+      wallet = new NodeWallet(new Keypair())
     } else if (owner instanceof Keypair) {
+      // create a node wallet with the keypair
       wallet = new NodeWallet(owner)
+    } else if (owner.publicKey) {
+      wallet = owner
     } else {
-      throw new Error('Invalid owner passed. Must be of type Wallet or Keypair')
+      wallet = new NodeWallet(new Keypair())
     }
 
     const provider = new Provider(
