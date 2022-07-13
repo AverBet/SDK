@@ -47,7 +47,11 @@ signature = await user_market_1.place_order(
         )
 ```
 
-See tests for more examples
+See examples.py for more examples
+
+# Token airdrop
+
+You may wish to airdrop yourself some USDC tokens (Devnet) to play around with using token_airdrop.py
 
 ## Tips
 
@@ -68,24 +72,3 @@ Using functions in refresh.py is quicker than load or load_multiple.
 - If you want to pull some specific data, check out data_classes.py.
 
 - Orderbooks are stored in loaded_market_object.orderbooks
-
-## Running tests
-
-In order to run tests type 'python3 -m tests.TEST_NAME'
-
-There are 3 possible values for TEST_NAME:
-
-- binary_market_test
-- ten_way_market_test
-- crank_market_test
-
-## Running the services
-# consume cranker
-From inside `src` run
-All markets:  `python3 -m pyaver_admin.services.consume_crank.crank_all_markets`
-Aver only markets: `python3 -m pyaver_admin.services.consume_crank.crank_aver_markets`
-
-# settle cranker
-From inside `src` run
-All markets: `python3 -m pyaver_admin.services.settle_crank.settle_all_markets`
-Aver only markets: `python3 -m pyaver_admin.services.settle_crank.settle_aver_markets`
