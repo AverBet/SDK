@@ -20,7 +20,7 @@ class Referrer {
      */
     static async load(averClient, pubkey) {
         const program = averClient.program;
-        const referrerResult = await program.account['referrer'].fetch(pubkey.toBase58());
+        const referrerResult = await program.account["referrer"].fetch(pubkey.toBase58());
         const referrerState = Referrer.parseReferrerState(referrerResult);
         return new Referrer(pubkey, referrerState);
     }
@@ -38,7 +38,7 @@ class Referrer {
     static async makeCreateReferrerAccountInstruction(averClient, host, owner, feePayer, programId = ids_1.AVER_PROGRAM_ID) {
         const program = averClient.program;
         const [referrer, bump] = await Referrer.derivePubkeyAndBump(owner, host, programId);
-        return program.instruction['initReferrer'](bump, {
+        return program.instruction["initReferrer"](bump, {
             accounts: {
                 payer: feePayer,
                 owner: owner,
@@ -63,7 +63,7 @@ class Referrer {
      */
     static async createReferrerAccount(averClient, host, owner, feePayer, sendOptions, manualMaxRetry, programId = ids_1.AVER_PROGRAM_ID) {
         const ix = await Referrer.makeCreateReferrerAccountInstruction(averClient, host, owner.publicKey, feePayer.publicKey, programId);
-        return (0, utils_1.signAndSendTransactionInstructions)(averClient.connection, [owner, feePayer], feePayer, [ix], sendOptions, manualMaxRetry);
+        return (0, utils_1.signAndSendTransactionInstructions)(averClient, [owner, feePayer], feePayer, [ix], sendOptions, manualMaxRetry);
     }
     // TODO
     /**
@@ -78,7 +78,7 @@ class Referrer {
      */
     static makeCollectRevenueShareInstruction(averClient, referrer, thirdPartyTokenVault, thirdPartyVaultAuthority, referrerTokenAccount) {
         const program = averClient.program;
-        return program.instruction['referrerCollectRevenueShare']({
+        return program.instruction["referrerCollectRevenueShare"]({
             accounts: {
                 referrer: referrer,
                 thirdPartyTokenVault: thirdPartyTokenVault,
@@ -105,7 +105,7 @@ class Referrer {
      */
     static async collectRevenueShare(averClient, referrer, thirdPartyTokenVault, thirdPartyVaultAuthority, referrerTokenAccount, feePayer, sendOptions, manualMaxRetry) {
         const ix = Referrer.makeCollectRevenueShareInstruction(averClient, referrer, thirdPartyTokenVault, thirdPartyVaultAuthority, referrerTokenAccount);
-        return (0, utils_1.signAndSendTransactionInstructions)(averClient.connection, [], feePayer, [ix], sendOptions, manualMaxRetry);
+        return (0, utils_1.signAndSendTransactionInstructions)(averClient, [], feePayer, [ix], sendOptions, manualMaxRetry);
     }
     static parseReferrerState(referrerResult) {
         return referrerResult;
@@ -120,7 +120,7 @@ class Referrer {
      * @returns {Promise<[PublicKey, number]>} The Referrer Public Key
      */
     static async derivePubkeyAndBump(owner, host = ids_1.AVER_HOST_ACCOUNT, programId = ids_1.AVER_PROGRAM_ID) {
-        return web3_js_1.PublicKey.findProgramAddress([Buffer.from('referrer', 'utf-8'), host.toBuffer(), owner.toBuffer()], programId);
+        return web3_js_1.PublicKey.findProgramAddress([Buffer.from("referrer", "utf-8"), host.toBuffer(), owner.toBuffer()], programId);
     }
     get pubkey() {
         return this._pubkey;

@@ -1,10 +1,10 @@
 /// <reference types="node" />
-import { Keypair, PublicKey, TransactionInstruction, AccountInfo, SendOptions } from '@solana/web3.js';
-import { SelfTradeBehavior } from '@bonfida/aaob';
-import { AverClient } from './aver-client';
-import { OrderType, Side, SizeFormat, UserMarketState } from './types';
-import { Market } from './market';
-import BN from 'bn.js';
+import { Keypair, PublicKey, TransactionInstruction, AccountInfo, SendOptions } from "@solana/web3.js";
+import { SelfTradeBehavior } from "@bonfida/aaob";
+import { AverClient } from "./aver-client";
+import { OrderType, Side, SizeFormat, UserMarketState } from "./types";
+import { Market } from "./market";
+import BN from "bn.js";
 export declare class UserMarket {
     private _userMarketState;
     private _pubkey;

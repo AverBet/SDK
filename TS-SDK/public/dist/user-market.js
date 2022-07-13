@@ -49,7 +49,7 @@ class UserMarket {
      */
     static async loadByUma(averClient, pubkey, market) {
         const program = averClient.program;
-        const userMarketResult = await program.account['userMarket'].fetch(pubkey);
+        const userMarketResult = await program.account["userMarket"].fetch(pubkey);
         const userMarketState = UserMarket.parseUserMarketState(userMarketResult);
         const lamportBalance = await averClient.requestLamportBalance(userMarketState.user);
         const tokenBalance = await averClient.requestTokenBalance(averClient.quoteTokenMint, userMarketState.user);
@@ -85,11 +85,13 @@ class UserMarket {
      */
     static async loadMultipleByUma(averClient, pubkeys, markets) {
         const program = averClient.program;
-        const userMarketResult = await program.account['userMarket'].fetchMultiple(pubkeys);
+        const userMarketResult = await program.account["userMarket"].fetchMultiple(pubkeys);
         const userMarketStates = userMarketResult.map((umr) => umr ? UserMarket.parseUserMarketState(umr) : null);
         const userPubkeys = userMarketStates.map((umr) => (umr === null || umr === void 0 ? void 0 : umr.user) || new web3_js_1.Keypair().publicKey);
         const userBalances = (await market_1.Market.loadMultipleAccountStates(averClient, [], [], [], [], userPubkeys)).userBalanceStates;
-        return userMarketStates.map((ums, i) => ums ? new UserMarket(averClient, pubkeys[i], ums, markets[i], userBalances[i]) : undefined);
+        return userMarketStates.map((ums, i) => ums
+            ? new UserMarket(averClient, pubkeys[i], ums, markets[i], userBalances[i])
+            : undefined);
     }
     static parseUserMarketState(marketResult) {
         return marketResult;
@@ -117,9 +119,9 @@ class UserMarket {
             isWritable: false,
             pubkey: getBestDiscountTokenAccount,
         };
-        console.log('Creating a User Market');
-        console.log('user:', umaOwner.toString(), 'userHostLifetime:', userHostLifetime.toString(), 'userMarket:', userMarket.toString(), 'market:', market.pubkey.toString(), 'host:', host.toString());
-        return program.instruction['initUserMarket'](numberOfOrders, umaBump, {
+        console.log("Creating a User Market");
+        console.log("user:", umaOwner.toString(), "userHostLifetime:", userHostLifetime.toString(), "userMarket:", userMarket.toString(), "market:", market.pubkey.toString(), "host:", host.toString());
+        return program.instruction["initUserMarket"](numberOfOrders, umaBump, {
             accounts: {
                 user: umaOwner,
                 userHostLifetime: userHostLifetime,
@@ -148,7 +150,7 @@ class UserMarket {
      */
     static async createUserMarketAccount(averClient, market, owner, sendOptions, manualMaxRetry, host = ids_1.AVER_HOST_ACCOUNT, numberOfOrders = market.numberOfOutcomes * 5, programId = ids_1.AVER_PROGRAM_ID) {
         const createUserMarketAccountIx = await this.makeCreateUserMarketAccountInstruction(averClient, market, owner.publicKey, host, numberOfOrders, programId);
-        return (0, utils_1.signAndSendTransactionInstructions)(averClient.connection, [], owner, [createUserMarketAccountIx], sendOptions, manualMaxRetry);
+        return (0, utils_1.signAndSendTransactionInstructions)(averClient, [], owner, [createUserMarketAccountIx], sendOptions, manualMaxRetry);
     }
     /**
      * Get a User Market Account, or create one if not present
@@ -168,7 +170,7 @@ class UserMarket {
     static async getOrCreateUserMarketAccount(averClient, owner, market, sendOptions, quoteTokenMint = averClient.quoteTokenMint, host = ids_1.AVER_HOST_ACCOUNT, numberOfOrders = market.numberOfOutcomes * 5, referrer = web3_js_1.SystemProgram.programId, programId = ids_1.AVER_PROGRAM_ID) {
         // check if account already exists for user
         const userMarket = (await UserMarket.derivePubkeyAndBump(owner.publicKey, market.pubkey, host, programId))[0];
-        const userMarketResult = await averClient.program.account['userMarket'].fetchNullable(userMarket);
+        const userMarketResult = await averClient.program.account["userMarket"].fetchNullable(userMarket);
         if (userMarketResult) {
             const userMarketState = UserMarket.parseUserMarketState(userMarketResult);
             const lamportBalance = await averClient.requestLamportBalance(userMarketState.user);
@@ -195,7 +197,7 @@ class UserMarket {
      */
     static deserializeMultipleUserMarketStoreData(averClient, userMarketStoresData) {
         return userMarketStoresData.map((marketStoreData) => (marketStoreData === null || marketStoreData === void 0 ? void 0 : marketStoreData.data)
-            ? averClient.program.account['userMarket'].coder.accounts.decode('UserMarket', marketStoreData.data)
+            ? averClient.program.account["userMarket"].coder.accounts.decode("UserMarket", marketStoreData.data)
             : null);
     }
     /**
@@ -227,7 +229,12 @@ class UserMarket {
      * @returns
      */
     static async derivePubkeyAndBump(owner, market, host = ids_1.AVER_HOST_ACCOUNT, programId = ids_1.AVER_PROGRAM_ID) {
-        return web3_js_1.PublicKey.findProgramAddress([Buffer.from('user-market', 'utf-8'), owner.toBuffer(), market.toBuffer(), host.toBuffer()], programId);
+        return web3_js_1.PublicKey.findProgramAddress([
+            Buffer.from("user-market", "utf-8"),
+            owner.toBuffer(),
+            market.toBuffer(),
+            host.toBuffer(),
+        ], programId);
     }
     get pubkey() {
         return this._pubkey;
@@ -281,13 +288,15 @@ class UserMarket {
         return this._userBalanceState.tokenBalance;
     }
     get tokenBalanceUi() {
-        return this._userBalanceState.tokenBalance / Math.pow(10, this.market.decimals);
+        return (this._userBalanceState.tokenBalance / Math.pow(10, this.market.decimals));
     }
     /**
      * Refresh the User Market object
      */
     async refresh() {
-        const refreshedUserMarket = (await UserMarket.refreshMultipleUserMarkets(this._averClient, [this]))[0];
+        const refreshedUserMarket = (await UserMarket.refreshMultipleUserMarkets(this._averClient, [
+            this,
+        ]))[0];
         this._market = refreshedUserMarket._market;
         this._userMarketState = refreshedUserMarket._userMarketState;
     }
@@ -316,7 +325,7 @@ class UserMarket {
         // @ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
         const orderbookAccount = this.market.orderbookAccounts[orderbookAccountIndex];
         const userQuoteTokenAta = await (0, spl_token_1.getAssociatedTokenAddress)(this.market.quoteTokenMint, this.user);
-        return this._averClient.program.instruction['placeOrder']({
+        return this._averClient.program.instruction["placeOrder"]({
             size: sizeU64,
             sizeFormat,
             limitPrice: limitPriceU64,
@@ -367,9 +376,9 @@ class UserMarket {
         // @ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
         const orderbookAccount = market.orderbookAccounts[orderbookAccountIndex];
         const userQuoteTokenAta = await (0, spl_token_1.getAssociatedTokenAddress)(market.quoteTokenMint, user);
-        console.log('Placing the order');
-        console.log('user:', user.toString(), 'userHostLifetime:', userHostLifetime.toString(), 'userMarket:', umaPubkey.toString(), 'userQuoteTokenAta:', userQuoteTokenAta.toString(), 'market:', market.pubkey.toString(), 'marketStore:', market.marketStore.toString(), 'quoteVault:', market.quoteVault.toString(), 'orderbook:', orderbookAccount.orderbook.toString(), 'bids:', orderbookAccount.bids.toString(), 'asks:', orderbookAccount.asks.toString(), 'eventQueue:', orderbookAccount.eventQueue.toString());
-        return averClient.program.instruction['placeOrder']({
+        console.log("Placing the order");
+        console.log("user:", user.toString(), "userHostLifetime:", userHostLifetime.toString(), "userMarket:", umaPubkey.toString(), "userQuoteTokenAta:", userQuoteTokenAta.toString(), "market:", market.pubkey.toString(), "marketStore:", market.marketStore.toString(), "quoteVault:", market.quoteVault.toString(), "orderbook:", orderbookAccount.orderbook.toString(), "bids:", orderbookAccount.bids.toString(), "asks:", orderbookAccount.asks.toString(), "eventQueue:", orderbookAccount.eventQueue.toString());
+        return averClient.program.instruction["placeOrder"]({
             size: sizeU64,
             sizeFormat,
             limitPrice: limitPriceU64,
@@ -414,9 +423,9 @@ class UserMarket {
      */
     async placeOrder(owner, outcomeIndex, side, limitPrice, size, sizeFormat, sendOptions, manualMaxRetry, orderType = types_1.OrderType.Limit, selfTradeBehavior = aaob_1.SelfTradeBehavior.CancelProvide, averPreFlightCheck = true) {
         if (!owner.publicKey.equals(this.user))
-            throw new Error('Owner must be same as user market owner');
+            throw new Error("Owner must be same as user market owner");
         const ix = await this.makePlaceOrderInstruction(outcomeIndex, side, limitPrice, size, sizeFormat, orderType, selfTradeBehavior, averPreFlightCheck);
-        return (0, utils_1.signAndSendTransactionInstructions)(this._averClient.connection, [], owner, [ix], sendOptions, manualMaxRetry);
+        return (0, utils_1.signAndSendTransactionInstructions)(this._averClient, [], owner, [ix], sendOptions, manualMaxRetry);
     }
     /**
      * Format the instruction to cancel an order
@@ -430,18 +439,21 @@ class UserMarket {
     makeCancelOrderInstruction(orderId, outcomeIndex, averPreFlightCheck = false) {
         if (averPreFlightCheck) {
             if (this.lamportBalance < 5000)
-                throw new Error('Insufficient lamport balance');
+                throw new Error("Insufficient lamport balance");
             if (!(0, market_1.canCancelOrderInMarket)(this.market.marketStatus))
-                throw new Error('Cannot cancel orders in current market status');
-            if (!this.orders.map((o) => o.orderId.toString()).includes(orderId.toString())) {
-                throw new Error('Order ID does not exist in list of open orders');
+                throw new Error("Cannot cancel orders in current market status");
+            if (!this.orders
+                .map((o) => o.orderId.toString())
+                .includes(orderId.toString())) {
+                throw new Error("Order ID does not exist in list of open orders");
             }
         }
         // account for binary markets where there is only one order book
-        outcomeIndex = this.market.numberOfOutcomes == 2 && outcomeIndex == 1 ? 0 : outcomeIndex;
+        outcomeIndex =
+            this.market.numberOfOutcomes == 2 && outcomeIndex == 1 ? 0 : outcomeIndex;
         // @ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
         const orderbookAccount = this.market.orderbookAccounts[outcomeIndex];
-        return this._averClient.program.instruction['cancelOrder'](orderId, outcomeIndex, {
+        return this._averClient.program.instruction["cancelOrder"](orderId, outcomeIndex, {
             accounts: {
                 orderbook: orderbookAccount.orderbook,
                 eventQueue: orderbookAccount.eventQueue,
@@ -468,7 +480,7 @@ class UserMarket {
      */
     cancelOrder(feePayer, orderId, outcomeIndex, sendOptions, manualMaxRetry, averPreFlightCheck = true) {
         const ix = this.makeCancelOrderInstruction(orderId, outcomeIndex, averPreFlightCheck);
-        return (0, utils_1.signAndSendTransactionInstructions)(this._averClient.connection, [], feePayer, [ix], sendOptions, manualMaxRetry);
+        return (0, utils_1.signAndSendTransactionInstructions)(this._averClient, [], feePayer, [ix], sendOptions, manualMaxRetry);
     }
     /**
      * Format instruction to cancel all orders on given outcomes
@@ -481,9 +493,9 @@ class UserMarket {
     makeCancelAllOrdersInstructions(outcomeIdsToCancel, averPreFlightCheck = false) {
         if (averPreFlightCheck) {
             if (this.lamportBalance < 5000)
-                throw new Error('Insufficient lamport balance');
+                throw new Error("Insufficient lamport balance");
             if (!(0, market_1.canCancelOrderInMarket)(this.market.marketStatus))
-                throw new Error('Cannot cancel orders in current market status');
+                throw new Error("Cannot cancel orders in current market status");
         }
         // @ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
         const remainingAccounts = this.market.orderbookAccounts
@@ -497,7 +509,7 @@ class UserMarket {
         const chunkSize = 5;
         const chunkedOutcomeIds = (0, lodash_1.chunk)(outcomeIdsToCancel, chunkSize);
         const chunkedRemainingAccounts = (0, lodash_1.chunk)(remainingAccounts, 4 * chunkSize);
-        return chunkedOutcomeIds.map((ids, i) => this._averClient.program.instruction['cancelAllOrders'](ids, {
+        return chunkedOutcomeIds.map((ids, i) => this._averClient.program.instruction["cancelAllOrders"](ids, {
             accounts: {
                 market: this.market.pubkey,
                 userMarket: this.pubkey,
@@ -520,7 +532,7 @@ class UserMarket {
      */
     cancelAllOrders(feePayer, outcomeIdsToCancel, sendOptions, manualMaxRetry, averPreFlightCheck = true) {
         const ixs = this.makeCancelAllOrdersInstructions(outcomeIdsToCancel, averPreFlightCheck);
-        return Promise.all(ixs.map((ix) => (0, utils_1.signAndSendTransactionInstructions)(this._averClient.connection, [], feePayer, [ix], sendOptions, manualMaxRetry)));
+        return Promise.all(ixs.map((ix) => (0, utils_1.signAndSendTransactionInstructions)(this._averClient, [], feePayer, [ix], sendOptions, manualMaxRetry)));
     }
     /**
      * Format instruction to deposit tokens
@@ -531,7 +543,7 @@ class UserMarket {
      */
     async makeDepositTokensInstruction(amount) {
         const userQuoteTokenAta = await (0, spl_token_1.getAssociatedTokenAddress)(this.market.quoteTokenMint, this.user);
-        return this._averClient.program.instruction['depositTokens'](amount, {
+        return this._averClient.program.instruction["depositTokens"](amount, {
             accounts: {
                 user: this.user,
                 userMarket: this.pubkey,
@@ -554,9 +566,9 @@ class UserMarket {
      */
     async depositTokens(owner, amount, sendOptions, manualMaxRetry) {
         if (!owner.publicKey.equals(this.user))
-            throw new Error('Owner must be same as user market owner');
+            throw new Error("Owner must be same as user market owner");
         const ix = await this.makeDepositTokensInstruction(amount);
-        return (0, utils_1.signAndSendTransactionInstructions)(this._averClient.connection, [], owner, [ix], sendOptions, manualMaxRetry);
+        return (0, utils_1.signAndSendTransactionInstructions)(this._averClient, [], owner, [ix], sendOptions, manualMaxRetry);
     }
     /**
      * Format instruction to withdraw idle funds
@@ -568,7 +580,7 @@ class UserMarket {
     async makeWithdrawIdleFundsInstruction(amount) {
         const userQuoteTokenAta = await (0, spl_token_1.getAssociatedTokenAddress)(this.market.quoteTokenMint, this.user);
         const amountToWithdraw = new bn_js_1.default(amount || this.calculateFundsAvailableToWithdraw());
-        return this._averClient.program.instruction['withdrawTokens'](amountToWithdraw, {
+        return this._averClient.program.instruction["withdrawTokens"](amountToWithdraw, {
             accounts: {
                 market: this.market.pubkey,
                 userMarket: this.pubkey,
@@ -591,9 +603,9 @@ class UserMarket {
      */
     async withdrawIdleFunds(owner, amount, sendOptions, manualMaxRetry) {
         if (!owner.publicKey.equals(this.user))
-            throw new Error('Owner must be same as user market owner');
+            throw new Error("Owner must be same as user market owner");
         const ix = await this.makeWithdrawIdleFundsInstruction(amount);
-        return (0, utils_1.signAndSendTransactionInstructions)(this._averClient.connection, [], owner, [ix], sendOptions, manualMaxRetry);
+        return (0, utils_1.signAndSendTransactionInstructions)(this._averClient, [], owner, [ix], sendOptions, manualMaxRetry);
     }
     /**
      * Format instruction to neutralise the outcome position
@@ -605,7 +617,7 @@ class UserMarket {
     async makeNeutralizePositionInstruction(outcomeId) {
         var _a, _b, _c, _d;
         const quoteTokenAta = await (0, spl_token_1.getAssociatedTokenAddress)(this.market.quoteTokenMint, this.user);
-        return this._averClient.program.instruction['neutralizeOutcomePosition'](outcomeId, {
+        return this._averClient.program.instruction["neutralizeOutcomePosition"](outcomeId, {
             accounts: {
                 user: this.user,
                 userHostLifetime: this.userHostLifetime,
@@ -635,9 +647,9 @@ class UserMarket {
      */
     async neutralizePosition(owner, outcomeId, sendOptions, manualMaxRetry) {
         if (!owner.publicKey.equals(this.user))
-            throw new Error('Owner must be same as user market owner');
+            throw new Error("Owner must be same as user market owner");
         const ix = await this.makeNeutralizePositionInstruction(outcomeId);
-        return (0, utils_1.signAndSendTransactionInstructions)(this._averClient.connection, [], owner, [ix], sendOptions, manualMaxRetry);
+        return (0, utils_1.signAndSendTransactionInstructions)(this._averClient, [], owner, [ix], sendOptions, manualMaxRetry);
     }
     // NOT TESTED
     /**
@@ -647,7 +659,7 @@ class UserMarket {
      */
     async makeCollectInstruction() {
         const userQuoteTokenAta = await (0, spl_token_1.getAssociatedTokenAddress)(this.market.quoteTokenMint, this.user);
-        return this._averClient.program.instruction['collect'](true, {
+        return this._averClient.program.instruction["collect"](true, {
             accounts: {
                 market: this.market.pubkey,
                 userMarket: this.pubkey,
@@ -671,14 +683,14 @@ class UserMarket {
      */
     async collect(owner, sendOptions, manualMaxRetry) {
         if (!owner.publicKey.equals(this.user))
-            throw new Error('Owner must be same as user market owner');
+            throw new Error("Owner must be same as user market owner");
         const ix = await this.makeCollectInstruction();
-        return (0, utils_1.signAndSendTransactionInstructions)(this._averClient.connection, [], owner, [ix], sendOptions, manualMaxRetry);
+        return (0, utils_1.signAndSendTransactionInstructions)(this._averClient, [], owner, [ix], sendOptions, manualMaxRetry);
     }
     // NOT TESTED
     async loadUserMarketListener(callback) {
-        const ee = this._averClient.program.account['userMarket'].subscribe(this.pubkey);
-        ee.on('change', callback);
+        const ee = this._averClient.program.account["userMarket"].subscribe(this.pubkey);
+        ee.on("change", callback);
         return ee;
     }
     /**
@@ -717,7 +729,8 @@ class UserMarket {
      * @returns {number}
      */
     calculateTokensAvailableToSell(outcomeIndex, price) {
-        return this.outcomePositions[outcomeIndex].free.toNumber() + price * this.tokenBalance;
+        return (this.outcomePositions[outcomeIndex].free.toNumber() +
+            price * this.tokenBalance);
     }
     /**
      * Calculates the tokens available to buy on an outcome
@@ -728,7 +741,9 @@ class UserMarket {
      * @returns {number}
      */
     calculateTokensAvailableToBuy(outcomeIndex, price) {
-        const minFreeTokensExceptOutcomeIndex = Math.min(...this.outcomePositions.filter((op, i) => i != outcomeIndex).map((op) => op.free.toNumber()));
+        const minFreeTokensExceptOutcomeIndex = Math.min(...this.outcomePositions
+            .filter((op, i) => i != outcomeIndex)
+            .map((op) => op.free.toNumber()));
         return minFreeTokensExceptOutcomeIndex + price * this.tokenBalance;
     }
     /**
@@ -744,21 +759,21 @@ class UserMarket {
      */
     isOrderValid(outcomeIndex, side, limitPrice, size, sizeFormat) {
         if (this.lamportBalance < 5000) {
-            throw new Error('Insufficient lamport balance');
+            throw new Error("Insufficient lamport balance");
         }
         const balanceRequired = sizeFormat == types_1.SizeFormat.Payout ? size * limitPrice : size;
         const currentBalance = side == types_1.Side.Ask
             ? this.calculateTokensAvailableToSell(outcomeIndex, limitPrice)
             : this.calculateTokensAvailableToBuy(outcomeIndex, limitPrice);
         if (currentBalance < balanceRequired) {
-            throw new Error('Insufficient token balance');
+            throw new Error("Insufficient token balance");
         }
         if (this.orders.length == this.maxNumberOfOrders) {
-            throw new Error('Max number of orders reached');
+            throw new Error("Max number of orders reached");
         }
         (0, utils_1.roundPriceToNearestTickSize)(limitPrice, this.market.numberOfOutcomes == 2);
         if (!(0, market_1.isMarketTradable)(this.market.marketStatus)) {
-            throw new Error('Market currently not in a tradeable status');
+            throw new Error("Market currently not in a tradeable status");
         }
         return true;
     }

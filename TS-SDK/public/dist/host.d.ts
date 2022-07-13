@@ -1,6 +1,6 @@
-import { Keypair, PublicKey, SendOptions } from '@solana/web3.js';
-import { AverClient } from './aver-client';
-import BN from 'bn.js';
+import { Keypair, PublicKey, SendOptions } from "@solana/web3.js";
+import { AverClient } from "./aver-client";
+import BN from "bn.js";
 export declare class Host {
     private _pubkey;
     private _hostState;

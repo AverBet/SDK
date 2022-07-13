@@ -42,6 +42,7 @@ export const signAndSendTransactionInstructions = async (
       // if its a program error, throw it
       if (errorThrown instanceof ProgramError) {
         console.log("Program error!")
+        console.log(errorThrown)
         break
         // otherwise try again
       } else {

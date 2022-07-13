@@ -649,7 +649,8 @@ export class UserMarket {
     // consider when binary markets where there is only one order book
     const orderbookAccountIndex =
       this.market.numberOfOutcomes == 2 && outcomeIndex == 1 ? 0 : outcomeIndex
-    // @ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
+    //@ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
+    // @ts-ignore
     const orderbookAccount =
       this.market.orderbookAccounts[orderbookAccountIndex]
 

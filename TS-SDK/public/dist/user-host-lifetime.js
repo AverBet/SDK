@@ -22,7 +22,7 @@ class UserHostLifetime {
      */
     static async load(averClient, pubkey) {
         const program = averClient.program;
-        const userHostLifetimeResult = await program.account['userHostLifetime'].fetch(pubkey.toBase58());
+        const userHostLifetimeResult = await program.account["userHostLifetime"].fetch(pubkey.toBase58());
         const userHostLifetimeState = UserHostLifetime.parseHostState(userHostLifetimeResult);
         return new UserHostLifetime(averClient, pubkey, userHostLifetimeState);
     }
@@ -53,7 +53,7 @@ class UserHostLifetime {
             isWritable: true,
             pubkey: referrer,
         };
-        return program.instruction['initUserHostLifetime'](bump, {
+        return program.instruction["initUserHostLifetime"](bump, {
             accounts: {
                 user: userHostLifetimeOwner,
                 userHostLifetime: userHostLifetime,
@@ -80,7 +80,7 @@ class UserHostLifetime {
      */
     static async createUserHostLifetime(averClient, owner, userQuoteTokenAta, sendOptions, manualMaxRetry, host = ids_1.AVER_HOST_ACCOUNT, referrer = web3_js_1.SystemProgram.programId, programId = ids_1.AVER_PROGRAM_ID) {
         const ix = await UserHostLifetime.makeCreateUserHostLifetimeInstruction(averClient, userQuoteTokenAta, owner.publicKey, host, referrer, programId);
-        return (0, utils_1.signAndSendTransactionInstructions)(averClient.connection, [], owner, [ix], sendOptions, manualMaxRetry);
+        return (0, utils_1.signAndSendTransactionInstructions)(averClient, [], owner, [ix], sendOptions, manualMaxRetry);
     }
     /**
      * Gets the User Host Lifetime account if present, or creates one if not
@@ -98,7 +98,7 @@ class UserHostLifetime {
     static async getOrCreateUserHostLifetime(averClient, owner, sendOptions, quoteTokenMint = averClient.quoteTokenMint, host = ids_1.AVER_HOST_ACCOUNT, referrer = web3_js_1.SystemProgram.programId, programId = ids_1.AVER_PROGRAM_ID) {
         const userHostLifetime = (await UserHostLifetime.derivePubkeyAndBump(owner.publicKey, host, programId))[0];
         // check if account exists first, and if so return it
-        const userHostLifetimeResult = await averClient.program.account['userHostLifetime'].fetchNullable(userHostLifetime);
+        const userHostLifetimeResult = await averClient.program.account["userHostLifetime"].fetchNullable(userHostLifetime);
         if (userHostLifetimeResult) {
             const userHostLifetimeState = UserHostLifetime.parseHostState(userHostLifetimeResult);
             return new UserHostLifetime(averClient, userHostLifetime, userHostLifetimeState);
@@ -122,7 +122,11 @@ class UserHostLifetime {
      * @returns {Promise<PublicKey>}
      */
     static async derivePubkeyAndBump(owner, host, programId = ids_1.AVER_PROGRAM_ID) {
-        return web3_js_1.PublicKey.findProgramAddress([Buffer.from('user-host-lifetime', 'utf-8'), owner.toBuffer(), host.toBuffer()], programId);
+        return web3_js_1.PublicKey.findProgramAddress([
+            Buffer.from("user-host-lifetime", "utf-8"),
+            owner.toBuffer(),
+            host.toBuffer(),
+        ], programId);
     }
     get pubkey() {
         return this._pubkey;
@@ -155,7 +159,9 @@ class UserHostLifetime {
         return this._userHostLifetimeState.isSelfExcluded;
     }
     get selfExclusionDate() {
-        return this._userHostLifetimeState.isSelfExcludedUntil ? new Date(this._userHostLifetimeState.isSelfExcludedUntil.toNumber() * 1000) : undefined;
+        return this._userHostLifetimeState.isSelfExcludedUntil
+            ? new Date(this._userHostLifetimeState.isSelfExcludedUntil.toNumber() * 1000)
+            : undefined;
     }
     get creationDate() {
         return new Date(this._userHostLifetimeState.creationDate.toNumber() * 1000);

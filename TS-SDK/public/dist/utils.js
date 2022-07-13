@@ -8,21 +8,23 @@ const errors_1 = require("./errors");
 const ids_1 = require("./ids");
 const signAndSendTransactionInstructions = async (
 // sign and send transaction
-connection, signers, feePayer, txInstructions, sendOptions, manualMaxRetry, program) => {
+client, signers, feePayer, txInstructions, sendOptions, manualMaxRetry) => {
     const tx = new web3_js_1.Transaction();
     tx.feePayer = feePayer.publicKey;
     signers.push(feePayer);
     tx.add(...txInstructions);
     let attempts = 0;
-    let errorThrown = new Error('Transaction failed');
+    let errorThrown = new Error("Transaction failed");
     while (attempts <= (manualMaxRetry || 0)) {
         try {
-            return await connection.sendTransaction(tx, signers, sendOptions);
+            return await client.connection.sendTransaction(tx, signers, sendOptions);
         }
         catch (e) {
-            errorThrown = (0, errors_1.parseError)(e, program);
+            errorThrown = (0, errors_1.parseError)(e, client.program);
             // if its a program error, throw it
             if (errorThrown instanceof anchor_1.ProgramError) {
+                console.log("Program error!");
+                console.log(errorThrown);
                 break;
                 // otherwise try again
             }
@@ -34,7 +36,7 @@ connection, signers, feePayer, txInstructions, sendOptions, manualMaxRetry, prog
     throw errorThrown;
 };
 exports.signAndSendTransactionInstructions = signAndSendTransactionInstructions;
-function throwIfNull(value, message = 'account not found') {
+function throwIfNull(value, message = "account not found") {
     if (value === null) {
         throw new Error(message);
     }
@@ -55,7 +57,7 @@ exports.chunkAndFetchMultiple = chunkAndFetchMultiple;
 const calculateTickSizeForPrice = (limitPrice) => {
     switch (true) {
         case limitPrice < 1000:
-            throw new Error('Limit price too low');
+            throw new Error("Limit price too low");
         case limitPrice <= 2000:
             return 100;
         case limitPrice <= 5000:
@@ -71,7 +73,7 @@ const calculateTickSizeForPrice = (limitPrice) => {
         case limitPrice <= 999000:
             return 10000;
         case limitPrice > 999000:
-            throw new Error('Limit price too high');
+            throw new Error("Limit price too high");
         default:
             return limitPrice;
     }
@@ -94,14 +96,16 @@ const getBestDiscountToken = async (averClient, owner) => {
         mint: zeroFeesToken,
     });
     if (zeroFeesTokenAccount.value.length > 0 &&
-        zeroFeesTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount > 0) {
+        zeroFeesTokenAccount.value[0].account.data.parsed.info.tokenAmount
+            .uiAmount > 0) {
         return zeroFeesTokenAccount.value[0].pubkey;
     }
     const communityRewardsTokenAccount = await averClient.connection.getParsedTokenAccountsByOwner(owner, {
         mint: ids_1.AVER_COMMUNITY_REWARDS_NFT,
     });
     if (communityRewardsTokenAccount.value.length > 0 &&
-        communityRewardsTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount > 0) {
+        communityRewardsTokenAccount.value[0].account.data.parsed.info.tokenAmount
+            .uiAmount > 0) {
         return communityRewardsTokenAccount.value[0].pubkey;
     }
     const averTokenAccount = await averClient.connection.getParsedTokenAccountsByOwner(owner, {

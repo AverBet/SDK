@@ -1,5 +1,5 @@
-import { Keypair, PublicKey, SendOptions, TransactionInstruction } from '@solana/web3.js';
-import { AverClient } from './aver-client';
+import { Keypair, PublicKey, SendOptions, TransactionInstruction } from "@solana/web3.js";
+import { AverClient } from "./aver-client";
 export declare class Referrer {
     private _pubkey;
     private _referrerState;

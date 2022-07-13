@@ -1,7 +1,6 @@
-import { Program } from '@project-serum/anchor';
-import { Keypair, Connection, TransactionInstruction, PublicKey, SendOptions } from '@solana/web3.js';
-import { AverClient } from './aver-client';
-export declare const signAndSendTransactionInstructions: (connection: Connection, signers: Array<Keypair>, feePayer: Keypair, txInstructions: Array<TransactionInstruction>, sendOptions?: SendOptions, manualMaxRetry?: number, program?: Program) => Promise<string>;
+import { Keypair, Connection, TransactionInstruction, PublicKey, SendOptions } from "@solana/web3.js";
+import { AverClient } from "./aver-client";
+export declare const signAndSendTransactionInstructions: (client: AverClient, signers: Array<Keypair>, feePayer: Keypair, txInstructions: Array<TransactionInstruction>, sendOptions?: SendOptions, manualMaxRetry?: number) => Promise<string>;
 export declare function throwIfNull<T>(value: T | null, message?: string): T;
 export declare const chunkAndFetchMultiple: (connection: Connection, pubkeys: PublicKey[]) => Promise<any>;
 /**

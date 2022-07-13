@@ -113,6 +113,7 @@ async def sign_and_send_transaction_instructions(
     fee_payer: Keypair,
     tx_instructions: list[TransactionInstruction],
     send_options: TxOpts = None,
+    manual_max_retry: int = 0
 ):
     """
     Cryptographically signs transaction and sends onchain
@@ -136,13 +137,18 @@ async def sign_and_send_transaction_instructions(
     tx.add(*tx_instructions)
     if(send_options == None):
         send_options = client.provider.opts
-    try:
-        return await client.provider.connection.send_transaction(tx, *signers, opts=send_options)
-    except Exception as e:
-        error = parse_error(e, client.program)
-        if(isinstance(error, ProgramError)):
-            print('Program Error: ', error.code, error.msg)
-        raise error
+    
+    attempts = 0
+    while attempts <= manual_max_retry:
+        try:
+            return await client.provider.connection.send_transaction(tx, *signers, opts=send_options)
+        except Exception as e:
+            error = parse_error(e, client.program)
+            if(isinstance(error, ProgramError)):
+                raise error
+            else:
+                attempts = attempts + 1
+                
 
 
 def calculate_tick_size_for_price(limit_price: float):

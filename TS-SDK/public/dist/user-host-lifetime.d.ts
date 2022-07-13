@@ -1,8 +1,8 @@
-import { Idl, IdlTypeDef } from '@project-serum/anchor/dist/cjs/idl';
-import { IdlTypes, TypeDef } from '@project-serum/anchor/dist/cjs/program/namespace/types';
-import { Keypair, PublicKey, SendOptions } from '@solana/web3.js';
-import { AverClient } from './aver-client';
-import { FeeTier, UserHostLifetimeState } from './types';
+import { Idl, IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl";
+import { IdlTypes, TypeDef } from "@project-serum/anchor/dist/cjs/program/namespace/types";
+import { Keypair, PublicKey, SendOptions } from "@solana/web3.js";
+import { AverClient } from "./aver-client";
+import { FeeTier, UserHostLifetimeState } from "./types";
 export declare class UserHostLifetime {
     private _pubkey;
     private _userHostLifetimeState;

@@ -23,7 +23,7 @@ class Host {
      */
     static async load(averClient, pubkey) {
         const program = averClient.program;
-        const hostResult = await program.account['host'].fetch(pubkey.toBase58());
+        const hostResult = await program.account["host"].fetch(pubkey.toBase58());
         const hostState = Host.parseHostState(hostResult);
         return new Host(pubkey, hostState);
     }
@@ -43,7 +43,7 @@ class Host {
         const hostOwner = owner || averClient.owner;
         const hostFeePayer = feePayer || hostOwner;
         const [hostPubkey, bump] = await Host.derivePubkeyAndBump(hostOwner, programId);
-        return program.instruction['initHost'](referrerFeeRateOfferedBps, bump, {
+        return program.instruction["initHost"](referrerFeeRateOfferedBps, bump, {
             accounts: {
                 payer: hostFeePayer,
                 owner: hostOwner,
@@ -67,7 +67,7 @@ class Host {
      */
     static async createHostAccount(averClient, owner, feePayer, referrerFeeRateOfferedBps = new bn_js_1.default(0), sendOptions, manualMaxRetry, programId = ids_1.AVER_PROGRAM_ID) {
         const ix = await Host.makeCreateHostAccountInstruction(averClient, owner.publicKey, feePayer.publicKey, referrerFeeRateOfferedBps, programId);
-        return (0, utils_1.signAndSendTransactionInstructions)(averClient.connection, [owner, feePayer], feePayer, [ix], sendOptions, manualMaxRetry);
+        return (0, utils_1.signAndSendTransactionInstructions)(averClient, [owner, feePayer], feePayer, [ix], sendOptions, manualMaxRetry);
     }
     static parseHostState(hostResult) {
         return hostResult;
@@ -81,7 +81,7 @@ class Host {
      * @returns {PublicKey}
      */
     static async derivePubkeyAndBump(owner, programId = ids_1.AVER_PROGRAM_ID) {
-        return web3_js_1.PublicKey.findProgramAddress([Buffer.from('host', 'utf-8'), owner.toBuffer()], programId);
+        return web3_js_1.PublicKey.findProgramAddress([Buffer.from("host", "utf-8"), owner.toBuffer()], programId);
     }
     // TODO
     makeCollectRevenueShareInstruction() { }
