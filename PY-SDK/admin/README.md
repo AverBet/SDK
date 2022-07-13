@@ -17,7 +17,7 @@ Currently: `pip install -i https://test.pypi.org/simple/ pyaver==0.0.6`
 
 ## Remaking the docs
 
-Delete the old folder and run `pdoc --docformat google ./src -o ./docs`
+Delete the old folder and run `pdoc --docformat google ./src/pyaver -o ./docs`
 
 Make sure you're in the /public folder
 
