@@ -1,4 +1,5 @@
 TS-SDK/admin/node_modules
 TS-SDK/public/node_modules
+TS-SDK/public/dist
 *.ignore.py
 *.ignore.ts
