@@ -7,7 +7,7 @@ Currently: `pip install -i https://test.pypi.org/simple/ pyaver==0.0.6`
 
 ## Uploading a new version
 
-1. Make sure the code is correct and version is correct
+1. Make sure the code is correct and version is correct (setup.py)
 2. Delete the old dist folder
 3. Run `python setup.py sdist`
 4. Run `twine upload --repository testpypi dist/*`

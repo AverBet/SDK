@@ -1,11 +1,14 @@
-import { Idl, IdlTypeDef } from '@project-serum/anchor/dist/cjs/idl'
-import { IdlTypes, TypeDef } from '@project-serum/anchor/dist/cjs/program/namespace/types'
-import { Keypair, PublicKey, SendOptions, SystemProgram } from '@solana/web3.js'
-import { AverClient } from './aver-client'
-import { AVER_PROGRAM_ID } from './ids'
-import { HostState } from './types'
-import { signAndSendTransactionInstructions } from './utils'
-import BN from 'bn.js'
+import { Idl, IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl"
+import {
+  IdlTypes,
+  TypeDef,
+} from "@project-serum/anchor/dist/cjs/program/namespace/types"
+import { Keypair, PublicKey, SendOptions, SystemProgram } from "@solana/web3.js"
+import { AverClient } from "./aver-client"
+import { AVER_PROGRAM_ID } from "./ids"
+import { HostState } from "./types"
+import { signAndSendTransactionInstructions } from "./utils"
+import BN from "bn.js"
 
 export class Host {
   private _pubkey: PublicKey
@@ -19,15 +22,15 @@ export class Host {
 
   /**
    * Load the host
-   * 
+   *
    * @param {AverClient} averClient The aver client instance
    * @param {PublicKey} pubkey The hosts pubkey
-   * 
+   *
    * @returns {Host}
    */
   static async load(averClient: AverClient, pubkey: PublicKey) {
     const program = averClient.program
-    const hostResult = await program.account['host'].fetch(pubkey.toBase58())
+    const hostResult = await program.account["host"].fetch(pubkey.toBase58())
     const hostState = Host.parseHostState(hostResult)
 
     return new Host(pubkey, hostState)
@@ -35,13 +38,13 @@ export class Host {
 
   /**
    * Function to format the instruction to create a host account
-   * 
+   *
    * @param {AverClient} averClient The aver client instance
    * @param {PublicKey} owner The host owner
    * @param {PublicKey} feePayer The fee payer
    * @param {BN} referrerFeeRateOfferedBps Referrer fee rate
    * @param {PublicKey} programId The program Id
-   * 
+   *
    * @returns {Promise<TransactionInstruction>}
    */
   static async makeCreateHostAccountInstruction(
@@ -54,9 +57,12 @@ export class Host {
     const program = averClient.program
     const hostOwner = owner || averClient.owner
     const hostFeePayer = feePayer || hostOwner
-    const [hostPubkey, bump] = await Host.derivePubkeyAndBump(hostOwner, programId)
+    const [hostPubkey, bump] = await Host.derivePubkeyAndBump(
+      hostOwner,
+      programId
+    )
 
-    return program.instruction['initHost'](referrerFeeRateOfferedBps, bump, {
+    return program.instruction["initHost"](referrerFeeRateOfferedBps, bump, {
       accounts: {
         payer: hostFeePayer,
         owner: hostOwner,
@@ -68,7 +74,7 @@ export class Host {
 
   /**
    * Signs and sends the instruction to create a host account
-   * 
+   *
    * @param {AverClient} averClient The aver client instance
    * @param {PublicKey} owner The host owner
    * @param {PublicKey} feePayer The fee payer
@@ -76,7 +82,7 @@ export class Host {
    * @param {SendOptions} sendOptions Options for sending the transaction
    * @param {number} manualMaxRetry The number of times to retry the transaction before failure
    * @param {PublicKey} programId The program Id
-   * 
+   *
    * @returns {Promise<string>}
    */
   static async createHostAccount(
@@ -97,7 +103,7 @@ export class Host {
     )
 
     return signAndSendTransactionInstructions(
-      averClient.connection,
+      averClient,
       [owner, feePayer],
       feePayer,
       [ix],
@@ -106,20 +112,28 @@ export class Host {
     )
   }
 
-  private static parseHostState(hostResult: TypeDef<IdlTypeDef, IdlTypes<Idl>>): HostState {
+  private static parseHostState(
+    hostResult: TypeDef<IdlTypeDef, IdlTypes<Idl>>
+  ): HostState {
     return hostResult as HostState
   }
 
   /**
    * Derive the host public key based on the owner and the program
-   * 
+   *
    * @param {PublicKey} owner The host owner
    * @param {PublicKey} programId The program Id
-   * 
-   * @returns {PublicKey} 
+   *
+   * @returns {PublicKey}
    */
-  static async derivePubkeyAndBump(owner: PublicKey, programId = AVER_PROGRAM_ID) {
-    return PublicKey.findProgramAddress([Buffer.from('host', 'utf-8'), owner.toBuffer()], programId)
+  static async derivePubkeyAndBump(
+    owner: PublicKey,
+    programId = AVER_PROGRAM_ID
+  ) {
+    return PublicKey.findProgramAddress(
+      [Buffer.from("host", "utf-8"), owner.toBuffer()],
+      programId
+    )
   }
 
   // TODO

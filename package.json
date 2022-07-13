@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "anchor": "^1.4.0",
+    "solana": "^1.0.4"
+  }
+}

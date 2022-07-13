@@ -20,7 +20,7 @@ from token_airdrop import request_token_airdrop
 
 async def main():
     #Decoding the secret key from base58 to bytes
-    secret_key = base58.b58decode('YOUR_SECRET_KEY')
+    secret_key = base58.b58decode('zSaKmpRbsJQQjmMRQsADRQ1vss8P2SQLbxGiiL8LFf9rJ8bFT8S1jAqj8Fkwg9hyq6vb97rR8EDkyu5EFD2tFbj')
     owner = Keypair.from_secret_key(secret_key)
 
     #Default Transaction Options
@@ -53,7 +53,7 @@ async def main():
     #Sometimes, the markets loaded above may have already been resolved
     #Therefore, I've copied and pasted a market public key from https://dev.app.aver.exchange/
     ###
-    market_pubkey = PublicKey('CzYFuUPDLJVCXFGsavgAyn2UmGHfUdrT7fznpRAgDME')
+    market_pubkey = PublicKey('Bq8wyvvWbSLcodH3DjamHZCnRZ4XzGCg4UTCGi8tZhvL')
 
     #Load market
     market = await AverMarket.load(client, market_pubkey)

@@ -1,11 +1,28 @@
-import { Idl, IdlTypeDef } from '@project-serum/anchor/dist/cjs/idl'
-import { IdlTypes, TypeDef } from '@project-serum/anchor/dist/cjs/program/namespace/types'
-import { getOrCreateAssociatedTokenAccount } from '@solana/spl-token'
-import { AccountMeta, Keypair, PublicKey, SendOptions, SystemProgram } from '@solana/web3.js'
-import { AverClient } from './aver-client'
-import { AVER_PROGRAM_ID, AVER_HOST_ACCOUNT, getAverLaunchZeroFeesToken, AVER_TOKEN } from './ids'
-import { FeeTier, UserHostLifetimeState } from './types'
-import { getBestDiscountToken, signAndSendTransactionInstructions } from './utils'
+import { Idl, IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl"
+import {
+  IdlTypes,
+  TypeDef,
+} from "@project-serum/anchor/dist/cjs/program/namespace/types"
+import { getOrCreateAssociatedTokenAccount } from "@solana/spl-token"
+import {
+  AccountMeta,
+  Keypair,
+  PublicKey,
+  SendOptions,
+  SystemProgram,
+} from "@solana/web3.js"
+import { AverClient } from "./aver-client"
+import {
+  AVER_PROGRAM_ID,
+  AVER_HOST_ACCOUNT,
+  getAverLaunchZeroFeesToken,
+  AVER_TOKEN,
+} from "./ids"
+import { FeeTier, UserHostLifetimeState } from "./types"
+import {
+  getBestDiscountToken,
+  signAndSendTransactionInstructions,
+} from "./utils"
 
 export class UserHostLifetime {
   private _pubkey: PublicKey
@@ -26,32 +43,34 @@ export class UserHostLifetime {
 
   /**
    * Load the User Host Lifetime Account
-   * 
-   * @param averClient 
-   * @param pubkey 
-   * 
+   *
+   * @param averClient
+   * @param pubkey
+   *
    * @returns {Promise<UserHostLifetime>}
    */
   static async load(averClient: AverClient, pubkey: PublicKey) {
     const program = averClient.program
-    const userHostLifetimeResult = await program.account['userHostLifetime'].fetch(
-      pubkey.toBase58()
+    const userHostLifetimeResult = await program.account[
+      "userHostLifetime"
+    ].fetch(pubkey.toBase58())
+    const userHostLifetimeState = UserHostLifetime.parseHostState(
+      userHostLifetimeResult
     )
-    const userHostLifetimeState = UserHostLifetime.parseHostState(userHostLifetimeResult)
 
     return new UserHostLifetime(averClient, pubkey, userHostLifetimeState)
   }
 
   /**
    * Formats the instruction to create the User Host Lifetime Account
-   * 
-   * @param averClient 
-   * @param userQuoteTokenAta 
-   * @param owner 
-   * @param host 
-   * @param referrer 
-   * @param programId 
-   * 
+   *
+   * @param averClient
+   * @param userQuoteTokenAta
+   * @param owner
+   * @param host
+   * @param referrer
+   * @param programId
+   *
    * @returns {Promise<UserHostLifetime>}
    */
   static async makeCreateUserHostLifetimeInstruction(
@@ -84,7 +103,7 @@ export class UserHostLifetime {
       pubkey: referrer,
     } as AccountMeta
 
-    return program.instruction['initUserHostLifetime'](bump, {
+    return program.instruction["initUserHostLifetime"](bump, {
       accounts: {
         user: userHostLifetimeOwner,
         userHostLifetime: userHostLifetime,
@@ -98,16 +117,16 @@ export class UserHostLifetime {
 
   /**
    * Create the User Host Lifetime Account
-   * 
-   * @param averClient 
-   * @param owner 
-   * @param userQuoteTokenAta 
-   * @param sendOptions 
-   * @param manualMaxRetry 
-   * @param host 
-   * @param referrer 
-   * @param programId 
-   * 
+   *
+   * @param averClient
+   * @param owner
+   * @param userQuoteTokenAta
+   * @param sendOptions
+   * @param manualMaxRetry
+   * @param host
+   * @param referrer
+   * @param programId
+   *
    * @returns {Promise<UserHostLifetime>}
    */
   static async createUserHostLifetime(
@@ -130,7 +149,7 @@ export class UserHostLifetime {
     )
 
     return signAndSendTransactionInstructions(
-      averClient.connection,
+      averClient,
       [],
       owner,
       [ix],
@@ -141,15 +160,15 @@ export class UserHostLifetime {
 
   /**
    * Gets the User Host Lifetime account if present, or creates one if not
-   * 
-   * @param averClient 
-   * @param owner 
-   * @param sendOptions 
-   * @param quoteTokenMint 
-   * @param host 
-   * @param referrer 
-   * @param programId 
-   * 
+   *
+   * @param averClient
+   * @param owner
+   * @param sendOptions
+   * @param quoteTokenMint
+   * @param host
+   * @param referrer
+   * @param programId
+   *
    * @returns {Promise<UserHostLifetime>}
    */
   static async getOrCreateUserHostLifetime(
@@ -162,17 +181,27 @@ export class UserHostLifetime {
     programId: PublicKey = AVER_PROGRAM_ID
   ) {
     const userHostLifetime = (
-      await UserHostLifetime.derivePubkeyAndBump(owner.publicKey, host, programId)
+      await UserHostLifetime.derivePubkeyAndBump(
+        owner.publicKey,
+        host,
+        programId
+      )
     )[0]
 
     // check if account exists first, and if so return it
     const userHostLifetimeResult = await averClient.program.account[
-      'userHostLifetime'
+      "userHostLifetime"
     ].fetchNullable(userHostLifetime)
 
     if (userHostLifetimeResult) {
-      const userHostLifetimeState = UserHostLifetime.parseHostState(userHostLifetimeResult)
-      return new UserHostLifetime(averClient, userHostLifetime, userHostLifetimeState)
+      const userHostLifetimeState = UserHostLifetime.parseHostState(
+        userHostLifetimeResult
+      )
+      return new UserHostLifetime(
+        averClient,
+        userHostLifetime,
+        userHostLifetimeState
+      )
     }
 
     // otherwise create one and load and return it
@@ -197,27 +226,43 @@ export class UserHostLifetime {
       programId
     )
 
-    await averClient.connection.confirmTransaction(sig, sendOptions?.preflightCommitment)
+    await averClient.connection.confirmTransaction(
+      sig,
+      sendOptions?.preflightCommitment
+    )
 
-    return (await UserHostLifetime.load(averClient, userHostLifetime)) as UserHostLifetime
+    return (await UserHostLifetime.load(
+      averClient,
+      userHostLifetime
+    )) as UserHostLifetime
   }
 
-  static parseHostState(hostResult: TypeDef<IdlTypeDef, IdlTypes<Idl>>): UserHostLifetimeState {
+  static parseHostState(
+    hostResult: TypeDef<IdlTypeDef, IdlTypes<Idl>>
+  ): UserHostLifetimeState {
     return hostResult as UserHostLifetimeState
   }
 
   /**
    * Derive the User Host Lifetime Public Key based on the owner, host and program
-   * 
-   * @param owner 
-   * @param host 
-   * @param programId 
-   * 
+   *
+   * @param owner
+   * @param host
+   * @param programId
+   *
    * @returns {Promise<PublicKey>}
    */
-  static async derivePubkeyAndBump(owner: PublicKey, host: PublicKey, programId = AVER_PROGRAM_ID) {
+  static async derivePubkeyAndBump(
+    owner: PublicKey,
+    host: PublicKey,
+    programId = AVER_PROGRAM_ID
+  ) {
     return PublicKey.findProgramAddress(
-      [Buffer.from('user-host-lifetime', 'utf-8'), owner.toBuffer(), host.toBuffer()],
+      [
+        Buffer.from("user-host-lifetime", "utf-8"),
+        owner.toBuffer(),
+        host.toBuffer(),
+      ],
       programId
     )
   }
@@ -263,7 +308,11 @@ export class UserHostLifetime {
   }
 
   get selfExclusionDate() {
-    return this._userHostLifetimeState.isSelfExcludedUntil ? new Date(this._userHostLifetimeState.isSelfExcludedUntil.toNumber() * 1000): undefined
+    return this._userHostLifetimeState.isSelfExcludedUntil
+      ? new Date(
+          this._userHostLifetimeState.isSelfExcludedUntil.toNumber() * 1000
+        )
+      : undefined
   }
 
   get creationDate() {
@@ -271,7 +320,9 @@ export class UserHostLifetime {
   }
 
   get lastBalanceUpdate() {
-    return new Date(this._userHostLifetimeState.lastBalanceUpdate.toNumber() * 1000)
+    return new Date(
+      this._userHostLifetimeState.lastBalanceUpdate.toNumber() * 1000
+    )
   }
 
   get totalMarketsTraded() {
@@ -308,8 +359,8 @@ export class UserHostLifetime {
 
   /**
    * Get the Fee Tier Position
-   * 
-   * @returns 
+   *
+   * @returns
    */
   getFeeTierPosition() {
     switch (this.lastFeeTierCheck) {

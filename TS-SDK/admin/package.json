@@ -12,7 +12,7 @@
   "author": "Nash",
   "license": "ISC",
   "dependencies": {
-    "aver-ts": "file:~/aver-ts-0.0.3.tgz"
+    "aver-ts": "file:./aver-ts-0.1.4.tgz"
   },
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",

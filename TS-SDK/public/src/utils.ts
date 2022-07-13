@@ -1,4 +1,4 @@
-import { ProgramError } from '@project-serum/anchor'
+import { Program, ProgramError } from "@project-serum/anchor"
 import {
   Keypair,
   Connection,
@@ -7,15 +7,19 @@ import {
   PublicKey,
   SendOptions,
   SystemProgram,
-} from '@solana/web3.js'
-import { chunk } from 'lodash'
-import { AverClient } from './aver-client'
-import { parseError } from './errors'
-import { AVER_COMMUNITY_REWARDS_NFT, AVER_TOKEN, getAverLaunchZeroFeesToken } from './ids'
+} from "@solana/web3.js"
+import { chunk } from "lodash"
+import { AverClient } from "./aver-client"
+import { parseError } from "./errors"
+import {
+  AVER_COMMUNITY_REWARDS_NFT,
+  AVER_TOKEN,
+  getAverLaunchZeroFeesToken,
+} from "./ids"
 
 export const signAndSendTransactionInstructions = async (
   // sign and send transaction
-  connection: Connection,
+  client: AverClient,
   signers: Array<Keypair>,
   feePayer: Keypair,
   txInstructions: Array<TransactionInstruction>,
@@ -27,16 +31,17 @@ export const signAndSendTransactionInstructions = async (
   signers.push(feePayer)
   tx.add(...txInstructions)
   let attempts = 0
-  let errorThrown = new Error('Transaction failed')
+  let errorThrown = new Error("Transaction failed")
 
   while (attempts <= (manualMaxRetry || 0)) {
     try {
-      return await connection.sendTransaction(tx, signers, sendOptions)
+      return await client.connection.sendTransaction(tx, signers, sendOptions)
     } catch (e) {
-      errorThrown = parseError(e)
+      errorThrown = parseError(e, client.program)
 
       // if its a program error, throw it
       if (errorThrown instanceof ProgramError) {
+        console.log("Program error!")
         break
         // otherwise try again
       } else {
@@ -48,7 +53,10 @@ export const signAndSendTransactionInstructions = async (
   throw errorThrown
 }
 
-export function throwIfNull<T>(value: T | null, message = 'account not found'): T {
+export function throwIfNull<T>(
+  value: T | null,
+  message = "account not found"
+): T {
   if (value === null) {
     throw new Error(message)
   }
@@ -61,7 +69,9 @@ export const chunkAndFetchMultiple = async (
   pubkeys: PublicKey[]
 ): Promise<any> => {
   const res = await Promise.all(
-    chunk(pubkeys, 100).map((pubkeyChunk) => connection.getMultipleAccountsInfo(pubkeyChunk))
+    chunk(pubkeys, 100).map((pubkeyChunk) =>
+      connection.getMultipleAccountsInfo(pubkeyChunk)
+    )
   ).then((responses) => responses.flat())
 
   return res
@@ -75,7 +85,7 @@ export const chunkAndFetchMultiple = async (
 export const calculateTickSizeForPrice = (limitPrice: number) => {
   switch (true) {
     case limitPrice < 1000:
-      throw new Error('Limit price too low')
+      throw new Error("Limit price too low")
     case limitPrice <= 2000:
       return 100
     case limitPrice <= 5000:
@@ -91,53 +101,64 @@ export const calculateTickSizeForPrice = (limitPrice: number) => {
     case limitPrice <= 999000:
       return 10000
     case limitPrice > 999000:
-      throw new Error('Limit price too high')
+      throw new Error("Limit price too high")
     default:
       return limitPrice
   }
 }
 
-export const roundPriceToNearestTickSize = (limitPrice: number, isBinary?: boolean) => {
+export const roundPriceToNearestTickSize = (
+  limitPrice: number,
+  isBinary?: boolean
+) => {
   const factor = Math.pow(10, 6)
   const limitPriceTo6dp = limitPrice * factor
   // binary markets tick size is mirrored on both sides due to there only being one orderbook
-  const tickSize = calculateTickSizeForPrice(isBinary ? factor - limitPriceTo6dp : limitPriceTo6dp)
-  const roundedLimitPriceTo6dp = Math.round(limitPriceTo6dp / tickSize) * tickSize
+  const tickSize = calculateTickSizeForPrice(
+    isBinary ? factor - limitPriceTo6dp : limitPriceTo6dp
+  )
+  const roundedLimitPriceTo6dp =
+    Math.round(limitPriceTo6dp / tickSize) * tickSize
   const finalLimitPrice = roundedLimitPriceTo6dp / factor
 
   return finalLimitPrice
 }
 
-export const getBestDiscountToken = async (averClient: AverClient, owner: PublicKey) => {
+export const getBestDiscountToken = async (
+  averClient: AverClient,
+  owner: PublicKey
+) => {
   const zeroFeesToken = getAverLaunchZeroFeesToken(averClient.solanaNetwork)
   const averToken = AVER_TOKEN
 
-  const zeroFeesTokenAccount = await averClient.connection.getParsedTokenAccountsByOwner(owner, {
-    mint: zeroFeesToken,
-  })
+  const zeroFeesTokenAccount =
+    await averClient.connection.getParsedTokenAccountsByOwner(owner, {
+      mint: zeroFeesToken,
+    })
   if (
     zeroFeesTokenAccount.value.length > 0 &&
-    zeroFeesTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount > 0
+    zeroFeesTokenAccount.value[0].account.data.parsed.info.tokenAmount
+      .uiAmount > 0
   ) {
     return zeroFeesTokenAccount.value[0].pubkey
   }
 
-  const communityRewardsTokenAccount = await averClient.connection.getParsedTokenAccountsByOwner(
-    owner,
-    {
+  const communityRewardsTokenAccount =
+    await averClient.connection.getParsedTokenAccountsByOwner(owner, {
       mint: AVER_COMMUNITY_REWARDS_NFT,
-    }
-  )
+    })
   if (
     communityRewardsTokenAccount.value.length > 0 &&
-    communityRewardsTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount > 0
+    communityRewardsTokenAccount.value[0].account.data.parsed.info.tokenAmount
+      .uiAmount > 0
   ) {
     return communityRewardsTokenAccount.value[0].pubkey
   }
 
-  const averTokenAccount = await averClient.connection.getParsedTokenAccountsByOwner(owner, {
-    mint: averToken,
-  })
+  const averTokenAccount =
+    await averClient.connection.getParsedTokenAccountsByOwner(owner, {
+      mint: averToken,
+    })
   if (
     averTokenAccount.value.length > 0 &&
     averTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount > 0

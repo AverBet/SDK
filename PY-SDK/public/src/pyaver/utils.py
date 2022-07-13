@@ -139,9 +139,9 @@ async def sign_and_send_transaction_instructions(
     try:
         return await client.provider.connection.send_transaction(tx, *signers, opts=send_options)
     except Exception as e:
-        #TODO
-        error = parse_error(e)
-        print(isinstance(error, ProgramError))
+        error = parse_error(e, client.program)
+        if(isinstance(error, ProgramError)):
+            print('Program Error: ', error.code, error.msg)
         raise error
 
 

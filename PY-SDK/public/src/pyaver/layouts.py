@@ -2,7 +2,7 @@ from enum import IntEnum
 from construct import Switch, Bytes, Int8ul, Int16ul, Int32ul, Int64ul, Padding, Int8sl
 from construct import Struct as cStruct
 
-from solana._layouts.shared import PUBLIC_KEY_LAYOUT
+PUBLIC_KEY_LAYOUT = Bytes(32)
 
 KEY_LAYOUT = Bytes(16)
 

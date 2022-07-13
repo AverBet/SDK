@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='pyaver',
-    version='0.0.6',
+    version='0.0.8',
     license='MIT',
     author="Aver Ramanujan",
     author_email='email@example.com',
