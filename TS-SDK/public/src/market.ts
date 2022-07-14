@@ -67,9 +67,12 @@ export class Market {
     const program = averClient.program
     const [marketStorePubkey, marketStoreBump] =
       await Market.deriveMarketStorePubkeyAndBump(pubkey)
+
     const marketResultAndMarketStoreResult = await Promise.all([
       program.account["market"].fetch(pubkey.toBase58()),
-      program.account["marketStore"].fetch(marketStorePubkey.toBase58()),
+      program.account["marketStore"].fetchNullable(
+        marketStorePubkey.toBase58()
+      ),
     ])
     const marketState = Market.parseMarketState(
       marketResultAndMarketStoreResult[0]
@@ -87,7 +90,9 @@ export class Market {
     const orderbooks = await Market.getOrderbooksFromOrderbookAccounts(
       program.provider.connection,
       marketStoreState.orderbookAccounts,
-      marketState.decimals
+      Array.from({ length: marketState.numberOfOutcomes }).map(
+        () => marketState.decimals
+      )
     )
 
     return new Market(
@@ -136,17 +141,23 @@ export class Market {
     )
 
     // TODO optimize to load all slabs for all orderbooks for all markets in one request
-    const nestedOrderbooks = await Promise.all(
-      marketStoreStates.map((mss, i) =>
-        mss && marketStates[i]
-          ? Market.getOrderbooksFromOrderbookAccounts(
-              program.provider.connection,
-              mss.orderbookAccounts,
-              marketStates[i]?.decimals || 6
-            )
-          : null
+    // const nestedOrderbooks = await Promise.all(
+    //   marketStoreStates.map((mss, i) =>
+    //     mss && marketStates[i]
+    //       ? Market.getOrderbooksFromOrderbookAccounts(
+    //           program.provider.connection,
+    //           mss.orderbookAccounts,
+    //           marketStates[i]?.decimals || 6
+    //         )
+    //       : null
+    //   )
+    // )
+    const nestedOrderbooks =
+      await Market.getOrderbooksFromOrderbookAccountsMultipleMarkets(
+        program.provider.connection,
+        marketStates,
+        marketStoreStates
       )
-    )
 
     return marketStates.map((marketState, i) =>
       marketState
@@ -559,10 +570,11 @@ export class Market {
 
   private static async getOrderbooksFromOrderbookAccounts(
     connection: Connection,
-    orderbookAccounts: OrderbookAccountsState[],
-    decimals: number
+    orderbookAccounts: (OrderbookAccountsState | undefined)[],
+    decimals: number[]
   ): Promise<Orderbook[]> {
     const allBidsAndAsksAccounts = orderbookAccounts
+      //@ts-expect-error
       .map((o) => [o.bids, o.asks])
       .flat()
     const allSlabs = await Orderbook.loadMultipleSlabs(
@@ -573,22 +585,80 @@ export class Market {
     return orderbookAccounts.map(
       (o, i) =>
         new Orderbook(
-          o.orderbook,
-          // @ts-expect-error
+          //@ts-expect-error
+          o?.orderbook,
           allSlabs[i * 2],
           allSlabs[i * 2 + 1],
           allBidsAndAsksAccounts[i * 2],
           allBidsAndAsksAccounts[i * 2 + 1],
-          decimals
+          decimals[i]
         )
     )
+  }
+
+  private static async getOrderbooksFromOrderbookAccountsMultipleMarkets(
+    connection: Connection,
+    marketStates: (MarketState | null)[],
+    marketStoreStates: (MarketStoreState | null)[]
+  ) {
+    //Create a list of accounts and decimals for each account
+    const orderbookAccounts = marketStoreStates
+      .map((m) => m?.orderbookAccounts || [])
+      .flat()
+
+    const decimals = marketStoreStates
+      .map(
+        (m, i) =>
+          m?.orderbookAccounts.map((o) => marketStates[i]?.decimals || 6) || []
+      )
+      .flat()
+
+    //Load all orderbooks
+    let allOrderbooks = await Market.getOrderbooksFromOrderbookAccounts(
+      connection,
+      orderbookAccounts,
+      decimals
+    )
+
+    //Create a list for each market we receive. This list contains all orderbooks for that market
+    let orderbooks_market_list: (Orderbook[] | undefined)[] = []
+    for (let ms of marketStates) {
+      if (!ms) {
+        orderbooks_market_list.push(undefined)
+        continue
+      }
+
+      const numberOfOutcomes = ms.numberOfOutcomes
+      let orderbooks: Orderbook[] = []
+
+      if (isMarketStatusClosed(ms.marketStatus)) {
+        orderbooks_market_list.push(undefined)
+        continue
+      }
+      if (numberOfOutcomes === 2 && allOrderbooks.length >= 1) {
+        //We check for this error above
+        //@ts-expect-error
+        orderbooks.push(allOrderbooks.shift())
+      } else if (
+        numberOfOutcomes !== 2 &&
+        allOrderbooks.length >= numberOfOutcomes
+      ) {
+        Array.from({ length: numberOfOutcomes }).map(() => {
+          //@ts-expect-error
+          orderbooks.push(allOrderbooks.shift())
+        })
+      } else {
+        throw new Error("Error getting orderbooks")
+      }
+      orderbooks_market_list.push(orderbooks)
+    }
+
+    return orderbooks_market_list
   }
 
   async getImpliedMarketStatus(): Promise<MarketStatus> {
     const solanaDatetime = await this._averClient.getSystemClockDatetime()
     if (!solanaDatetime) return this.marketStatus
-
-    console.log(solanaDatetime, this.tradingCeaseTime.getTime())
 
     if (solanaDatetime > this.tradingCeaseTime.getTime())
       return MarketStatus.TradingCeased
