@@ -140,18 +140,6 @@ export class Market {
           : null
     )
 
-    // TODO optimize to load all slabs for all orderbooks for all markets in one request
-    // const nestedOrderbooks = await Promise.all(
-    //   marketStoreStates.map((mss, i) =>
-    //     mss && marketStates[i]
-    //       ? Market.getOrderbooksFromOrderbookAccounts(
-    //           program.provider.connection,
-    //           mss.orderbookAccounts,
-    //           marketStates[i]?.decimals || 6
-    //         )
-    //       : null
-    //   )
-    // )
     const nestedOrderbooks =
       await Market.getOrderbooksFromOrderbookAccountsMultipleMarkets(
         program.provider.connection,
