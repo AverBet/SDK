@@ -1,5 +1,5 @@
 from enum import IntEnum
-from construct import Switch, Bytes, Int8ul, Int16ul, Int32ul, Int64ul, Padding, Int8sl
+from construct import Switch, Bytes, Int8ul, Int16ul, Int32ul, Int64ul, Padding, Int8sl, Int64sl
 from construct import Struct as cStruct
 
 PUBLIC_KEY_LAYOUT = Bytes(32)
@@ -121,6 +121,13 @@ USER_MARKET_ORDER_LAYOUT = cStruct(
     "base_qty" / Int64ul,
 )
 
+CLOCK_STRUCT = cStruct(
+    "slot" / Int64ul,
+    "epoch_start_timestamp" / Int64sl,
+    "epoch" / Int64ul,
+    "leader_schedule_epoch" / Int64ul,
+    "unix_timestamp" / Int64sl,
+)
 
 def USER_MARKET_STATE_LEN(number_of_outcomes: int, max_number_of_orders: int):
     return 8 + 32*4 + 3*1 +2*4 + 6*8 + 4+(number_of_outcomes * 2*8) + 4+(max_number_of_orders * (16+1+8))

@@ -86,6 +86,8 @@ AVER_MAINNET_LAUNCH_NFT_MAINNET = PublicKey(
   'BqSFP5CbfBfZeQqGbzYEipfzTDptTYHFL9AzZA8TBXjn'
 )
 
+SYS_VAR_CLOCK = PublicKey('SysvarC1ock11111111111111111111111111111111')
+
 # helpers
 def get_aver_api_endpoint(solanaNetwork: SolanaNetwork):
   """

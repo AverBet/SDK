@@ -39,13 +39,13 @@ class MarketState():
     version: float
     number_of_umas: int
     vault_bump: int
-    trading_ceased_time: int
+    trading_cease_time: int
     aver_accumulated_fees: int
     third_party_accumulated_fees: int
     open_interest: int
     oracle_feed: PublicKey
     fee_tier_collection_bps_rates: list[int]
-    in_play_start_time: int = None
+    inplay_start_time: int = None
    
    
 

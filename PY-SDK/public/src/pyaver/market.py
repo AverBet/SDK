@@ -379,6 +379,7 @@ class AverMarket():
         return orderbooks
 
 
+
     @staticmethod
     async def get_orderbooks_from_orderbook_accounts_multiple_markets(
         conn: AsyncClient,
@@ -502,5 +503,23 @@ class AverMarket():
             for ob in self.orderbooks:
                 list_of_pubkeys += [ob.pubkey, ob.slab_asks_pubkey, ob.slab_asks_pubkey] # TODO: Event Queue?
         return list_of_pubkeys
+    
+    async def get_implied_market_status(self) -> MarketStatus:
+        """
+        Returns what we believe the market status ought to be (rather than is)
+
+        If Solana clock time is beyond TradingCeaseTime, market is TradingCeased
+        If Solana clock time is beyond InPlayStartTime but before TradingCeaseTime, market is ActiveInPlay
+
+        Returns:
+            MarketStatus: Implied market status
+        """
+        solana_datetime = await self.aver_client.get_system_clock_datetime()
+        if solana_datetime.timestamp() > self.market_state.trading_cease_time:
+            return MarketStatus.TRADING_CEASED
+        if self.market_state.inplay_start_time is not None and solana_datetime.timestamp() > self.market_state.inplay_start_time :
+            return MarketStatus.ACTIVE_IN_PLAY
+        return self.market_state.market_status
+        
 
 #TODO - Market Listener
