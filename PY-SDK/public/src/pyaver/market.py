@@ -84,7 +84,7 @@ class AverMarket():
         market_store_state = None
         orderbooks = None
         is_market_status_closed = AverMarket.is_market_status_closed(market_state.market_status)
-        market_store_state: MarketStoreState = await market_state_and_store['market_stores'][0]
+        market_store_state: MarketStoreState = market_state_and_store['market_stores'][0]
 
         if(not is_market_status_closed):
             orderbooks = await AverMarket.get_orderbooks_from_orderbook_accounts(
