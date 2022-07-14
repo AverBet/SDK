@@ -5,7 +5,7 @@ from solana.keypair import Keypair
 from .enums import MarketStatus
 # from constants import DEFAULT_QUOTE_TOKEN_DEVNET, DEFAULT_MARKET_AUTHORITY, AVER_PROGRAM_ID_DEVNET_2
 from .constants import AVER_MARKET_AUTHORITY, AVER_PROGRAM_ID
-from .utils import sign_and_send_transaction_instructions
+from .utils import load_multiple_bytes_data, sign_and_send_transaction_instructions
 from .data_classes import MarketState, MarketStoreState, OrderbookAccountsState
 from .orderbook import Orderbook
 from .slab import Slab
@@ -114,18 +114,14 @@ class AverMarket():
         Returns:
             list[AverMarket]: List of AverMarket objects
         """
-        market_states = await AverMarket.load_multiple_market_states(aver_client, market_pubkeys)
+        market_states_and_stores = await AverMarket.load_multiple_market_states_and_stores(aver_client, market_pubkeys)
+        market_states: list[MarketState] = market_states_and_stores['market_states']
 
-        market_store_pubkeys = []
         are_market_statuses_closed = []
         for market_state in market_states:
-            market_store_pubkeys.append(market_state.market_store)
             are_market_statuses_closed.append(AverMarket.is_market_status_closed(market_state.market_status))
 
-        market_stores = await AverMarket.load_multiple_market_store_states(
-            aver_client, 
-            market_store_pubkeys
-            )
+        market_stores: list[MarketStoreState] = market_states_and_stores['market_stores']
 
         orderbooks_market_list = await AverMarket.get_orderbooks_from_orderbook_accounts_multiple_markets(
             aver_client.provider.connection,
@@ -176,6 +172,43 @@ class AverMarket():
         """
         res = await aver_client.program.account['Market'].fetch_multiple(market_pubkeys)
         return res
+   
+    @staticmethod
+    async def load_market_state_and_store(aver_client: AverClient, market_pubkey: PublicKey):
+        """
+        Loads onchain data for multiple MarketStates and MarketStoreStates at once
+
+        Args:
+            aver_client (AverClient): AverClient object
+            market_pubkey (PublicKey]: Market public key
+
+        Returns:
+            dict[str, list[MarketState] or list[MarketStoreState]]: Keys are market_states or market_stores
+        """
+        return await AverMarket.load_multiple_market_states_and_stores(aver_client, [market_pubkey])
+
+    @staticmethod
+    async def load_multiple_market_states_and_stores(aver_client: AverClient, market_pubkeys: list[PublicKey]):
+        """
+        Loads onchain data for multiple MarketStates and MarketStoreStates at once
+
+        Args:
+            aver_client (AverClient): AverClient object
+            market_pubkeys (list[PublicKey]): List of market public keys
+
+        Returns:
+            dict[str, list[MarketState] or list[MarketStoreState]]: Keys are market_states or market_stores
+        """
+        market_store_pubkeys = [AverMarket.derive_market_store_pubkey_and_bump(m, AVER_PROGRAM_ID)[0] for m in market_pubkeys]
+
+        data = await load_multiple_bytes_data(aver_client.connection, market_pubkeys + market_store_pubkeys)
+        market_states_data = data[0:len(market_pubkeys)]
+        market_stores_data = data[len(market_pubkeys):]
+
+        market_states = [AverMarket.parse_market_state(d, aver_client) for d in market_states_data]
+        market_stores = [AverMarket.parse_market_store(d, aver_client) for d in market_stores_data]
+
+        return {'market_states': market_states, 'market_stores': market_stores}
 
     @staticmethod
     def derive_market_store_pubkey_and_bump(market_pubkey: PublicKey, program_id: PublicKey = AVER_PROGRAM_ID):
