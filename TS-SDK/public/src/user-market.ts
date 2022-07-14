@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Idl, IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl"
 import {
   IdlTypes,

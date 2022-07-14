@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios from "axios"
 import {
   ConfirmOptions,
   Connection,
@@ -6,19 +6,20 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   Signer,
-} from '@solana/web3.js'
-import { Program, Provider } from '@project-serum/anchor'
+} from "@solana/web3.js"
+import { Program, Provider } from "@project-serum/anchor"
 import {
   getOrCreateAssociatedTokenAccount,
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddress,
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
-} from '@solana/spl-token'
-import { AVER_PROGRAM_ID, getQuoteToken, getAverApiEndpoint } from './ids'
-import { SolanaNetwork } from './types'
-import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet'
-import { Wallet } from '@project-serum/anchor/dist/cjs/provider'
+} from "@solana/spl-token"
+import { AVER_PROGRAM_ID, getQuoteToken, getAverApiEndpoint } from "./ids"
+import { SolanaNetwork } from "./types"
+import NodeWallet from "@project-serum/anchor/dist/cjs/nodewallet"
+import { Wallet } from "@project-serum/anchor/dist/cjs/provider"
+import { SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js"
 
 export class AverClient {
   private _connection: Connection
@@ -31,7 +32,11 @@ export class AverClient {
 
   private _quoteTokenMint: PublicKey
 
-  private constructor(program: Program, averApiEndpoint: string, solanaNetwork: SolanaNetwork) {
+  private constructor(
+    program: Program,
+    averApiEndpoint: string,
+    solanaNetwork: SolanaNetwork
+  ) {
     this._connection = program.provider.connection
     this._program = program
     this._averApiEndpoint = averApiEndpoint
@@ -41,17 +46,17 @@ export class AverClient {
 
   /**
    * Initialises an AverClient object
-   * 
+   *
    * @param {Connection} connection Solana Client Object
    * @param {PublicKey | null} owner Public Key to pay transaction costs
-   * @param {string} averApiEndpoint 
+   * @param {string} averApiEndpoint
    * @param {PublicKey} averProgramId Program public key. Defaults to AVER_PROGRAM_ID.
    * @returns {AverClient | null} The Aver Client object or null if unsuccesful
    */
   static async loadAverClient(
     connection: Connection,
     solanaNetwork: SolanaNetwork,
-    owner:  null | Keypair | Wallet,
+    owner: null | Keypair | Wallet,
     opts?: ConfirmOptions,
     averProgramId?: PublicKey
   ) {
@@ -111,14 +116,14 @@ export class AverClient {
   }
 
   async checkHealth() {
-    const url = this._averApiEndpoint + '/health' + '?format=json'
+    const url = this._averApiEndpoint + "/health" + "?format=json"
     let averHealthResponse = await axios
       .get(url)
-      .then((res) => res.status.toString().startsWith('2'))
+      .then((res) => res.status.toString().startsWith("2"))
       .catch((_e) => false)
     let solanaHealthResponse = await this.connection
       .getVersion()
-      .then((res) => !!res['solana-core'])
+      .then((res) => !!res["solana-core"])
       .catch((_e) => false)
 
     return {
@@ -129,11 +134,11 @@ export class AverClient {
 
   /**
    * Formats the instruction to create an associated token account
-   * 
+   *
    * @param {PublicKey} mint Associated token account mint
    * @param {PublicKey} owner Owner of the assocaited token account
    * @param {PublicKey} payer Fee payer for creating the associated token account
-   * 
+   *
    * @returns {Promise<TransactionInstruction>} Instruction to create an associated token account
    */
   async createTokenAtaInstruction(
@@ -159,13 +164,13 @@ export class AverClient {
     )
   }
 
-   /**
+  /**
    * Returns the associated token account if present, or creates one if not
-   * 
-   * @param {PublicKey} payer Fee payer for creating the associated token account 
+   *
+   * @param {PublicKey} payer Fee payer for creating the associated token account
    * @param {PublicKey} mint Associated token account mint
    * @param {PublicKey} owner Owner of the assocaited token account
-   * 
+   *
    * @returns {Promise<Account>} The associated token account
    */
   async getOrCreateTokenAta(
@@ -173,20 +178,28 @@ export class AverClient {
     mint: PublicKey = this.quoteTokenMint,
     owner: PublicKey = this.owner
   ) {
-    return getOrCreateAssociatedTokenAccount(this._connection, payer, mint, owner)
+    return getOrCreateAssociatedTokenAccount(
+      this._connection,
+      payer,
+      mint,
+      owner
+    )
   }
 
   /**
    * Requests a lamport airdrop. This is only available on DevNet
-   * 
+   *
    * @param {number} amount The number of lamports to airdrop
    * @param {PublicKey} owner Owner of the account to be airdropeed
-   * 
+   *
    * @returns {Promise<string>}
    */
-  async requestLamportAirdrop(amount: number = LAMPORTS_PER_SOL, owner = this.owner) {
+  async requestLamportAirdrop(
+    amount: number = LAMPORTS_PER_SOL,
+    owner = this.owner
+  ) {
     if (this.solanaNetwork == SolanaNetwork.Mainnet) {
-      throw new Error('Cannot airdrop on mainnet')
+      throw new Error("Cannot airdrop on mainnet")
     }
 
     return this._connection.requestAirdrop(owner, amount)
@@ -194,12 +207,12 @@ export class AverClient {
 
   /**
    * Requests an airdrop of a specific token, or USDC by default
-   * 
+   *
    * @param {number} amount The amount of the token to be airdropped
    * @param {PublicKey} mint The token mint
    * @param {PublicKey} owner The owner of the wallet to be airdropped
-   * 
-   * @returns 
+   *
+   * @returns
    */
   async requestTokenAirdrop(
     amount: number = 1_000_000_000,
@@ -207,10 +220,10 @@ export class AverClient {
     owner: PublicKey = this.owner
   ) {
     if (this.solanaNetwork == SolanaNetwork.Mainnet) {
-      throw new Error('Cannot airdrop on mainnet')
+      throw new Error("Cannot airdrop on mainnet")
     }
 
-    const url = this._averApiEndpoint + '/airdrop'
+    const url = this._averApiEndpoint + "/airdrop"
 
     const params = {
       wallet: owner.toBase58(),
@@ -221,11 +234,11 @@ export class AverClient {
     return axios.post(url, params)
   }
 
-   /**
+  /**
    * Requests the associated token account balance
-   * 
+   *
    * @param {PublicKey} ata Associated token account
-   * 
+   *
    * @returns {Promise<RpcResponseAndContext<TokenAmount>>}
    */
   async requestAtaBalance(ata: PublicKey) {
@@ -234,25 +247,34 @@ export class AverClient {
 
   /**
    * Requests the token balance
-   * 
+   *
    * @param {PublicKey} mint Token mint
    * @param {PublicKey} owner Wallet owner
-   * 
+   *
    * @returns {Promise<RpcResponseAndContext<TokenAmount>>}
    */
-  async requestTokenBalance(mint: PublicKey = this.quoteTokenMint, owner: PublicKey = this.owner) {
+  async requestTokenBalance(
+    mint: PublicKey = this.quoteTokenMint,
+    owner: PublicKey = this.owner
+  ) {
     const ata = await getAssociatedTokenAddress(mint, owner)
     return (await this.requestAtaBalance(ata)).value
   }
 
   /**
    * Requests the lamport balance
-   * 
+   *
    * @param {PublicKey} owner The wallet owner
-   * 
+   *
    * @returns {Promise<number>}
    */
   async requestLamportBalance(owner: PublicKey) {
     return this.connection.getBalance(owner)
+  }
+
+  async getSystemClockDatetime() {
+    const slot = await this.connection.getSlot()
+    const time = await this.connection.getBlockTime(slot)
+    return time ? time * 1000 : null
   }
 }
