@@ -79,15 +79,12 @@ class AverMarket():
         Returns:
             AverMarket: AverMarket object
         """
-        market_state = await AverMarket.load_market_state(aver_client, market_pubkey)
+        market_state_and_store = await AverMarket.load_market_state_and_store(aver_client, market_pubkey)
+        market_state: MarketState = market_state_and_store['market_states'][0]
         market_store_state = None
         orderbooks = None
         is_market_status_closed = AverMarket.is_market_status_closed(market_state.market_status)
-        market_store_state = await AverMarket.load_market_store_state(
-            aver_client,
-            is_market_status_closed,
-            market_state.market_store
-        ) 
+        market_store_state: MarketStoreState = await market_state_and_store['market_stores'][0]
 
         if(not is_market_status_closed):
             orderbooks = await AverMarket.get_orderbooks_from_orderbook_accounts(
@@ -206,7 +203,7 @@ class AverMarket():
         market_stores_data = data[len(market_pubkeys):]
 
         market_states = [AverMarket.parse_market_state(d, aver_client) for d in market_states_data]
-        market_stores = [AverMarket.parse_market_store(d, aver_client) for d in market_stores_data]
+        market_stores = [AverMarket.parse_market_store(d, aver_client) if d is not None else None for d in market_stores_data]
 
         return {'market_states': market_states, 'market_stores': market_stores}
 
