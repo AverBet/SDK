@@ -106,7 +106,7 @@ async def load_multiple_bytes_data(
         is_only_getting_data
     )
 
-    
+#TODO - calculate lamports required for transaction    
 async def sign_and_send_transaction_instructions(
     client: AverClient,
     signers: list[Keypair],

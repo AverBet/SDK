@@ -3,6 +3,7 @@ from pydash import chunk
 from .market import AverMarket
 from solana.publickey import PublicKey
 from asyncio import gather
+from .checks import *
 from solana.transaction import AccountMeta
 from solana.keypair import Keypair
 from solana.system_program import SYS_PROGRAM_ID
@@ -133,23 +134,28 @@ class UserMarket():
         Returns:
             UserMarket: UserMarket object
         """
-        res = await aver_client.program.account['UserMarket'].fetch(pubkey)
+        res: UserMarketState = await aver_client.program.account['UserMarket'].fetch(pubkey)
 
         lamport_balance = await aver_client.request_lamport_balance(res.user)
         token_balance = await aver_client.request_token_balance(aver_client.quote_token, res.user)
         user_balance_state = UserBalanceState(lamport_balance, token_balance)
 
+        if(res.market.to_base58() != market.market_pubkey.to_base58()):
+            raise Exception('UserMarket and Market do not match')
+
         return UserMarket(aver_client, pubkey, res, market, user_balance_state)   
     
     @staticmethod
     async def load_multiple_by_uma(aver_client: AverClient, pubkeys: list[PublicKey], markets: list[AverMarket]):
-        res = await aver_client.program.account['UserMarket'].fetch_multiple(pubkeys)
+        res: list[UserMarketState] = await aver_client.program.account['UserMarket'].fetch_multiple(pubkeys)
 
         user_pubkeys = [u.user for u in res]
         user_balances = (await load_multiple_account_states(aver_client, [], [], [], [], user_pubkeys))['user_balance_states']
 
         umas: list[UserMarket] = []
         for i, pubkey in enumerate(pubkeys):
+            if(res[i].market.to_base58() != markets[i].market_pubkey.to_base58()):
+                raise Exception('UserMarket and Market do not match')
             umas.append(UserMarket(aver_client, pubkey, res[i], markets[i], user_balances[i]))
         return umas
     
@@ -464,7 +470,20 @@ class UserMarket():
             raise Exception('Cannot place error on closed market')
 
         if(active_pre_flight_check):
-            self.is_order_valid(outcome_position, side, limit_price, size,size_format)
+            check_sufficient_lamport_balance(self.user_balance_state)
+            check_correct_uma_market_match(self.user_market_state, self.market)
+            check_market_active_pre_event(self.market.market_state.market_status)
+            #check_uhl_self_excluded(self.user_market_state.user_host_lifetime) - Requires loading UHL
+            check_user_market_full(self.user_market_state)
+            check_limit_price_error(limit_price, self.market)
+            check_outcome_outside_space(outcome_position, self.market)
+            check_incorrect_order_type_for_market_order(limit_price, order_type, side, self.market)
+            check_stake_noop(size_format, limit_price, side)
+            tokens_available_to_buy = self.calculate_tokens_available_to_buy(outcome_position, limit_price)
+            tokens_available_to_sell = self.calculate_tokens_available_to_sell(outcome_position, limit_price)
+            check_is_order_valid(outcome_position, side, limit_price, size, size_format, tokens_available_to_sell, tokens_available_to_buy)
+            check_quote_and_base_size_too_small(self.market, side, size_format, outcome_position, limit_price, size)
+            check_user_permission_and_quote_token_limit_exceeded(self.market, self.user_market_state, size, limit_price, size_format)
         
         #Do we need a limit_price_u64 for Python?
         max_base_qty = math.floor(size * (10 ** self.market.market_state.decimals))
@@ -596,14 +615,9 @@ class UserMarket():
             raise Exception('Cannot cancel orders on closed market')
 
         if(active_pre_flight_check):
-            if(self.user_balance_state.lamport_balance < 5000):
-                raise Exception('Insufficient lamport balance')
-            
-            if(not can_cancel_order_in_market(self.market.market_state.market_status)):
-                raise Exception('Cannot cancel orders in current market status')
-            
-            if(not str(order_id) in [str(o.order_id) for o in self.user_market_state.orders]):
-                raise Exception('Order ID does not exist in list of open orders')
+            check_sufficient_lamport_balance(self.user_balance_state)
+            check_cancel_order_market_status(self.market.market_state.market_status)
+            check_order_exists(self.user_market_state, order_id)
       
         
         is_binary_market_second_outcome = self.market.market_state.number_of_outcomes == 2 and outcome_position == 1
@@ -691,11 +705,10 @@ class UserMarket():
             raise Exception('Cannot cancel orders on closed market')
 
         if(active_pre_flight_check):
-            if(self.user_balance_state.lamport_balance < 5000):
-                raise Exception('Insufficient lamport balance')
-            
-            if(not can_cancel_order_in_market(self.market.market_state.market_status)):
-                raise Exception('Cannot cancel orders in current market status')
+            check_sufficient_lamport_balance(self.user_balance_state)
+            check_cancel_order_market_status(self.market.market_state.market_status)
+            for outcome_id in outcome_ids_to_cancel:
+                check_outcome_has_orders(outcome_id, self.user_market_state)
 
         remaining_accounts: list[AccountMeta] = []
         for i, accounts in enumerate(self.market.market_store_state.orderbook_accounts):
@@ -1047,47 +1060,5 @@ class UserMarket():
 
         return min_free_tokens_except_outcome_index + price * self.user_balance_state.token_balance
     
-    def is_order_valid(
-        self,
-        outcome_index: int,
-        side: Side,
-        limit_price: float,
-        size: float,
-        size_format: SizeFormat
-    ):
-        """
-        Performs clientside checks prior to placing an order
-
-        Args:
-            outcome_index (int): Outcome ID
-            side (Side): Side
-            limit_price (float): Limit price
-            size (float): Size
-            size_format (SizeFormat): SizeFormat object (state or payout)
-
-        Raises:
-            Exception: Insufficient Lamport Balance
-            Exception: Insufficient Token Balance
-            Exception: Max number of orders recieved
-            Exception: Market currently not in tradeable status
-
-        Returns:
-            bool: True if order is valid
-        """
-        if(self.user_balance_state.lamport_balance < 5000):
-            raise Exception('Insufficient Lamport Balance')
-        
-        balance_required = size * limit_price if size_format == SizeFormat.PAYOUT else size
-        current_balance = self.calculate_tokens_available_to_sell(outcome_index, limit_price) if side == Side.SELL else self.calculate_tokens_available_to_buy(outcome_index, limit_price)
-
-        if(current_balance < balance_required):
-            raise Exception('Insufficient Token Balance')
-
-        if(len(self.user_market_state.orders) == self.user_market_state.max_number_of_orders):
-            raise Exception('Max number of orders recieved')
-
-        if(not is_market_tradeable(self.market.market_state.market_status)):
-            raise Exception('Market currently not in tradeable status')
-
-        return True
-
+    def calculate_min_free_outcome_positions(self):
+        return min([o.free for o in self.user_market_state.outcome_positions])
