@@ -79,7 +79,8 @@ def check_is_order_valid(
         Returns:
             bool: True if order is valid
         """
-        
+        limit_price = round_price_to_nearest_tick_size(limit_price)
+
         balance_required = size * limit_price if size_format == SizeFormat.PAYOUT else size
         current_balance = tokens_available_to_sell if side == Side.SELL else tokens_available_to_buy
 

@@ -120,7 +120,7 @@ class UserMarket():
             return await UserMarket.load_multiple_by_uma(aver_client, umas, markets)
 
     @staticmethod
-    async def load_by_uma(aver_client: AverClient, pubkey: PublicKey, market: AverMarket):
+    async def load_by_uma(aver_client: AverClient, pubkey: PublicKey, market: (AverMarket or PublicKey)):
         """
         Initialises an UserMarket object, from UserMarket account public key
 
@@ -129,7 +129,7 @@ class UserMarket():
         Args:
             aver_client (AverClient): AverClient object
             pubkey (PublicKey): UserMarket account public key
-            market (AverMarket): AverMarket object
+            market (AverMarket or PublicKey): AverMarket object or AverMarket public key
 
         Returns:
             UserMarket: UserMarket object
@@ -139,6 +139,9 @@ class UserMarket():
         lamport_balance = await aver_client.request_lamport_balance(res.user)
         token_balance = await aver_client.request_token_balance(aver_client.quote_token, res.user)
         user_balance_state = UserBalanceState(lamport_balance, token_balance)
+
+        if(isinstance(market, PublicKey)):
+            market = await AverMarket.load(aver_client, market)
 
         if(res.market.to_base58() != market.market_pubkey.to_base58()):
             raise Exception('UserMarket and Market do not match')
