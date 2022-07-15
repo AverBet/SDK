@@ -120,6 +120,10 @@ export class UserMarket {
       tokenBalance: parseInt(tokenBalance.amount),
     }
 
+    if (userMarketState.market.toString() !== market.pubkey.toString()) {
+      throw Error("UserMarket and Market do not match")
+    }
+
     return new UserMarket(
       averClient,
       pubkey,
@@ -193,6 +197,14 @@ export class UserMarket {
         userPubkeys
       )
     ).userBalanceStates
+
+    for (let i = 0; i < userMarketStates.length; i++) {
+      if (
+        userMarketStates[i].market.toString() !== markets[i].pubkey.toString()
+      ) {
+        throw Error(`UserMarket and Market do not match for the ${i}th market`)
+      }
+    }
 
     return userMarketStates.map((ums, i) =>
       ums
