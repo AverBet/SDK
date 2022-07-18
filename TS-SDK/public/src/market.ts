@@ -1,4 +1,4 @@
-import { Slab } from "@bonfida/aaob"
+import { EventFill, EventOut, Slab } from "@bonfida/aaob"
 import { Idl, IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl"
 import {
   IdlTypes,
@@ -9,9 +9,20 @@ import {
   ACCOUNT_SIZE,
   getAssociatedTokenAddress,
 } from "@solana/spl-token"
-import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
+import {
+  AccountInfo,
+  Connection,
+  Keypair,
+  PublicKey,
+  AccountMeta,
+} from "@solana/web3.js"
 import { AverClient } from "./aver-client"
-import { AVER_PROGRAM_ID, getQuoteToken } from "./ids"
+import { loadAllEventQueues, prepareUserAccountsList } from "./event-queue"
+import {
+  AVER_PROGRAM_ID,
+  getQuoteToken,
+  MAX_ITERATIONS_FOR_CONSUME_EVENTS,
+} from "./ids"
 import { Orderbook } from "./orderbook"
 import {
   MarketState,
@@ -654,6 +665,116 @@ export class Market {
       return MarketStatus.ActiveInPlay
 
     return this.marketStatus
+  }
+
+  async consumeEvents(
+    outcome_idx: number,
+    user_accounts: PublicKey[],
+    payer: Keypair,
+    max_iterations?: number,
+    reward_target?: PublicKey
+  ) {
+    if (!reward_target) reward_target = this._averClient.owner
+    if (!max_iterations || max_iterations > MAX_ITERATIONS_FOR_CONSUME_EVENTS)
+      max_iterations = MAX_ITERATIONS_FOR_CONSUME_EVENTS
+
+    const userAccountsUnsorted = user_accounts.map((pk) => {
+      return { pubkey: pk, isSigner: false, isWritable: true } as AccountMeta
+    })
+
+    const remainingAccounts = userAccountsUnsorted.sort((a, b) =>
+      a.pubkey.toString().localeCompare(b.pubkey.toString())
+    )
+
+    if (!this.orderbookAccounts) throw new Error("No orderbook accounts")
+
+    return await this._averClient.program.rpc["consumeEvents"](
+      max_iterations,
+      outcome_idx,
+      {
+        accounts: {
+          market: this.pubkey,
+          marketStore: this.marketStore,
+          orderbook: this.orderbookAccounts[outcome_idx].orderbook,
+          eventQueue: this.orderbookAccounts[outcome_idx].eventQueue,
+          rewardTarget: reward_target,
+        },
+        remainingAccounts: remainingAccounts,
+      }
+    )
+  }
+
+  async crankMarket(
+    payer: Keypair,
+    outcome_idxs?: number[],
+    reward_target?: PublicKey
+  ) {
+    //Refresh market before cranking
+    //If no outcome_idx are passed, all outcomes are cranked if they meet the criteria to be cranked.
+    if (!outcome_idxs) {
+      //For binary markets, there is only one orderbook
+      const range = this.numberOfOutcomes == 2 ? 1 : this.numberOfOutcomes
+      outcome_idxs = Array.from(Array(range).keys())
+    }
+    if (
+      this.numberOfOutcomes == 2 &&
+      (outcome_idxs.includes(0) || outcome_idxs.includes(1))
+    ) {
+      // # OLD COMMENT: For binary markets, there is only one orderbook
+      //### ^ Not anymore. I've left the legacy code in there just in case.
+      outcome_idxs = [0]
+    }
+    if (!reward_target) reward_target = this._averClient.owner
+
+    if (!this.orderbookAccounts) throw new Error("No orderbook accounts")
+
+    await this.refresh()
+
+    const eventQueues = this.orderbookAccounts?.map((o) => o.eventQueue)
+    const loadedEventQueues = await loadAllEventQueues(
+      this._averClient.connection,
+      eventQueues
+    )
+
+    let sig = ""
+    for (let idx of outcome_idxs) {
+      if (loadedEventQueues[idx].header.count == 0) continue
+
+      console.log(
+        `Cranking market ${this.pubkey.toString()} for outcome ${idx} - ${
+          loadedEventQueues[idx].header.count
+        } events left to crank`
+      )
+      //TODO - CHECK THIS
+      if (loadedEventQueues[idx].header.count > 0) {
+        let userAccounts = loadedEventQueues[idx]
+          .parseFill(MAX_ITERATIONS_FOR_CONSUME_EVENTS)
+          .map((e) => {
+            if (e instanceof EventFill) {
+              return new PublicKey(e.makerCallbackInfo.slice(0, 32))
+            } else if (e instanceof EventOut) {
+              return new PublicKey(e.callBackInfo.slice(0, 32))
+            } else {
+              throw new Error("Not Fill and Not Out")
+            }
+          })
+
+        userAccounts = prepareUserAccountsList(userAccounts)
+        const eventsToCrank = Math.min(
+          MAX_ITERATIONS_FOR_CONSUME_EVENTS,
+          ...loadedEventQueues.map((e) => e.header.count)
+        )
+
+        sig = await this.consumeEvents(
+          idx,
+          userAccounts,
+          payer,
+          eventsToCrank,
+          reward_target
+        )
+      }
+    }
+    return sig
   }
 }
 

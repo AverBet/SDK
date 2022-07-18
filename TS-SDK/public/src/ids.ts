@@ -75,6 +75,8 @@ export const AVER_LAUNCH_ZERO_FEES_MAINNET = new PublicKey(
   "4QwFUyLKtHZqbHvxZQqLGPz8eMjXBgedaWvuQTdKwKJx"
 )
 
+export const MAX_ITERATIONS_FOR_CONSUME_EVENTS = 5
+
 // helpers
 export const getAverApiEndpoint = (solanaNetwork: SolanaNetwork) =>
   solanaNetwork == SolanaNetwork.Devnet
