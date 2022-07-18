@@ -34,6 +34,25 @@ import BN from "bn.js"
 import { AVER_PROGRAM_ID, AVER_HOST_ACCOUNT } from "./ids"
 import { UserHostLifetime } from "./user-host-lifetime"
 import { chunk } from "lodash"
+import {
+  checkCorrectUmaMarketMatch,
+  checkMarketActivePreEvent,
+  checkSufficientLamportBalance,
+  checkCancelOrderMarketStatus,
+  checkIncorrectOrderTypeForMarketOrder,
+  checkIsOrderValid,
+  checkLimitPriceError,
+  checkOrderExists,
+  checkOutcomeHasOrders,
+  checkOutcomeOutsideSpace,
+  checkOutcomePositionAmountError,
+  checkPriceError,
+  checkQuoteAndBaseSizeTooSmall,
+  checkStakeNoop,
+  checkUhlSelfExcluded,
+  checkUserMarketFull,
+  checkUserPermissionAndQuoteTokenLimitExceeded,
+} from "./checks"
 export class UserMarket {
   private _userMarketState: UserMarketState
 
@@ -650,7 +669,52 @@ export class UserMarket {
     averPreFlightCheck: boolean = false
   ) {
     if (averPreFlightCheck) {
-      this.isOrderValid(outcomeIndex, side, limitPrice, size, sizeFormat)
+      checkSufficientLamportBalance(this._userBalanceState)
+      checkCorrectUmaMarketMatch(this._userMarketState, this._market)
+      checkMarketActivePreEvent(this._market.marketStatus)
+      //checkUHLSelfExcluded() -Requires loading UHL
+      checkUserMarketFull(this._userMarketState)
+      checkLimitPriceError(limitPrice, this._market)
+      checkOutcomeOutsideSpace(outcomeIndex, this._market)
+      checkIncorrectOrderTypeForMarketOrder(
+        limitPrice,
+        orderType,
+        side,
+        this._market
+      )
+      checkStakeNoop(sizeFormat, limitPrice, side)
+      let tokens_available_to_buy = this.calculateTokensAvailableToBuy(
+        outcomeIndex,
+        limitPrice
+      )
+      let tokens_available_to_sell = this.calculateTokensAvailableToSell(
+        outcomeIndex,
+        limitPrice
+      )
+      checkIsOrderValid(
+        outcomeIndex,
+        side,
+        limitPrice,
+        size,
+        sizeFormat,
+        tokens_available_to_sell,
+        tokens_available_to_buy
+      )
+      checkQuoteAndBaseSizeTooSmall(
+        this._market,
+        side,
+        sizeFormat,
+        outcomeIndex,
+        limitPrice,
+        size
+      )
+      checkUserPermissionAndQuoteTokenLimitExceeded(
+        this._market,
+        this._userMarketState,
+        size,
+        limitPrice,
+        sizeFormat
+      )
     }
 
     const sizeU64 = new BN(
@@ -833,9 +897,6 @@ export class UserMarket {
     selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide,
     averPreFlightCheck: boolean = true
   ) {
-    if (!owner.publicKey.equals(this.user))
-      throw new Error("Owner must be same as user market owner")
-
     const ix = await this.makePlaceOrderInstruction(
       outcomeIndex,
       side,
@@ -872,19 +933,9 @@ export class UserMarket {
     averPreFlightCheck: boolean = false
   ) {
     if (averPreFlightCheck) {
-      if (this.lamportBalance < 5000)
-        throw new Error("Insufficient lamport balance")
-
-      if (!canCancelOrderInMarket(this.market.marketStatus))
-        throw new Error("Cannot cancel orders in current market status")
-
-      if (
-        !this.orders
-          .map((o) => o.orderId.toString())
-          .includes(orderId.toString())
-      ) {
-        throw new Error("Order ID does not exist in list of open orders")
-      }
+      checkSufficientLamportBalance(this._userBalanceState)
+      checkCancelOrderMarketStatus(this._market.marketStatus)
+      checkOrderExists(this._userMarketState, order)
     }
 
     // account for binary markets where there is only one order book
@@ -960,11 +1011,11 @@ export class UserMarket {
     averPreFlightCheck: boolean = false
   ) {
     if (averPreFlightCheck) {
-      if (this.lamportBalance < 5000)
-        throw new Error("Insufficient lamport balance")
-
-      if (!canCancelOrderInMarket(this.market.marketStatus))
-        throw new Error("Cannot cancel orders in current market status")
+      checkSufficientLamportBalance(this._userBalanceState)
+      checkCancelOrderMarketStatus(this._market.marketStatus)
+      outcomeIdsToCancel.map((o) => {
+        checkOutcomeHasOrders(o, this._userMarketState)
+      })
     }
 
     // @ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
@@ -1351,50 +1402,5 @@ export class UserMarket {
     )
 
     return minFreeTokensExceptOutcomeIndex + price * this.tokenBalance
-  }
-
-  /**
-   * Checks if an order is valid
-   *
-   * @param outcomeIndex
-   * @param side
-   * @param limitPrice
-   * @param size
-   * @param sizeFormat
-   *
-   * @returns {boolean}
-   */
-  isOrderValid(
-    outcomeIndex: number,
-    side: Side,
-    limitPrice: number,
-    size: number,
-    sizeFormat: SizeFormat
-  ) {
-    if (this.lamportBalance < 5000) {
-      throw new Error("Insufficient lamport balance")
-    }
-
-    const balanceRequired =
-      sizeFormat == SizeFormat.Payout ? size * limitPrice : size
-    const currentBalance =
-      side == Side.Ask
-        ? this.calculateTokensAvailableToSell(outcomeIndex, limitPrice)
-        : this.calculateTokensAvailableToBuy(outcomeIndex, limitPrice)
-    if (currentBalance < balanceRequired) {
-      throw new Error("Insufficient token balance")
-    }
-
-    if (this.orders.length == this.maxNumberOfOrders) {
-      throw new Error("Max number of orders reached")
-    }
-
-    roundPriceToNearestTickSize(limitPrice, this.market.numberOfOutcomes == 2)
-
-    if (!isMarketTradable(this.market.marketStatus)) {
-      throw new Error("Market currently not in a tradeable status")
-    }
-
-    return true
   }
 }
