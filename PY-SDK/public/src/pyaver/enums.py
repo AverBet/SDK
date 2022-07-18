@@ -1,4 +1,6 @@
 from enum import IntEnum, Enum
+from typing import NamedTuple
+from solana.publickey import PublicKey
 
 class Side(IntEnum):
     """
@@ -95,3 +97,21 @@ class SolanaNetwork(str, Enum):
     """
     DEVNET = 'devnet'
     MAINNET = 'mainnet-beta'
+
+class Fill(NamedTuple):
+    taker_side: Side
+    maker_order_id: int
+    quote_size: int
+    base_size: int
+    maker_user_market: PublicKey
+    taker_user_market: PublicKey
+    maker_fee_tier: int
+    taker_fee_tier: int
+
+class Out(NamedTuple):
+    side: Side
+    order_id: int
+    base_size: int
+    delete: bool
+    user_market: PublicKey
+    fee_tier: int

@@ -1,13 +1,16 @@
 from solana.rpc.async_api import AsyncClient
+from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
+from .event_queue import load_all_event_queues, prepare_user_accounts_list
 from .aver_client import AverClient
 from solana.publickey import PublicKey
 from solana.keypair import Keypair
-from .enums import MarketStatus
+from .enums import Fill, MarketStatus
 # from constants import DEFAULT_QUOTE_TOKEN_DEVNET, DEFAULT_MARKET_AUTHORITY, AVER_PROGRAM_ID_DEVNET_2
 from .constants import AVER_MARKET_AUTHORITY, AVER_PROGRAM_ID
 from .utils import load_multiple_bytes_data, sign_and_send_transaction_instructions
 from .data_classes import MarketState, MarketStoreState, OrderbookAccountsState
 from .orderbook import Orderbook
+from solana.transaction import AccountMeta
 from .slab import Slab
 from anchorpy import Context
 from spl.token.instructions import get_associated_token_address
@@ -550,6 +553,100 @@ class AverMarket():
         if self.market_state.inplay_start_time is not None and solana_datetime.timestamp() > self.market_state.inplay_start_time :
             return MarketStatus.ACTIVE_IN_PLAY
         return self.market_state.market_status
+
+    async def crank_market(
+        self,
+        outcome_idxs: list[int] = None,
+        reward_target: PublicKey = None,
+        payer: Keypair = None,
+    ):
+        """
+        Refresh market before cranking
+        If no outcome_idx are passed, all outcomes are cranked if they meet the criteria to be cranked.
+        """
+        if outcome_idxs == None:
+            # For binary markets, there is only one orderbook
+            outcome_idxs = [idx for idx in range(
+                1 if self.market_state.number_of_outcomes == 2 else self.market_state.number_of_outcomes)]
+        if self.market_state.number_of_outcomes == 2 and (0 in outcome_idxs or 1 in outcome_idxs):
+            # OLD COMMENT: For binary markets, there is only one orderbook
+            ### ^ Not anymore. I've left the legacy code in there just in case.
+            outcome_idxs = [0]
+        if reward_target == None:
+            reward_target = self.aver_client.owner.public_key
+        if payer == None:
+            payer = self.aver_client.owner
+
+        # refreshed_market = await refresh_market(self.aver_client, self)
+
+        event_queues = [o.event_queue for o in self.market_store_state.orderbook_accounts]
+        loaded_event_queues = await load_all_event_queues(
+            self.aver_client.provider.connection,
+            event_queues 
+            )
+
+        sig = ''
+        for idx in outcome_idxs:
+            if loaded_event_queues[idx]["header"].count == 0:
+                continue
+
+            print(f'Cranking market {str(self.market_pubkey)} for outcome {idx} - {loaded_event_queues[idx]["header"].count} events left to crank')
+            if loaded_event_queues[idx]['header'].count > 0:
+                user_accounts = []
+                for j, event in enumerate(loaded_event_queues[idx]['nodes']):
+                    if type(event) == Fill:
+                        user_accounts += [event.maker_user_market]
+                    else:  # Out
+                        user_accounts += [event.user_market]
+                    if j == MAX_ITERATIONS_FOR_CONSUME_EVENTS:
+                        break
+                user_accounts = prepare_user_accounts_list(user_accounts)
+                events_to_crank = min(
+                    loaded_event_queues[idx]['header'].count, MAX_ITERATIONS_FOR_CONSUME_EVENTS)
+
+                sig = await self.consume_events(
+                    outcome_idx=idx,
+                    max_iterations=events_to_crank,
+                    user_accounts=user_accounts,
+                    reward_target=reward_target,
+                    payer=payer,
+                )
+
+        return sig
+
+    async def consume_events(
+        self,
+        outcome_idx: int,
+        user_accounts: list[PublicKey],
+        max_iterations: int = None,
+        reward_target: PublicKey = None,
+        payer: Keypair = None,
+    ):
+        if reward_target == None:
+            reward_target = self.aver_client.owner.public_key
+        if payer == None:
+            payer = self.aver_client.owner
+        if max_iterations > MAX_ITERATIONS_FOR_CONSUME_EVENTS or max_iterations == None:
+            max_iterations = MAX_ITERATIONS_FOR_CONSUME_EVENTS
         
+        user_accounts_unsorted = [AccountMeta(
+                pk, False, True) for pk in user_accounts]
+                
+        remaining_accounts = sorted(user_accounts_unsorted, key=lambda account: bytes(account.pubkey))
+
+        return await self.aver_client.program.rpc["consume_events"](
+                max_iterations,
+                outcome_idx,
+                ctx=Context(
+                    accounts={
+                        "market": self.market_pubkey,
+                        "market_store": self.market_state.market_store,
+                        "orderbook": self.market_store_state.orderbook_accounts[outcome_idx].orderbook,
+                        "event_queue": self.market_store_state.orderbook_accounts[outcome_idx].event_queue,
+                        "reward_target": reward_target,
+                    },
+                    remaining_accounts=remaining_accounts,
+                ),
+            )
 
 #TODO - Market Listener

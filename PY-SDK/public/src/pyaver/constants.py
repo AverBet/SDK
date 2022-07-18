@@ -88,6 +88,8 @@ AVER_MAINNET_LAUNCH_NFT_MAINNET = PublicKey(
 
 SYS_VAR_CLOCK = PublicKey('SysvarC1ock11111111111111111111111111111111')
 
+MAX_ITERATIONS_FOR_CONSUME_EVENTS = 5  
+
 # helpers
 def get_aver_api_endpoint(solanaNetwork: SolanaNetwork):
   """
