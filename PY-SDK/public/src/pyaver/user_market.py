@@ -66,14 +66,14 @@ class UserMarket():
 
     @staticmethod
     async def load(
-        aver_client: AverClient, 
-        market: AverMarket, 
-        owner: PublicKey, 
-        host: PublicKey = AVER_HOST_ACCOUNT,
-        program_id: PublicKey = AVER_PROGRAM_ID
+            aver_client: AverClient, 
+            market: AverMarket, 
+            owner: PublicKey, 
+            host: PublicKey = AVER_HOST_ACCOUNT,
+            program_id: PublicKey = AVER_PROGRAM_ID
         ):
             """
-            Initialises an UserMarket object, from Market, Host and Owner public keys
+            Initialises an UserMarket object from Market, Host and Owner public keys
 
             To refresh data on an already loaded UserMarket use src.refresh.refresh_user_market()
 
@@ -93,16 +93,16 @@ class UserMarket():
     #Should we instead have owners: list[PublicKey] here to allow for different owners
     @staticmethod
     async def load_multiple(
-        aver_client: AverClient, 
-        markets: list[AverMarket], 
-        owner: PublicKey, 
-        host: PublicKey = AVER_HOST_ACCOUNT,
-        program_id: PublicKey = AVER_PROGRAM_ID,
+            aver_client: AverClient, 
+            markets: list[AverMarket], 
+            owner: PublicKey, 
+            host: PublicKey = AVER_HOST_ACCOUNT,
+            program_id: PublicKey = AVER_PROGRAM_ID,
         ):
             """
-            Initialises multiple UserMarket objects, from Market, Host and Owner public keys
+            Initialises multiple UserMarket objects from Market, Host and Owner public keys
 
-            This method is quicker that using UserMarket.load() multiple times
+            This method is more highly optimized and faster than using UserMarket.load() multiple times.
 
             To refresh data on already loaded UserMarkets use src.refresh.refresh_multiple_user_markets()
 
@@ -120,9 +120,13 @@ class UserMarket():
             return await UserMarket.load_multiple_by_uma(aver_client, umas, markets)
 
     @staticmethod
-    async def load_by_uma(aver_client: AverClient, pubkey: PublicKey, market: (AverMarket or PublicKey)):
+    async def load_by_uma(
+            aver_client: AverClient,
+            pubkey: PublicKey,
+            market: (AverMarket or PublicKey)
+        ):
         """
-        Initialises an UserMarket object, from UserMarket account public key
+        Initialises an UserMarket object from UserMarket account public key
 
         To refresh data on an already loaded UserMarket use src.refresh.refresh_user_market()
 
@@ -149,7 +153,12 @@ class UserMarket():
         return UserMarket(aver_client, pubkey, res, market, user_balance_state)   
     
     @staticmethod
-    async def load_multiple_by_uma(aver_client: AverClient, pubkeys: list[PublicKey], markets: list[AverMarket]):
+    async def load_multiple_by_uma(
+            aver_client: AverClient,
+            pubkeys: list[PublicKey],
+            markets: list[AverMarket]
+        ):
+
         res: list[UserMarketState] = await aver_client.program.account['UserMarket'].fetch_multiple(pubkeys)
 
         user_pubkeys = [u.user for u in res]
@@ -164,11 +173,11 @@ class UserMarket():
     
     @staticmethod
     def get_user_markets_from_account_state(
-        aver_client: AverClient, 
-        pubkeys: list[PublicKey], 
-        user_market_states: list[UserMarketState],
-        aver_markets: list[AverMarket],
-        user_balance_states: list[UserBalanceState]
+            aver_client: AverClient, 
+            pubkeys: list[PublicKey], 
+            user_market_states: list[UserMarketState],
+            aver_markets: list[AverMarket],
+            user_balance_states: list[UserBalanceState]
         ):
         """
         Returns multiple UserMarket objects from their respective MarketStates, stores and orderbook objects
@@ -192,7 +201,10 @@ class UserMarket():
         return user_markets
     
     @staticmethod
-    def parse_user_market_state(buffer: bytes, aver_client: AverClient):
+    def parse_user_market_state(
+            buffer: bytes,
+            aver_client: AverClient
+        ):
         """
         Parses raw onchain data to UserMarketState object        
         Args:
@@ -207,7 +219,10 @@ class UserMarket():
         return uma_parsed
     
     @staticmethod
-    def parse_multiple_user_market_state(buffer: list[bytes], aver_client: AverMarket):
+    def parse_multiple_user_market_state(
+            buffer: list[bytes],
+            aver_client: AverMarket
+        ):
         """
         Parses raw onchain data to UserMarketState objects    
 
@@ -221,9 +236,14 @@ class UserMarket():
         return [UserMarket.parse_user_market_state(b, aver_client) for b in buffer]
 
     @staticmethod
-    def derive_pubkey_and_bump(owner: PublicKey, market: PublicKey, host: PublicKey, program_id: PublicKey = AVER_PROGRAM_ID) -> PublicKey:
+    def derive_pubkey_and_bump(
+            owner: PublicKey,
+            market: PublicKey,
+            host: PublicKey,
+            program_id: PublicKey = AVER_PROGRAM_ID
+        ) -> PublicKey:
         """
-        Derives PDA for MarketStore public key 
+        Derives PDA (Program Derived Account) for UserMarket public key given a user, host and market
 
         Args:
             owner (PublicKey): Owner of UserMarket account
@@ -241,15 +261,15 @@ class UserMarket():
 
     @staticmethod
     def make_create_user_market_account_instruction(
-        aver_client: AverClient,
-        market: AverMarket,
-        owner: PublicKey,
-        host: PublicKey = AVER_HOST_ACCOUNT, 
-        number_of_orders: int = None,
-        program_id: PublicKey = AVER_PROGRAM_ID
-    ):
+            aver_client: AverClient,
+            market: AverMarket,
+            owner: PublicKey,
+            host: PublicKey = AVER_HOST_ACCOUNT, 
+            number_of_orders: int = None,
+            program_id: PublicKey = AVER_PROGRAM_ID
+        ):
         """
-        Creates instruction for UserMarket account creation.
+        Creates instruction for UserMarket account creation
 
         Returns TransactionInstruction object only. Does not send transaction.
 
@@ -287,16 +307,16 @@ class UserMarket():
 
     @staticmethod
     async def create_user_market_account(
-        aver_client: AverClient,
-        market: AverMarket,
-        owner: Keypair,
-        send_options: TxOpts = None,
-        host: PublicKey = AVER_HOST_ACCOUNT,
-        number_of_orders: int = None,
-        program_id: PublicKey = AVER_PROGRAM_ID
-    ):
+            aver_client: AverClient,
+            market: AverMarket,
+            owner: Keypair,
+            send_options: TxOpts = None,
+            host: PublicKey = AVER_HOST_ACCOUNT,
+            number_of_orders: int = None,
+            program_id: PublicKey = AVER_PROGRAM_ID
+        ):
         """
-        Creates UserMarket account.
+        Creates UserMarket account
 
         Sends instructions on chain
 
@@ -343,19 +363,19 @@ class UserMarket():
     
     @staticmethod
     async def get_or_create_user_market_account(
-        client: AverClient,
-        owner: Keypair,
-        market: AverMarket,
-        send_options: TxOpts = None,
-        quote_token_mint: PublicKey = None,
-        host: PublicKey = AVER_HOST_ACCOUNT,
-        number_of_orders: int = None,
-        referrer: PublicKey = SYS_PROGRAM_ID,
-        discount_token: PublicKey = SYS_PROGRAM_ID,
-        program_id: PublicKey = AVER_PROGRAM_ID 
-    ):
+            client: AverClient,
+            owner: Keypair,
+            market: AverMarket,
+            send_options: TxOpts = None,
+            quote_token_mint: PublicKey = None,
+            host: PublicKey = AVER_HOST_ACCOUNT,
+            number_of_orders: int = None,
+            referrer: PublicKey = SYS_PROGRAM_ID,
+            discount_token: PublicKey = SYS_PROGRAM_ID,
+            program_id: PublicKey = AVER_PROGRAM_ID 
+        ):
         """
-        Attempts to load UserMarket object and creates one if not found
+        Attempts to load UserMarket object or creates one if not one is not found
 
         Args:
             client (AverClient): AverClient object
@@ -417,11 +437,11 @@ class UserMarket():
     
     @staticmethod
     async def create_uma_and_get_or_create_associated_accounts(
-        aver_client: AverClient,
-        fee_payer: Keypair,
-        owner: PublicKey,
-        token_mint: PublicKey = None
-    ):
+            aver_client: AverClient,
+            fee_payer: Keypair,
+            owner: PublicKey,
+            token_mint: PublicKey = None
+        ):
         """
         See src.aver_client.AverClient.get_or_create_associated_token_account()
         """
@@ -436,17 +456,17 @@ class UserMarket():
 
 
     def make_place_order_instruction(
-        self,
-        outcome_position: int,
-        side: Side,
-        limit_price: float,
-        size: float,
-        size_format: SizeFormat,
-        user_quote_token_ata: PublicKey,
-        order_type: OrderType = OrderType.LIMIT,
-        self_trade_behavior: SelfTradeBehavior = SelfTradeBehavior.CANCEL_PROVIDE,
-        active_pre_flight_check: bool = False,
-    ):
+            self,
+            outcome_position: int,
+            side: Side,
+            limit_price: float,
+            size: float,
+            size_format: SizeFormat,
+            user_quote_token_ata: PublicKey,
+            order_type: OrderType = OrderType.LIMIT,
+            self_trade_behavior: SelfTradeBehavior = SelfTradeBehavior.CANCEL_PROVIDE,
+            active_pre_flight_check: bool = False,
+        ):
         """
         Creates instruction to place order.
 
@@ -526,34 +546,34 @@ class UserMarket():
         )
 
     async def place_order(
-        self,
-        owner: Keypair,
-        outcome_position: int,
-        side: Side,
-        limit_price: float,
-        size: float,
-        size_format: SizeFormat,
-        send_options: TxOpts = None,
-        order_type: OrderType = OrderType.LIMIT,
-        self_trade_behavior: SelfTradeBehavior = SelfTradeBehavior.CANCEL_PROVIDE,
-        active_pre_flight_check: bool = True,  
-    ):
+            self,
+            owner: Keypair,
+            outcome_position: int,
+            side: Side,
+            limit_price: float,
+            size: float,
+            size_format: SizeFormat,
+            send_options: TxOpts = None,
+            order_type: OrderType = OrderType.LIMIT,
+            self_trade_behavior: SelfTradeBehavior = SelfTradeBehavior.CANCEL_PROVIDE,
+            active_pre_flight_check: bool = True,  
+        ):
         """
-        Places order
+        Places a new order
 
         Sends instructions on chain
 
         Args:
             owner (Keypair): Owner of UserMarket account
-            outcome_position (int): ID of outcome
-            side (Side): Side object (bid or ask)
-            limit_price (float): Limit price
-            size (float): Size
-            size_format (SizeFormat): SizeFormat object (stake or payout)
+            outcome_position (int): index of the outcome intended to be traded
+            side (Side): Side object (bid/back/buy or ask/lay/sell)
+            limit_price (float): Limit price - in probability format i.e. in the range (0, 1). If you are using Decimal or other odds formats you will need to convert these prior to passing as an argument
+            size (float): Size - in the format specified in size_format. This value is in number of 'tokens' - i.e. 20.45 => 20.45 USDC, the SDK handles the conversion to u64 token units (e.g. to 20,450,000 as USDC is a 6 decimal place token)
+            size_format (SizeFormat): SizeFormat object (Stake or Payout formats supported)
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
-            order_type (OrderType, optional): OrderType object. Defaults to OrderType.LIMIT.
-            self_trade_behavior (SelfTradeBehavior, optional): Behavior when a user's trade is matched with themselves. Defaults to SelfTradeBehavior.CANCEL_PROVIDE.
-            active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to True.
+            order_type (OrderType, optional): OrderType object. Defaults to OrderType.LIMIT. Other options include OrderType.IOC, OrderType.KILL_OR_FILL, OrderType.POST_ONLY.
+            self_trade_behavior (SelfTradeBehavior, optional): Behavior when a user's trade is matched with themselves. Defaults to SelfTradeBehavior.CANCEL_PROVIDE. Other options include SelfTradeBehavior.DECREMENT_TAKE and SelfTradeBehavior.ABORT_TRANSACTION.
+            active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to True. 
 
         Raises:
             Exception: Owner must be same as user market owner
@@ -590,11 +610,11 @@ class UserMarket():
         )
 
     def make_cancel_order_instruction(
-        self,
-        order_id: int,
-        outcome_position: int,
-        active_pre_flight_check: bool = False,
-    ):
+            self,
+            order_id: int,
+            outcome_position: int,
+            active_pre_flight_check: bool = False,
+        ):
         """
         Creates instruction for to cancel order.
 
@@ -622,7 +642,6 @@ class UserMarket():
             check_cancel_order_market_status(self.market.market_state.market_status)
             check_order_exists(self.user_market_state, order_id)
       
-        
         is_binary_market_second_outcome = self.market.market_state.number_of_outcomes == 2 and outcome_position == 1
         orderbook_account_index = outcome_position if not is_binary_market_second_outcome else 0
         orderbook_account = self.market.market_store_state.orderbook_accounts[orderbook_account_index]

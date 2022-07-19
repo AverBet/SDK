@@ -12,6 +12,11 @@ class Side(IntEnum):
 class OrderType(IntEnum):
     """
     Type of order
+
+    LIMIT = a Limit order, will attempt to fill against existing opposing orders and post any or all residual order to the orderbook
+    IOC ('Immediate-or-Cancel') = will fill as much as available against existing opposing orders. Any residual unmatched part of the order will not be posted to the orderbook
+    KILL_OR_FILL = The entire order will be aborted if it cannot be immediately matched with existing opposing orders
+    POST_ONLY = The entire order will be aborted if it would have resulted in some or all of the order being filled against existing opposing orders.
     """
 
     LIMIT = 0
@@ -23,6 +28,10 @@ class OrderType(IntEnum):
 class SelfTradeBehavior(IntEnum):
     """
     Behavior when a user's trade is matched with themselves
+
+    DECREMENT_TAKE = Reduces the size of the new order
+    CANCEL_PROVIDE = Reduces the size of the existing (opposing) order
+    ABORT_TRANSACTION = Cancels the whole transaction if some or all of it would self-trade
     """
     DECREMENT_TAKE = 0
     CANCEL_PROVIDE = 1

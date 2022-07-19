@@ -53,6 +53,7 @@ class Host():
         host_result = await aver_client.program.account['Host'].fetch(pubkey)
         return Host(pubkey, host_result)
 
+
     @staticmethod
     def make_create_host_account_instruction(
         aver_client: AverClient,
@@ -103,7 +104,7 @@ class Host():
         """
         Creates host account.
 
-        Sends instructions on chain
+        Sends an instructions to the on-chain program to create a new Host account.
 
         Args:
             aver_client (AverClient): AverClient object

@@ -44,7 +44,10 @@ class UserHostLifetime():
     @staticmethod
     async def load(aver_client: AverClient, pubkey: PublicKey):
         """
-        Initialises an UserHostLifetime object
+        Initialises an UserHostLifetime Account (UHLA) object.
+
+        A UHLA is an account which is initialized when a wallet interacts with Aver via a particular Host for the first time. It is used to store values related to 
+        a wallet's interactions with Aver Markets via this Host. It is required to be initialized before a wallet can interact with any Markets via a given Host.
 
         Args:
             aver_client (AverClient): AverClient object

@@ -10,11 +10,11 @@ from .data_classes import UserBalanceState, UserMarketState
 #TODO - Waiting on Adi for cost of creating UHL/UMA and add this to calculation
 def check_sufficient_lamport_balance(user_balance_state: UserBalanceState):
     if(user_balance_state.lamport_balance < 5000):
-        raise Exception('Payer has insufficient funds')
+        raise Exception(f'Payer has insufficient lamports. Lamport balance: {user_balance_state.lamport_balance}')
 
 def check_market_active_pre_event(market_status: MarketStatus):
     if(market_status != MarketStatus.ACTIVE_PRE_EVENT):
-        raise Exception('Market status is invalid for operation.')
+        raise Exception(f'The current market status does not permit this action. Market status {market_status}')
 
 def check_uhl_self_excluded(uhl: UserHostLifetime):
     if(uhl.user_host_lifetime_state.is_self_excluded):
@@ -22,37 +22,36 @@ def check_uhl_self_excluded(uhl: UserHostLifetime):
 
 def check_user_market_full(user_market_state: UserMarketState):
     if(user_market_state.number_of_orders == user_market_state.max_number_of_orders):
-        raise Exception('The user account has reached its maximum capacity for open orders.')
+        raise Exception(f'The UserMarketAccount for this market has reach its maximum capacity for open orders. Open orders: {user_market_state.number_of_orders } Slots: {user_market_state.max_number_of_orders}')
 
 def check_limit_price_error(limit_price: float, market: AverMarket):
     one_in_market_decimals = 10 ** market.market_state.decimals
     if(limit_price > one_in_market_decimals):
-        raise Exception('Limit price too high for market decimals')
+        raise Exception(f'Limit prices must be in the range 0 to 1 USDC (0 - 1,000,000). Value provided: {limit_price}')
 
 def check_price_error(limit_price: float, side: Side):
-    error_message = 'If buy: price must be strictly greater than zero, sell: price strictly less than 1"'
     if(side == Side.BUY):
         if(not limit_price > 0):
-            raise Exception(error_message)
+            raise Exception(f'The price provided for a BUY order must be strictly greater than 0. Limit price provided: {limit_price}')
     
     if(side == Side.SELL):
         if(not limit_price < 1):
-            raise Exception(error_message)
+            raise Exception(f'The price provided for a SELL order must be strictly less than 1 USDC (1,000,000). Limit price provided: {limit_price}')
 
 def check_outcome_outside_space(outcome_id: int, market: AverMarket):
     if(not outcome_id in range(0, market.market_state.number_of_outcomes - 1)):
-        raise Exception('Given outcome is outside the outcome space for this market')
+        raise Exception(f'The outcome index provided is not within the outcome space for this market. Outcome index provided: {outcome_id}; Outcome indices in this market: 0 to {(market.market_state.number_of_outcomes-1)}')
 
 def check_incorrect_order_type_for_market_order(limit_price: float, order_type: OrderType, side: Side, market: AverMarket):
     market_order = (limit_price == 1 and side == Side.BUY) or (limit_price == 0 and side == Side.SELL)
     if(market_order):
         if(order_type != OrderType.KILL_OR_FILL and order_type != OrderType.IOC):
-            raise Exception('"Market order type needs to be IOC or KOF')
+            raise Exception(f"When placing a market order (BUY with price = 1, or SELL with price = 0), the order type must to be IOC or KOF")
 
 def check_stake_noop(size_format: SizeFormat, limit_price: float, side: Side):
     market_order = (limit_price == 1 and side == Side.BUY) or (limit_price == 0 and side == Side.SELL)
     if(size_format == SizeFormat.STAKE and market_order):
-        raise Exception('The operation is a no-op"')
+        raise Exception('Market orders are currently not supports for orders specified in STAKE.')
 
 def check_is_order_valid(
     outcome_index: int,
@@ -85,7 +84,7 @@ def check_is_order_valid(
         current_balance = tokens_available_to_sell if side == Side.SELL else tokens_available_to_buy
 
         if(current_balance < balance_required):
-            raise Exception('')
+            raise Exception(f'Insufficient token balance to support this order. Balance: {current_balance}; Required: {balance_required}')
 
 #TODO - Please check this function 
 #Here one_in_market_decimals has been replaced by 1, as price is not in market decimals
@@ -114,14 +113,14 @@ def check_quote_and_base_size_too_small(market: AverMarket, side: Side, size_for
     max_base_qty = max_base_qty * (10 ** market.market_state.decimals)
     
     if(binary_second_outcome and size_format == SizeFormat.PAYOUT and side == Side.BUY and (max_base_qty - max_quote_qty) < market.market_store_state.min_new_order_quote_size):
-        raise Exception('The quote order size is too small.')
+        raise Exception(f'The resulting STAKE size for this order is below the market minimum. Stake: {max_base_qty - max_quote_qty}, Minimum stake: {market.market_store_state.min_new_order_quote_size}')
   
 
     if((not binary_second_outcome) and max_quote_qty < market.market_store_state.min_new_order_quote_size):
-        raise Exception('The quote order size is too small.')
+        raise Exception(f'The resulting STAKE size for this order is below the market minimum. Stake: {max_quote_qty}, Minimum stake: {market.market_store_state.min_new_order_quote_size}')
     
     if(max_base_qty < market.market_store_state.min_new_order_base_size):
-        raise Exception('The base order size is too small.')
+        raise Exception(f'The resulting PAYOUT size for this order is below the market minimum. Payout: {max_base_qty}, Minimum payout: {market.market_store_state.min_new_order_base_size}')
 
 #TODO - check this
 def check_user_permission_and_quote_token_limit_exceeded(market: AverMarket, user_market_state: UserMarketState, size: float, limit_price: float, size_format: SizeFormat):
@@ -133,10 +132,10 @@ def check_user_permission_and_quote_token_limit_exceeded(market: AverMarket, use
     elif(pmf and user_market_state.user_verification_account is None):
         quote_tokens_limit = market.market_state.max_quote_tokens_in_permission_capped
     else:
-        raise Exception('Something went wrong with user permissioning')
+        raise Exception(f'This wallet does not have the required permissions to interact with this market.')
 
     if((balance_required + user_market_state.net_quote_tokens_in) > quote_tokens_limit):
-        raise Exception('Permissioned quote token limit exceeded')
+        raise Exception(f'This order would lead to the maximum number of tokens for this market being exceeded. Please adjust your order to remain within market limits. Tokens required for this order {balance_required}; Remaining tokens until limit reached: {quote_token_limit - user_market_state.net_quote_tokens_in}')
 
 #####
 ## Cancel order
@@ -149,14 +148,13 @@ def check_cancel_order_market_status(market_status: MarketStatus):
     invalid_statuses = [MarketStatus.INITIALIZED, MarketStatus.RESOLVED, MarketStatus.VOIDED, MarketStatus.UNINITIALIZED, MarketStatus.CEASED_CRANKED_CLOSED, MarketStatus.TRADING_CEASED]
 
     if(market_status in invalid_statuses):
-        raise Error('Market status is invalid for operation')
+        raise Exception(f'The current market status does not permit this action. Market status {market_status}')
 
 def check_order_exists(user_market_state: UserMarketState, order_id: int):
     for o in user_market_state.orders:
         if o.order_id - order_id == 0:
             return
-
-    raise Exception('The specified order has not been found.')
+    raise Exception(f'No order at order_id {order_id} was found for this market.')
 
 #TODO - Calculate min across free outcome positions
 def check_outcome_position_amount_error(user_market_state: UserMarketState):
@@ -166,5 +164,4 @@ def check_outcome_has_orders(outcome_id: int, user_market_state: UserMarketState
     for o in user_market_state.orders:
         if(o.outcome_id == outcome_id):
             return
-
-    raise Exception('The specified order has not been found.')
+    raise Exception(f'No open orders found for outcome {outcome_id} in this market.')

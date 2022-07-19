@@ -20,37 +20,37 @@ class AverClient():
     """
     Aver Client Class
 
-    Use AverClient to interact with the Aver Program
+    Use AverClient to interact with the Aver Program, Solana network and Aver API
     """
 
     connection: AsyncClient
-    """AsyncClient"""
+    """Solana AsyncClient"""
     program: Program
-    """Program"""
+    """AnchorPy Program"""
     provider: Provider
-    """Provider"""
+    """AnchorPy Provider"""
     aver_api_endpoint: str
     """Endpoint is used to make requests to Aver"""
     solana_network: SolanaNetwork
-    """Devnet or Mainnet"""
+    """Devnet or Mainnet - must correspond to the network provided in the connection AsyncClient"""
     quote_token: PublicKey
-    """"""
+    """The token mint of the default quote token for markets on this network (i.e. USDC)"""
     solana_client: Client
-    """"""
+    """Solana Client"""
     owner: Keypair
-    """Pays for transactions onchain"""
+    """The default payer for transactions on-chain, unless one is specified"""
 
     def __init__(
-        self, 
-        program: Program,
-        aver_api_endpoint: str,
-        solana_network: SolanaNetwork,
+            self, 
+            program: Program,
+            aver_api_endpoint: str,
+            solana_network: SolanaNetwork,
         ):
         """
         Initialises AverClient object. Do not use this function; use AverClient.load() instead
 
         Args:
-            program (Program): Aver program
+            program (Program): Aver program AnchorPy
             aver_api_endpoint (str): Endpoint for Aver API (to be removed soon)
             solana_network (SolanaNetwork): Solana network
         """
@@ -65,27 +65,27 @@ class AverClient():
 
     @staticmethod
     async def load(
-        connection: AsyncClient,
-        owner: Keypair or Wallet, 
-        opts: types.TxOpts,
-        network: SolanaNetwork,
-        program_id: PublicKey = AVER_PROGRAM_ID,
+            connection: AsyncClient,
+            owner: Keypair or Wallet, 
+            opts: types.TxOpts,
+            network: SolanaNetwork,
+            program_id: PublicKey = AVER_PROGRAM_ID,
         ):
             """
             Initialises an AverClient object
 
             Args:
                 connection (AsyncClient): Solana AsyncClient object
-                owner (KeypairorWallet): Keypair to pay transaction costs (and rent costs)
-                opts (types.TxOpts): Default options for sending transactions
+                owner (KeypairorWallet): Default keypair to pay transaction costs (and rent costs) unless one is otherwise specified for a given transaction.
+                opts (types.TxOpts): Default options for sending transactions. 
                 network (SolanaNetwork): Solana network
-                program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
+                program_id (PublicKey, optional): Program public key. Defaults to latest AVER_PROGRAM_ID specified in constants.py.
 
             Raises:
                 Exception: Invalid owner argument
 
             Returns:
-                AverClient: Aver Client
+                AverClient: AverClient
             """
             if(isinstance(owner, Wallet)):
                 wallet = owner
@@ -106,7 +106,10 @@ class AverClient():
             return aver_client
 
     @staticmethod
-    async def load_program(provider: Provider, program_id: PublicKey = AVER_PROGRAM_ID):
+    async def load_program(
+            provider: Provider,
+            program_id: PublicKey = AVER_PROGRAM_ID
+        ):
         """
         Loads Aver Program
 
@@ -132,7 +135,7 @@ class AverClient():
         """
         Closes connection.
 
-        You should call this in your program's clean-up function(s)
+        Call this in your program's clean-up function(s)
         """
         await self.provider.close()
 
@@ -153,11 +156,11 @@ class AverClient():
             token_mint: PublicKey = None,
         ):
         """
-        Attempts to load an ATA and creates one if not found.
+        Attempts to load an Associate Token Account (ATA) or creates one if not found.
 
         Args:
-            owner (PublicKey): Owner of ATA
-            payer (Keypair): Payer of transaction fee and ATA rent (this is recoverable)
+            owner (PublicKey): Public key of the owner of Associated Token Account
+            payer (Keypair): Payer of transaction fee and ATA rent (rent is recoverable)
             token_mint (PublicKey, optional): ATA token mint public key. Defaults to USDC token according to chosen solana network.
 
         Returns:
@@ -183,12 +186,16 @@ class AverClient():
         else:
             return associated_token_account
 
-    async def request_lamport_airdrop(self, amount: int, owner: PublicKey):
+    async def request_lamport_airdrop(
+            self,
+            amount: int,
+            owner: PublicKey
+        ):
         """
-        Request lamport airdrop. Only works on devnet
+        Request an airdrop of lamports (SOL). This method is only supported on devnet.
 
         Args:
-            amount (int): Lamports requested
+            amount (int): Lamports to airdrop. Note 1 lamport = 10^-9 SOL. Max of 1 SOL (10^9 lamports) applies.
             owner (PublicKey): Public key of account to be airdropped
 
         Returns:
@@ -203,7 +210,9 @@ class AverClient():
 
     async def request_ata_balance(self, ata: PublicKey):
         """
-        Fetches ATA Balance
+        Fetches the balance for an Associated Token Account (ATA). 
+        Note: the value returned is the integer representation of the balance, where a unit is the smallest possible increment of the token.
+        For example, USDC is a 6 decimal place token, so a value of 1,000,000 here = 1 USDC.
 
         Args:
             ata (PublicKey): ATA public key
@@ -219,14 +228,35 @@ class AverClient():
             raise Exception(response['error'])
         return int(response['result']['value']['amount'])
 
-    async def request_token_balance(self, mint: PublicKey, owner: PublicKey):
-        """"""
+    async def request_token_balance(
+            self,
+            mint: PublicKey,
+            owner: PublicKey
+        ):
+        """
+        Fetches a wallet's token balance, given the wallet's owner and the token mint's public key.
+        Note: the value returned is the integer representation of the balance, where a unit is the smallest possible increment of the token.
+        For example, USDC is a 6 decimal place token, so a value of 1,000,000 here = 1 USDC.
+
+        Args:
+            mint: The public key of the token mint
+            owner: The public key of the wallet
+
+        Returns:
+            int: Token balance
+
+        """
         ata = get_associated_token_address(owner, mint)
         return await self.request_ata_balance(ata)
 
-    async def request_lamport_balance(self, owner: PublicKey):
+    async def request_lamport_balance(
+            self,
+            owner: PublicKey
+        ):
         """
-        Fetches Lamport balance
+        Fetches Lamport (SOL) balance for a given wallet
+        Note: the value returned is the integer representation of the balance, where a unit is one lamport (=10^-9 SOL)
+        For example, a value of 1,000,000,000 (lamports) = 1 SOL.
 
         Args:
             owner (PublicKey): Owner public key
@@ -242,7 +272,9 @@ class AverClient():
             raise Exception(response['error'])
         return response['result']['value']
 
-    async def get_system_clock_datetime(self):
+    async def get_system_clock_datetime(
+            self
+        ):
         """
         Loads current solana system datetime
 

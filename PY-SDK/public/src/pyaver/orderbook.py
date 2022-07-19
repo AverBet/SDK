@@ -10,7 +10,7 @@ class Orderbook:
     """
     Orderbook object
 
-    Contains information on all orders for a particular outcome on a particular market
+    Contains information on open orders on both the bids and asks of a particular outcome in a market
     """
 
     pubkey: PublicKey
@@ -27,11 +27,11 @@ class Orderbook:
     """
     slab_bids_pubkey: PublicKey
     """
-    Slab bids public key
+    Public key of the account containing the bids
     """
     slab_asks_pubkey: PublicKey
     """
-    Slab asks public key
+    Public key of the account containing the asks
     """
     decimals: int
     """
@@ -39,7 +39,7 @@ class Orderbook:
     """
     is_inverted: bool
     """
-    Whether the bids and asks have been switched with each other
+    Whether the bids and asks should be interpretted as inverted when parsing the data. (Used in the case of the second outcome in a two-outcome market.)
     """
 
     def __init__(
@@ -84,7 +84,7 @@ class Orderbook:
         """
         Initialise an Orderbook object
 
-        Parameters are usually found in MarketStoreStates' --> OrderbookAccounts
+        Parameters are found in MarketStoreStates' --> OrderbookAccounts
 
         Args:
             conn (AsyncClient): Solana AsyncClient object
@@ -146,7 +146,8 @@ class Orderbook:
 
     def invert(self):
         """
-        Returns a version of the orderbook that has bids and asks switched
+        Returns a version of the orderbook which has been parsed with bids and asks swtiched and
+        prices inverted. (Used for the second outcome in a two-outcome market)
 
         Returns:
             Orderbook: Orderbook object
@@ -191,9 +192,9 @@ class Orderbook:
         is_inverted=False
         ):
         """
-        Get level 2 market information for a particular slab
+        Get Level 2 market information for a particular slab
 
-        This contains information on orders on the slab
+        This contains information on orders on the slab aggregated by price tick.
 
         Args:
             slab (Slab): Slab object
@@ -264,7 +265,11 @@ class Orderbook:
         """
         Inverts prices
 
-        When switching prices between bids and asks, the price is `1-p`
+        This is used when inverting the second outcome in a two-outcome market.
+
+        When switching prices between bids and asks, the price is `1-p`. 
+
+        Example, a BUY on A at a (probability) price of 0.4 is equivelant to a SELL on B at a price of 0.6 (1-0.4) and vice versa.
 
         Args:
             p (Price): Price object
@@ -355,7 +360,7 @@ class Orderbook:
             ui_amount (bool): Converts prices based on decimal precision if true.
 
         Returns:
-            list[Price]: List of Price objects (size and price) corresponding to orders on the slab
+            list[Price]: List of Price objects (size and probability price) corresponding to orders on the slab
         """
         is_increasing = True
         if(self.is_inverted):
@@ -446,7 +451,7 @@ class Orderbook:
     
     def estimate_avg_fill_for_base_qty(self, base_qty: int, side: Side, ui_amount: bool):
         """
-        Gets estimate of average fill given a base quantity
+        Gets estimate of average fill price (probability format) given a base/payout quantity
 
         Args:
             base_qty (int): Base quantity
@@ -460,7 +465,7 @@ class Orderbook:
 
     def estimate_avg_fill_for_quote_qty(self, quote_qty: int, side: Side, ui_amount: bool):
         """
-        Gets estimate of average fill given a quote quantity
+        Gets estimate of average fill price (probability format) given a stake/quote quantity
 
         Args:
             quote_qty (int): Base quantity

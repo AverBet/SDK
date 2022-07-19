@@ -21,7 +21,7 @@ class AverMarket():
     """
     AverMarket object
 
-    Contains information and orderbooks on a particular market
+    Contains information, references and and orderbooks on a particular market
     """
 
     market_pubkey: PublicKey
@@ -29,14 +29,14 @@ class AverMarket():
     market_state: MarketState
     """MarketState object holding data about the market"""
     market_store_state: MarketStoreState
-    """MarketStoreStateobject holding data about the market. 
+    """MarketStoreStateobject holding data about the market required during active trading. 
     
     This does not exist if the market has stopped trading, voided or resolved"""
     orderbooks: list[Orderbook]
     """
-    All Orderbooks for this market.
+    Ordered list of Orderbooks for this market.
 
-    Binary markets only have 1 orderbook
+    Note: Binary (two-outcome0) markets only have 1 orderbook.
     """
     aver_client: AverClient
     """AverClient object"""
@@ -50,7 +50,7 @@ class AverMarket():
         orderbooks: list[Orderbook] = None,
         ):
         """
-        Initialise an AverMarket object. Do not use this function; use AverMarket.load() instead
+        Initialise an AverMarket object. Do not use this function; use AverMarket.load() instead.
 
         Args:
             aver_client (AverClient): AverClient object
@@ -213,7 +213,8 @@ class AverMarket():
     @staticmethod
     def derive_market_store_pubkey_and_bump(market_pubkey: PublicKey, program_id: PublicKey = AVER_PROGRAM_ID):
         """
-        Derives PDA for MarketStore public key 
+        Derives PDA (Program Derived Account) for MarketStore public key.
+        MarketStore account addresses are derived deterministically using the market's pubkey.
 
         Args:
             market_pubkey (PublicKey): Market public key
@@ -358,7 +359,8 @@ class AverMarket():
     @staticmethod
     def is_market_status_closed(market_status: MarketStatus):
         """
-        Checks if a market no longer has orderbooks / MarketStore state
+        Checks if a market no longer in a trading status, and therefore will have no Orderbook or MarketStore accounts.
+        Note: Once trading has ceased for a market, these accounts are closed.
 
         Args:
             market_status (MarketStatus): Market status (find in MarketState object)
@@ -375,7 +377,7 @@ class AverMarket():
         decimals_list: list[int]
         ) -> list[Orderbook]:
         """
-        Returns orderbook objects from orderbook account objects, by fetching and parsing. 
+        Returns Orderbook objects from Orderbook Account objects, by fetching and parsing. 
 
         Args:
             conn (AsyncClient): Solana AsyncClient object
@@ -421,7 +423,7 @@ class AverMarket():
         are_market_statuses_closed: list[bool],
     ):
         """
-        Returns orderbook objects from MarketState and MarketStoreStateobjects,
+        Returns Orderbook objects from MarketState and MarketStoreStateobjects,
         by fetching and parsing for multiple markets.
 
         Use when fetching orderbooks for multiple markets 
@@ -537,9 +539,15 @@ class AverMarket():
                 list_of_pubkeys += [ob.pubkey, ob.slab_asks_pubkey, ob.slab_asks_pubkey] # TODO: Event Queue?
         return list_of_pubkeys
     
-    async def get_implied_market_status(self) -> MarketStatus:
+    async def get_implied_market_status(
+            self
+        ) -> MarketStatus:
         """
-        Returns what we believe the market status ought to be (rather than is)
+        Returns what we believe the market status ought to be (rather than what is stored in the market's state on-chain)
+
+        Note: As a fail safe, markets have specified times beyond which the market will react as if it is in another Status until it is formally cranked to that Status.
+        For example, if Solana were to have issues and it was not possible for the market's authority to crank it into In-Play status or to Cease Trading in time,
+        the market would use the System Time as a trigger to treat new requests as if it were in the later Status.
 
         If Solana clock time is beyond TradingCeaseTime, market is TradingCeased
         If Solana clock time is beyond InPlayStartTime but before TradingCeaseTime, market is ActiveInPlay
@@ -555,11 +563,11 @@ class AverMarket():
         return self.market_state.market_status
 
     async def crank_market(
-        self,
-        outcome_idxs: list[int] = None,
-        reward_target: PublicKey = None,
-        payer: Keypair = None,
-    ):
+            self,
+            outcome_idxs: list[int] = None,
+            reward_target: PublicKey = None,
+            payer: Keypair = None,
+        ):
         """
         Refresh market before cranking
         If no outcome_idx are passed, all outcomes are cranked if they meet the criteria to be cranked.

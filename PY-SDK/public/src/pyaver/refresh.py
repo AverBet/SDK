@@ -14,6 +14,8 @@ async def refresh_multiple_markets(
     """
     Refresh all data for multiple markets quickly
 
+    This function optimizes the calls to the Solana network batching them efficiently so that many can be reloaded in the fewest calls.
+
     Use instead instead of src.market.AverMarket.load_multiple()
 
     Args:
@@ -56,6 +58,8 @@ async def refresh_market(aver_client: AverClient, market: AverMarket) -> AverMar
     """
     Refresh all data for an AverMarket quickly
 
+    This function optimizes the calls to the Solana network batching them efficiently so that many can be reloaded in the fewest calls.
+
     Use instead instead of src.market.AverMarket.load()
 
     Args:
@@ -73,6 +77,8 @@ async def refresh_multiple_user_markets(
     ) -> list[UserMarket]:
     """
     Refresh all data for multiple user markets quickly
+
+    This function optimizes the calls to the Solana network batching them efficiently so that many can be reloaded in the fewest calls.
 
     Also refreshes the underlying AverMarket objects
 
@@ -127,6 +133,8 @@ async def refresh_multiple_user_markets(
 async def refresh_user_market(aver_client: AverClient, user_market: UserMarket) -> UserMarket:
     """
     Refresh all data for a user markets quickly
+
+    This function optimizes the calls to the Solana network batching them efficiently so that many can be reloaded in the fewest calls.
 
     Also refreshes the underlying AverMarket object
 
