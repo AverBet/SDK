@@ -411,7 +411,7 @@
 </span><span id="L-109"><a href="#L-109"><span class="linenos">109</span></a>
 </span><span id="L-110"><a href="#L-110"><span class="linenos">110</span></a><span class="k">class</span> <span class="nc">Fill</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
 </span><span id="L-111"><a href="#L-111"><span class="linenos">111</span></a>    <span class="sd">&quot;&quot;&quot;</span>
-</span><span id="L-112"><a href="#L-112"><span class="linenos">112</span></a><span class="sd">    Structure of Fill Event Object on an Event Queue</span>
+</span><span id="L-112"><a href="#L-112"><span class="linenos">112</span></a><span class="sd">    A Fill event describes a matched trade between a maker and a taker, and contains all of the necessary information to facilitate update of the maker’s UserMarket account to reflect the trade.</span>
 </span><span id="L-113"><a href="#L-113"><span class="linenos">113</span></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="L-114"><a href="#L-114"><span class="linenos">114</span></a>    <span class="n">taker_side</span><span class="p">:</span> <span class="n">Side</span>
 </span><span id="L-115"><a href="#L-115"><span class="linenos">115</span></a>    <span class="n">maker_order_id</span><span class="p">:</span> <span class="nb">int</span>
@@ -424,7 +424,7 @@
 </span><span id="L-122"><a href="#L-122"><span class="linenos">122</span></a>
 </span><span id="L-123"><a href="#L-123"><span class="linenos">123</span></a><span class="k">class</span> <span class="nc">Out</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
 </span><span id="L-124"><a href="#L-124"><span class="linenos">124</span></a>    <span class="sd">&quot;&quot;&quot;</span>
-</span><span id="L-125"><a href="#L-125"><span class="linenos">125</span></a><span class="sd">    Structure of Out Event Object on an Event Queue</span>
+</span><span id="L-125"><a href="#L-125"><span class="linenos">125</span></a><span class="sd">    An Out event describes the removal of an order from the orderbook, and contains all of the necessary information to facilitate updating the order owner’s UserMarket account to reflect that this order (or residual part of an order) is no longer being offered. (i.e. unlocked positions previously locked to back the order)</span>
 </span><span id="L-126"><a href="#L-126"><span class="linenos">126</span></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="L-127"><a href="#L-127"><span class="linenos">127</span></a>    <span class="n">side</span><span class="p">:</span> <span class="n">Side</span>
 </span><span id="L-128"><a href="#L-128"><span class="linenos">128</span></a>    <span class="n">order_id</span><span class="p">:</span> <span class="nb">int</span>
@@ -1432,7 +1432,7 @@ Stake is the total amount at risk for a user (payout - profit).</p>
     <a class="headerlink" href="#Fill"></a>
             <div class="pdoc-code codehilite"><pre><span></span><span id="Fill-111"><a href="#Fill-111"><span class="linenos">111</span></a><span class="k">class</span> <span class="nc">Fill</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
 </span><span id="Fill-112"><a href="#Fill-112"><span class="linenos">112</span></a>    <span class="sd">&quot;&quot;&quot;</span>
-</span><span id="Fill-113"><a href="#Fill-113"><span class="linenos">113</span></a><span class="sd">    Structure of Fill Event Object on an Event Queue</span>
+</span><span id="Fill-113"><a href="#Fill-113"><span class="linenos">113</span></a><span class="sd">    A Fill event describes a matched trade between a maker and a taker, and contains all of the necessary information to facilitate update of the maker’s UserMarket account to reflect the trade.</span>
 </span><span id="Fill-114"><a href="#Fill-114"><span class="linenos">114</span></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="Fill-115"><a href="#Fill-115"><span class="linenos">115</span></a>    <span class="n">taker_side</span><span class="p">:</span> <span class="n">Side</span>
 </span><span id="Fill-116"><a href="#Fill-116"><span class="linenos">116</span></a>    <span class="n">maker_order_id</span><span class="p">:</span> <span class="nb">int</span>
@@ -1445,7 +1445,7 @@ Stake is the total amount at risk for a user (payout - profit).</p>
 </span></pre></div>
 
 
-            <div class="docstring"><p>Structure of Fill Event Object on an Event Queue</p>
+            <div class="docstring"><p>A Fill event describes a matched trade between a maker and a taker, and contains all of the necessary information to facilitate update of the maker’s UserMarket account to reflect the trade.</p>
 </div>
 
 
@@ -1591,7 +1591,7 @@ Stake is the total amount at risk for a user (payout - profit).</p>
     <a class="headerlink" href="#Out"></a>
             <div class="pdoc-code codehilite"><pre><span></span><span id="Out-124"><a href="#Out-124"><span class="linenos">124</span></a><span class="k">class</span> <span class="nc">Out</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
 </span><span id="Out-125"><a href="#Out-125"><span class="linenos">125</span></a>    <span class="sd">&quot;&quot;&quot;</span>
-</span><span id="Out-126"><a href="#Out-126"><span class="linenos">126</span></a><span class="sd">    Structure of Out Event Object on an Event Queue</span>
+</span><span id="Out-126"><a href="#Out-126"><span class="linenos">126</span></a><span class="sd">    An Out event describes the removal of an order from the orderbook, and contains all of the necessary information to facilitate updating the order owner’s UserMarket account to reflect that this order (or residual part of an order) is no longer being offered. (i.e. unlocked positions previously locked to back the order)</span>
 </span><span id="Out-127"><a href="#Out-127"><span class="linenos">127</span></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="Out-128"><a href="#Out-128"><span class="linenos">128</span></a>    <span class="n">side</span><span class="p">:</span> <span class="n">Side</span>
 </span><span id="Out-129"><a href="#Out-129"><span class="linenos">129</span></a>    <span class="n">order_id</span><span class="p">:</span> <span class="nb">int</span>
@@ -1602,7 +1602,7 @@ Stake is the total amount at risk for a user (payout - profit).</p>
 </span></pre></div>
 
 
-            <div class="docstring"><p>Structure of Out Event Object on an Event Queue</p>
+            <div class="docstring"><p>An Out event describes the removal of an order from the orderbook, and contains all of the necessary information to facilitate updating the order owner’s UserMarket account to reflect that this order (or residual part of an order) is no longer being offered. (i.e. unlocked positions previously locked to back the order)</p>
 </div>
 
 
