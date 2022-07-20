@@ -262,20 +262,6 @@ class UserHostLifetime():
             program_id
         )
 
-    @staticmethod
-    def parse_user_host_lifetime_state(aver_client: AverClient, buffer):
-        """
-        Parses raw onchain data to UserHostLifetime object
-
-        Args:
-            aver_client (AverClient): AverClient object
-            buffer (bytes): Raw bytes coming from onchain
-
-        Returns:
-            UserHostLifetime: UserHostLifetime object
-        """
-        user_host_lifetime_info = aver_client.program.account['UserHostLifetime'].coder.accounts.decode(buffer)
-        return user_host_lifetime_info
 
     def get_fee_tier_postion(self):
         """

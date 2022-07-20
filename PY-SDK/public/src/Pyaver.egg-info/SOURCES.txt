@@ -14,12 +14,10 @@ src/pyaver/data_classes.py
 src/pyaver/enums.py
 src/pyaver/errors.py
 src/pyaver/event_queue.py
-src/pyaver/host.py
 src/pyaver/ignore.py
 src/pyaver/layouts.py
 src/pyaver/market.py
 src/pyaver/orderbook.py
-src/pyaver/referrer.py
 src/pyaver/refresh.py
 src/pyaver/slab.py
 src/pyaver/user_host_lifetime.py

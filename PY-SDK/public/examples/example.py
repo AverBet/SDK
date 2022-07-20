@@ -8,7 +8,7 @@ from pyaver.constants import get_solana_endpoint, AVER_PROGRAM_ID, get_aver_api_
 from solana.rpc.types import TxOpts
 from solana.rpc.commitment import Confirmed
 import base58 
-from pyaver.enums import Side, SizeFormat
+from pyaver.enums import Side, SizeFormat, MarketStatus
 from pyaver.refresh import refresh_user_market
 from solana.publickey import PublicKey
 from pyaver.market import AverMarket
@@ -102,27 +102,13 @@ async def main():
     # ----------------------------------------------------
     # We can query the Aver API to provide a list of markets
     # Filters can be applied to load specific categories, status, etc
-    # Here we simply load all markets and select the first one
+    # Here we simply load all markets and will select the first one in the section below
+    # To find out more, query https://dev.api.aver.exchange/v2/markets/ in your browser
 
     all_markets = get(get_aver_api_endpoint(SolanaNetwork.DEVNET) + '/v2/markets')
     
-    #Just pick the first active market
-    chosen_market = ''
-    for m in all_markets.json():
-        print(m)
-        if m['internal_status'] != 'test':
-            chosen_market = m
-            break
-    print(chosen_market)
-    market_pubkey = PublicKey(chosen_market['pubkey'])
-
-    ###
-    #Example warning
-    #Sometimes, the markets loaded above may have already been resolved
-    #Therefore, I've copied and pasted a market public key from https://dev.app.aver.exchange/
-    ###
-    market_pubkey = PublicKey('Bq8wyvvWbSLcodH3DjamHZCnRZ4XzGCg4UTCGi8tZhvL')
-
+    #Load all active markets from endpoint
+    market_pubkeys = [PublicKey(m['pubkey']) for m in all_markets.json() if m['internal_status'] == 'active']
 
 
     # ----------------------------------------------------
@@ -132,12 +118,16 @@ async def main():
     # This must be awaited, as the class will autopopulate state from all of the related
     #  on-chain accounts which make up this market.
 
-    # Load market
-    market = await AverMarket.load(client, market_pubkey)
+    #Loads market data from onchain
+    loaded_markets = await AverMarket.load_multiple(client, market_pubkeys)
+    #Ensure market is in ACTIVE_PRE_EVENT status so we can place orders on it
+    active_pre_event_markets = list(filter(lambda market: market.market_state.market_status == MarketStatus.ACTIVE_PRE_EVENT, loaded_markets))
+    #Let's just pick the first market in the list
+    market = active_pre_event_markets[0]
 
     # Print market data or specific properties
     print('-'*10)
-    print(f'Market {market_pubkey} loaded...')
+    print(f'Market {market.market_pubkey} loaded...')
     print(f'Market name: {market.market_state.market_name}')
     for idx, outcome_name in enumerate(market.market_state.outcome_names):
         print(f' - {idx} - {outcome_name}')
@@ -170,7 +160,7 @@ async def main():
     #  several orders per outcome and side.)
 
     uma = await UserMarket.get_or_create_user_market_account(
-        aver_client = client,
+        client = client,
         owner = owner_keypair,
         market = market,
         number_of_orders = (3 * market.market_state.number_of_outcomes) # Optional argument
@@ -279,10 +269,10 @@ async def main():
 
     if uma.user_market_state.number_of_orders > 0:
         
-        my_order = uma.user_market_state.orders[0].order_id
+        my_order = uma.user_market_state.orders[0]
 
         signature = await uma.cancel_order(
-            owner = owner_keypair,
+            fee_payer = owner_keypair,
             order_id = my_order.order_id,
             outcome_id = my_order.outcome_id,                                
             active_pre_flight_check=True

@@ -73,6 +73,8 @@ MAX_ITERATIONS_FOR_CONSUME_EVENTS = 5
 
 CALLBACK_INFO_LEN = 33
 
+CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE = 5
+
 
 ###### HELPER FUNCTIONS
 def get_aver_api_endpoint(solanaNetwork: SolanaNetwork):

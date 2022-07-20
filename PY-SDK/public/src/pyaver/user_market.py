@@ -16,8 +16,7 @@ from .utils import sign_and_send_transaction_instructions, load_multiple_account
 from solana.rpc.types import TxOpts
 from solana.rpc.commitment import Finalized
 from .data_classes import UserHostLifetimeState, UserMarketState, UserBalanceState
-# from constants import DEFAULT_QUOTE_TOKEN_DEVNET, AVER_PROGRAM_ID, DEFAULT_HOST_ACCOUNT_DEVNET
-from .constants import AVER_PROGRAM_ID, AVER_HOST_ACCOUNT
+from .constants import AVER_PROGRAM_ID, AVER_HOST_ACCOUNT, CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
 from .enums import OrderType, SelfTradeBehavior, Side, SizeFormat
 import math
 
@@ -273,6 +272,7 @@ class UserMarket():
         Returns:
             PublicKey: UserMarket account public key
         """
+
         return PublicKey.find_program_address(
             [bytes('user-market', 'utf-8'), bytes(owner), bytes(market), bytes(host)],
             program_id
@@ -463,7 +463,7 @@ class UserMarket():
 
     def make_place_order_instruction(
             self,
-            outcome_position: int,
+            outcome_id: int,
             side: Side,
             limit_price: float,
             size: float,
@@ -479,7 +479,7 @@ class UserMarket():
         Returns TransactionInstruction object only. Does not send transaction.
 
         Args:
-            outcome_position (int): ID of outcome
+            outcome_id (int): ID of outcome
             side (Side): Side object (bid or ask)
             limit_price (float): Limit price - in probability format i.e. in the range (0, 1). If you are using Decimal or other odds formats you will need to convert these prior to passing as an argument
             size (float): Size - in the format specified in size_format. This value is in number of 'tokens' - i.e. 20.45 => 20.45 USDC, the SDK handles the conversion to u64 token units (e.g. to 20,450,000 as USDC is a 6 decimal place token)
@@ -505,21 +505,20 @@ class UserMarket():
             check_uhl_self_excluded(self.user_host_lifetime)
             check_user_market_full(self.user_market_state)
             check_limit_price_error(limit_price, self.market)
-            check_outcome_outside_space(outcome_position, self.market)
+            check_outcome_outside_space(outcome_id, self.market)
             check_incorrect_order_type_for_market_order(limit_price, order_type, side, self.market)
             check_stake_noop(size_format, limit_price, side)
-            tokens_available_to_buy = self.calculate_tokens_available_to_buy(outcome_position, limit_price)
-            tokens_available_to_sell = self.calculate_tokens_available_to_sell(outcome_position, limit_price)
-            check_is_order_valid(outcome_position, side, limit_price, size, size_format, tokens_available_to_sell, tokens_available_to_buy)
-            check_quote_and_base_size_too_small(self.market, side, size_format, outcome_position, limit_price, size)
+            tokens_available_to_buy = self.calculate_tokens_available_to_buy(outcome_id, limit_price)
+            tokens_available_to_sell = self.calculate_tokens_available_to_sell(outcome_id, limit_price)
+            check_is_order_valid(outcome_id, side, limit_price, size, size_format, tokens_available_to_sell, tokens_available_to_buy)
+            check_quote_and_base_size_too_small(self.market, side, size_format, outcome_id, limit_price, size)
             check_user_permission_and_quote_token_limit_exceeded(self.market, self.user_market_state, size, limit_price, size_format)
         
-        #Do we need a limit_price_u64 for Python?
         max_base_qty = math.floor(size * (10 ** self.market.market_state.decimals))
         limit_price_u64 = math.ceil(limit_price * (10 ** self.market.market_state.decimals))
 
-        is_binary_market_second_outcome = self.market.market_state.number_of_outcomes == 2 and outcome_position == 1
-        orderbook_account_index = outcome_position if not is_binary_market_second_outcome else 0
+        is_binary_market_second_outcome = self.market.market_state.number_of_outcomes == 2 and outcome_id == 1
+        orderbook_account_index = outcome_id if not is_binary_market_second_outcome else 0
         orderbook_account = self.market.market_store_state.orderbook_accounts[orderbook_account_index]
 
         return self.aver_client.program.instruction['place_order'](
@@ -530,7 +529,7 @@ class UserMarket():
                 "side": side,
                 "order_type": order_type,
                 "self_trade_behavior": self_trade_behavior,
-                "outcome_id": outcome_position,
+                "outcome_id": outcome_id,
             },
             ctx=Context(
                 accounts={
@@ -554,7 +553,7 @@ class UserMarket():
     async def place_order(
             self,
             owner: Keypair,
-            outcome_position: int,
+            outcome_id: int,
             side: Side,
             limit_price: float,
             size: float,
@@ -571,7 +570,7 @@ class UserMarket():
 
         Args:
             owner (Keypair): Owner of UserMarket account. Pays transaction fees.
-            outcome_position (int): index of the outcome intended to be traded
+            outcome_id (int): index of the outcome intended to be traded
             side (Side): Side object (bid/back/buy or ask/lay/sell)
             limit_price (float): Limit price - in probability format i.e. in the range (0, 1). If you are using Decimal or other odds formats you will need to convert these prior to passing as an argument
             size (float): Size - in the format specified in size_format. This value is in number of 'tokens' - i.e. 20.45 => 20.45 USDC, the SDK handles the conversion to u64 token units (e.g. to 20,450,000 as USDC is a 6 decimal place token)
@@ -597,7 +596,7 @@ class UserMarket():
         )
 
         ix = self.make_place_order_instruction(
-            outcome_position,
+            outcome_id,
             side, 
             limit_price,
             size,
@@ -618,7 +617,7 @@ class UserMarket():
     def make_cancel_order_instruction(
             self,
             order_id: int,
-            outcome_position: int,
+            outcome_id: int,
             active_pre_flight_check: bool = False,
         ):
         """
@@ -628,7 +627,7 @@ class UserMarket():
 
         Args:
             order_id (int): ID of order to cancel
-            outcome_position (int): ID of outcome
+            outcome_id (int): ID of outcome
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to False.
 
         Raises:
@@ -648,8 +647,8 @@ class UserMarket():
             check_cancel_order_market_status(self.market.market_state.market_status)
             check_order_exists(self.user_market_state, order_id)
       
-        is_binary_market_second_outcome = self.market.market_state.number_of_outcomes == 2 and outcome_position == 1
-        orderbook_account_index = outcome_position if not is_binary_market_second_outcome else 0
+        is_binary_market_second_outcome = self.market.market_state.number_of_outcomes == 2 and outcome_id == 1
+        orderbook_account_index = outcome_id if not is_binary_market_second_outcome else 0
         orderbook_account = self.market.market_store_state.orderbook_accounts[orderbook_account_index]
 
         return self.aver_client.program.instruction['cancel_order'](
@@ -670,7 +669,7 @@ class UserMarket():
     async def cancel_order(
         self,
         order_id: int,
-        outcome_position: int,
+        outcome_id: int,
         fee_payer: Keypair = None,
         send_options: TxOpts = None,
         active_pre_flight_check: bool = True,
@@ -683,7 +682,7 @@ class UserMarket():
         Args:
             fee_payer (Keypair): Keypair to pay fee for transaction. Defaults to AverClient wallet
             order_id (int): ID of order to cancel
-            outcome_position (int): ID of outcome
+            outcome_id (int): ID of outcome
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to True.
 
@@ -696,7 +695,7 @@ class UserMarket():
 
         ix = self.make_cancel_order_instruction(
             order_id,
-            outcome_position,
+            outcome_id,
             active_pre_flight_check
         )
 
@@ -766,7 +765,7 @@ class UserMarket():
                 is_writable=True,
             )]
         
-        chunk_size = 5
+        chunk_size = CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
         chunked_outcome_ids = chunk(outcome_ids_to_cancel, chunk_size)
         chunked_remaining_accounts = chunk(remaining_accounts, chunk_size * 4)
 
@@ -826,71 +825,6 @@ class UserMarket():
             ) for ix in ixs]
             )
         return sigs
-
-    def make_deposit_token_instruction(self, amount: int, user_quote_token_ata: PublicKey):
-        """
-        COMING SOON
-
-        Returns TransactionInstruction object only. Does not send transaction.
-
-        Args:
-            amount (int): amount
-            user_quote_token_ata (PublicKey): Quote token ATA public key (holds funds for this user)
-
-        Returns:
-            TransactionInstruction: TransactionInstruction
-        """
-        return self.aver_client.program.instruction['deposit_tokens'](
-            amount,
-            ctx=Context(
-                accounts={
-                    "user": self.user_market_state.user,
-                    "user_market": self.pubkey,
-                    "user_quote_token_ata": user_quote_token_ata,
-                    "market": self.market.market_pubkey,
-                    "quote_vault": self.market.market_state.quote_vault,
-                    "spl_token_program": TOKEN_PROGRAM_ID,
-                },
-            )
-        )
-    
-    async def deposit_tokens(self, amount: int, owner: Keypair = None, send_options: TxOpts = None):
-        """
-        COMING SOON
-
-        Sends instructions on chain
-
-        Args:
-            owner (Keypair): Owner of UserMarket account
-            amount (int): amount
-            send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
-
-        Raises:
-            Exception: Owner must be same as UMA owner
-
-        Returns:
-            RPCResponse: Response
-        """
-
-        if(not owner.public_key == self.user_market_state.user):
-            raise Exception('Owner must be same as UMA owner')
-
-        user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
-            self.user_market_state.user,
-            self.market.aver_client.owner,
-            self.market.market_state.quote_token_mint
-        )
-        
-        ix = self.make_deposit_token_instruction(amount, user_quote_token_ata)
-
-        return await sign_and_send_transaction_instructions(
-            self.aver_client,
-            [],
-            owner,
-            [ix],
-            send_options
-        )
-
 
     def make_withdraw_idle_funds_instruction(
         self,
@@ -963,59 +897,6 @@ class UserMarket():
             send_options
         )
 
-    def make_collect_instruction(self):
-        """
-        COMING SOON
-
-        Returns TransactionInstruction object only. Does not send transaction.
-
-        Returns:
-            TransactionInstruction: TransactionInstruction object
-        """
-        user_quote_token_ata = get_associated_token_address(self.market.market_state.quote_token_mint, self.user_market_state.user)
-
-        return self.aver_client.program.instruction['collect'](True,
-        ctx=Context(
-            accounts={
-                "market": self.market.market_pubkey,
-                "user_market": self.pubkey,
-                "user": self.user_market_state.user,
-                "user_quote_token_ata": user_quote_token_ata,
-                "quote_vault": self.market.market_state.quote_vault,
-                "vault_authority": self.market.market_state.vault_authority,
-                "spl_token_program": TOKEN_PROGRAM_ID,
-                }
-            )
-        )
-    
-    async def collect(self, owner: Keypair, send_options: TxOpts = None):
-        """
-        COMING SOON
-
-        Sends instructions on chain
-
-        Args:
-            owner (Keypair): Owner of UserMarket account
-            send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
-
-        Raises:
-            Exception: Owner must be same as UMA owner
-
-        Returns:
-            RPCResponse: Response
-        """
-        ix = self.make_collect_instruction()
-
-        if(not owner.public_key == self.user_market_state.user):
-            raise Exception('Owner must be same as UMA owner')
-
-        return await sign_and_send_transaction_instructions(
-            self.aver_client,
-            [],
-            owner,
-            [ix],
-            send_options
-        )
 
     def calculate_funds_available_to_withdraw(self):
         """
@@ -1051,19 +932,7 @@ class UserMarket():
         net_quote_tokens_in = self.user_market_state.net_quote_tokens_in
         return [o.free + o.locked - net_quote_tokens_in for o in self.user_market_state.outcome_positions]
 
-    #TODO - UMA listener
 
-    #TODO - Add close instructions
-
-    # def get_fee_tier_position(self):
-    #     fee_tier_last_checked =  self.user_market_state.fee_tier_last_checked
-    #     if(fee_tier_last_checked == FeeTier.BASE):
-    #         return 0
-    #     if(fee_tier_last_checked == FeeTier.AVER2):
-    #         return 1
-    #     if(fee_tier_last_checked == FeeTier.AVER3):
-    #         return 2
-    #     return 0
 
     def calculate_tokens_available_to_sell(self, outcome_index: int, price: float):
         """
