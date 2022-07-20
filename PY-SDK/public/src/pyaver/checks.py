@@ -1,4 +1,3 @@
-from jsonrpcserver import Error
 from .utils import round_price_to_nearest_tick_size
 from .market import AverMarket
 from .enums import MarketStatus, OrderType, Side, SizeFormat
@@ -7,7 +6,6 @@ from .data_classes import UserBalanceState, UserMarketState
 
 ###### PLACE ORDER CHECKS
 
-#TODO - Waiting on Adi for cost of creating UHL/UMA and add this to calculation
 def check_sufficient_lamport_balance(user_balance_state: UserBalanceState):
     if(user_balance_state.lamport_balance < 5000):
         raise Exception(f'Payer has insufficient lamports. Lamport balance: {user_balance_state.lamport_balance}')
@@ -86,8 +84,6 @@ def check_is_order_valid(
         if(current_balance < balance_required):
             raise Exception(f'Insufficient token balance to support this order. Balance: {current_balance}; Required: {balance_required}')
 
-#TODO - Please check this function 
-#Here one_in_market_decimals has been replaced by 1, as price is not in market decimals
 def check_quote_and_base_size_too_small(market: AverMarket, side: Side, size_format: SizeFormat, outcome_id: int, limit_price: float, size: float):
     binary_second_outcome = market.market_state.number_of_outcomes == 2 and outcome_id == 1
     limit_price_rounded = round_price_to_nearest_tick_size(limit_price)
@@ -122,7 +118,7 @@ def check_quote_and_base_size_too_small(market: AverMarket, side: Side, size_for
     if(max_base_qty < market.market_store_state.min_new_order_base_size):
         raise Exception(f'The resulting PAYOUT size for this order is below the market minimum. Payout: {max_base_qty}, Minimum payout: {market.market_store_state.min_new_order_base_size}')
 
-#TODO - check this
+
 def check_user_permission_and_quote_token_limit_exceeded(market: AverMarket, user_market_state: UserMarketState, size: float, limit_price: float, size_format: SizeFormat):
     balance_required = size * limit_price if size_format == SizeFormat.PAYOUT else size
     pmf = market.market_state.permissioned_market_flag

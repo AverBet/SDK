@@ -1,5 +1,5 @@
 from enum import IntEnum
-from construct import Switch, Bytes, Int8ul, Int16ul, Int32ul, Int64ul, Padding, Int8sl, Int64sl
+from construct import Switch, Bytes, Int8ul, Int32ul, Int64ul, Padding, Int64sl
 from construct import Struct as cStruct
 
 PUBLIC_KEY_LAYOUT = Bytes(32)

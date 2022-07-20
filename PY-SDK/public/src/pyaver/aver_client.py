@@ -1,7 +1,6 @@
 import base64
 import datetime
 from anchorpy import Provider, Wallet, Program
-from solana.rpc.commitment import Finalized, Confirmed
 from solana.rpc import types
 from solana.rpc.async_api import AsyncClient
 from solana.publickey import PublicKey
@@ -10,9 +9,8 @@ from solana.rpc.api import Client
 # from constants import AVER_API_URL_DEVNET, DEVNET_SOLANA_URL, DEFAULT_QUOTE_TOKEN_DEVNET, AVER_PROGRAM_ID_DEVNET_2
 from .constants import SYS_VAR_CLOCK, get_aver_api_endpoint, get_quote_token, get_solana_endpoint, AVER_PROGRAM_ID
 from solana.keypair import Keypair
-from requests import get, post
+from requests import get
 from spl.token.instructions import get_associated_token_address, create_associated_token_account
-from solana.rpc.commitment import Commitment, Finalized
 from .enums import SolanaNetwork
 from .layouts import CLOCK_STRUCT
 

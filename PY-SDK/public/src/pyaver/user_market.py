@@ -12,13 +12,13 @@ from anchorpy import Context
 from .user_host_lifetime import UserHostLifetime
 from spl.token.instructions import get_associated_token_address
 from .aver_client import AverClient
-from .utils import sign_and_send_transaction_instructions, load_multiple_account_states, is_market_tradeable, can_cancel_order_in_market
+from .utils import sign_and_send_transaction_instructions, load_multiple_account_states
 from solana.rpc.types import TxOpts
 from solana.rpc.commitment import Finalized
 from .data_classes import UserMarketState, UserBalanceState
 # from constants import DEFAULT_QUOTE_TOKEN_DEVNET, AVER_PROGRAM_ID, DEFAULT_HOST_ACCOUNT_DEVNET
 from .constants import AVER_PROGRAM_ID, AVER_HOST_ACCOUNT
-from .enums import OrderType, SelfTradeBehavior, Side, FeeTier, SizeFormat
+from .enums import OrderType, SelfTradeBehavior, Side, SizeFormat
 import math
 
 class UserMarket():
@@ -309,7 +309,7 @@ class UserMarket():
     async def create_user_market_account(
             aver_client: AverClient,
             market: AverMarket,
-            owner: Keypair,
+            owner: Keypair = None,
             send_options: TxOpts = None,
             host: PublicKey = AVER_HOST_ACCOUNT,
             number_of_orders: int = None,
@@ -323,7 +323,7 @@ class UserMarket():
         Args:
             aver_client (AverClient): AverClient object
             market (AverMarket): Correspondign Market object
-            owner (Keypair): Owner of UserMarket account
+            owner (Keypair): Owner of UserMarket account. Defaults to AverClient wallet
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             host (PublicKey, optional): Host account public key. Defaults to AVER_HOST_ACCOUNT.
             number_of_orders (int, optional): _description_. Defaults to 5 * number of market outcomes.
@@ -334,6 +334,9 @@ class UserMarket():
         """
         if(number_of_orders is None):
             number_of_orders = 5 * market.market_state.number_of_outcomes
+
+        if(owner is None):
+            owner = aver_client.owner
 
         ix = UserMarket.make_create_user_market_account_instruction(
             aver_client,
@@ -364,8 +367,8 @@ class UserMarket():
     @staticmethod
     async def get_or_create_user_market_account(
             client: AverClient,
-            owner: Keypair,
             market: AverMarket,
+            owner: Keypair = None,
             send_options: TxOpts = None,
             quote_token_mint: PublicKey = None,
             host: PublicKey = AVER_HOST_ACCOUNT,
@@ -379,8 +382,8 @@ class UserMarket():
 
         Args:
             client (AverClient): AverClient object
-            owner (Keypair): Owner of UserMarket account
             market (AverMarket): Corresponding AverMarket object
+            owner (Keypair): Owner of UserMarket account. Defaults to AverClient wallet
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             quote_token_mint (PublicKey, optional): ATA token mint public key. Defaults to USDC token according to chosen solana network.
             host (PublicKey, optional): Host account public key. Defaults to AVER_HOST_ACCOUNT.
@@ -395,6 +398,9 @@ class UserMarket():
         quote_token_mint = quote_token_mint if quote_token_mint is not None else client.quote_token
         if(number_of_orders is None):
             number_of_orders = market.market_state.number_of_outcomes * 5
+        
+        if(owner is None):
+            owner = client.owner
         
         user_market_pubkey = UserMarket.derive_pubkey_and_bump(owner.public_key, market.market_pubkey, host, program_id)[0]
         try:
@@ -439,12 +445,16 @@ class UserMarket():
     async def create_uma_and_get_or_create_associated_accounts(
             aver_client: AverClient,
             fee_payer: Keypair,
-            owner: PublicKey,
+            owner: PublicKey = None,
             token_mint: PublicKey = None
         ):
         """
         See src.aver_client.AverClient.get_or_create_associated_token_account()
         """
+        
+        if(owner is None):
+            owner = aver_client.owner
+
         token_mint = token_mint if token_mint is not None else aver_client.quote_token
         ata = aver_client.get_or_create_associated_token_account(
             owner,
@@ -475,8 +485,8 @@ class UserMarket():
         Args:
             outcome_position (int): ID of outcome
             side (Side): Side object (bid or ask)
-            limit_price (float): Limit price
-            size (float): Size
+            limit_price (float): Limit price - in probability format i.e. in the range (0, 1). If you are using Decimal or other odds formats you will need to convert these prior to passing as an argument
+            size (float): Size - in the format specified in size_format. This value is in number of 'tokens' - i.e. 20.45 => 20.45 USDC, the SDK handles the conversion to u64 token units (e.g. to 20,450,000 as USDC is a 6 decimal place token)
             size_format (SizeFormat): SizeFormat object (Stake or Payout)
             user_quote_token_ata (PublicKey): Quote token ATA public key (holds funds for this user)
             order_type (OrderType, optional): OrderType object. Defaults to OrderType.LIMIT.
@@ -564,7 +574,7 @@ class UserMarket():
         Sends instructions on chain
 
         Args:
-            owner (Keypair): Owner of UserMarket account
+            owner (Keypair): Owner of UserMarket account. Pays transaction fees.
             outcome_position (int): index of the outcome intended to be traded
             side (Side): Side object (bid/back/buy or ask/lay/sell)
             limit_price (float): Limit price - in probability format i.e. in the range (0, 1). If you are using Decimal or other odds formats you will need to convert these prior to passing as an argument
@@ -663,9 +673,9 @@ class UserMarket():
     
     async def cancel_order(
         self,
-        fee_payer: Keypair,
         order_id: int,
         outcome_position: int,
+        fee_payer: Keypair = None,
         send_options: TxOpts = None,
         active_pre_flight_check: bool = True,
     ):
@@ -675,7 +685,7 @@ class UserMarket():
         Sends instructions on chain
 
         Args:
-            fee_payer (Keypair): Keypair to pay fee for transaction
+            fee_payer (Keypair): Keypair to pay fee for transaction. Defaults to AverClient wallet
             order_id (int): ID of order to cancel
             outcome_position (int): ID of outcome
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
@@ -684,6 +694,9 @@ class UserMarket():
         Returns:
             RPCResponse: Response
         """
+
+        if(fee_payer is None):
+            fee_payer = self.aver_client.owner
 
         ix = self.make_cancel_order_instruction(
             order_id,
@@ -783,8 +796,8 @@ class UserMarket():
     
     async def cancel_all_orders(
         self,
-        fee_payer: Keypair, 
         outcome_ids_to_cancel: list[int], 
+        fee_payer: Keypair = None, 
         send_options: TxOpts = None,
         active_pre_flight_check: bool = True,
     ):
@@ -794,7 +807,7 @@ class UserMarket():
         Sends instructions on chain
 
         Args:
-            fee_payer (Keypair): Keypair to pay fee for transaction
+            fee_payer (Keypair): Keypair to pay fee for transaction. Defaults to AverClient wallet
             outcome_ids_to_cancel (list[int]): List of outcome ids to cancel orders on
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to True.
@@ -802,6 +815,9 @@ class UserMarket():
         Returns:
             RPCResponse: Response
         """
+        if(fee_payer is None):
+            fee_payer = self.aver_client.owner
+        
         ixs = self.make_cancel_all_orders_instruction(outcome_ids_to_cancel, active_pre_flight_check)
 
         sigs = await gather(
@@ -842,7 +858,7 @@ class UserMarket():
             )
         )
     
-    async def deposit_tokens(self, owner: Keypair, amount: int, send_options: TxOpts = None):
+    async def deposit_tokens(self, amount: int, owner: Keypair = None, send_options: TxOpts = None):
         """
         COMING SOON
 
@@ -859,6 +875,7 @@ class UserMarket():
         Returns:
             RPCResponse: Response
         """
+
         if(not owner.public_key == self.user_market_state.user):
             raise Exception('Owner must be same as UMA owner')
 
@@ -1058,7 +1075,7 @@ class UserMarket():
 
         Args:
             outcome_index (int): Outcome ID
-            price (float): Price
+            price (float): Price - in probability format i.e. in the range (0, 1). If you are using Decimal or other odds formats you will need to convert these prior to passing as an argument
 
         Returns:
             float: Token amount
@@ -1071,7 +1088,7 @@ class UserMarket():
 
         Args:
             outcome_index (int): Outcome ID
-            price (float): Price
+            price (float): Price - in probability format i.e. in the range (0, 1). If you are using Decimal or other odds formats you will need to convert these prior to passing as an argument
 
         Returns:
             float: Token amount

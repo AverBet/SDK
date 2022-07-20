@@ -5,7 +5,6 @@ from .aver_client import AverClient
 from solana.publickey import PublicKey
 from solana.keypair import Keypair
 from .enums import Fill, MarketStatus
-# from constants import DEFAULT_QUOTE_TOKEN_DEVNET, DEFAULT_MARKET_AUTHORITY, AVER_PROGRAM_ID_DEVNET_2
 from .constants import AVER_MARKET_AUTHORITY, AVER_PROGRAM_ID
 from .utils import load_multiple_bytes_data, sign_and_send_transaction_instructions
 from .data_classes import MarketState, MarketStoreState, OrderbookAccountsState

@@ -91,7 +91,7 @@ class Referrer():
         aver_client: AverClient,
         host: PublicKey,
         owner: Keypair,
-        fee_payer: Keypair,
+        fee_payer: Keypair = None,
         send_options: TxOpts = None,
         program_id: PublicKey = AVER_PROGRAM_ID
         ):
@@ -103,7 +103,7 @@ class Referrer():
             Args:
                 aver_client (AverClient): AverClient object
                 host (PublicKey): Host account public key
-                owner (Keypair): Keypair of owner of referrer account
+                owner (Keypair): Keypair of owner of referrer account. Defaults to AverClient Wallet
                 fee_payer (Keypair): Keypair to pay fee for transaction and rent cost
                 send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
                 program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
@@ -111,6 +111,9 @@ class Referrer():
             Returns:
                 RPCResponse: Response
             """
+
+            if(fee_payer is None):
+                fee_payer = aver_client.owner
 
             ix = Referrer.make_create_referrer_account_instruction(
                 aver_client,
@@ -171,7 +174,7 @@ class Referrer():
         third_party_token_vault: PublicKey,
         third_party_vault_authority: Keypair,
         referrer_token_account: PublicKey,
-        fee_payer: Keypair,
+        fee_payer: Keypair = None,
         send_options: TxOpts = None,
         ):
             """
@@ -185,12 +188,15 @@ class Referrer():
                 third_party_token_vault (PublicKey): _description_
                 third_party_vault_authority (Keypair): _description_
                 referrer_token_account (PublicKey): _description_
-                fee_payer (Keypair): Keypair to pay fee for transaction
+                fee_payer (Keypair): Keypair to pay fee for transaction. Defaults to AverClient wallet
                 send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
 
             Returns:
                 RPCResponse: Response
             """
+            if(fee_payer is None):
+                fee_payer = aver_client.provider.wallet.payer
+
             ix = Referrer.make_collect_revenue_share_instruction(
                 aver_client,
                 referrer,

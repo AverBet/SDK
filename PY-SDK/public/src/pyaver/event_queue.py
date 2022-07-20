@@ -1,9 +1,8 @@
 from .utils import load_multiple_bytes_data
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
-from typing import List, Optional, Tuple, Union, cast, NamedTuple, Container
+from typing import List, Tuple, Union, Container
 from .enums import Fill, Out, Side
-from solana.transaction import AccountMeta
 from solana.rpc.async_api import AsyncClient
 from .layouts import EVENT_QUEUE_HEADER_LAYOUT, EVENT_QUEUE_HEADER_LEN, REGISTER_SIZE, EVENT_LAYOUT
 

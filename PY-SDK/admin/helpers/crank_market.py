@@ -5,8 +5,7 @@ from solana.keypair import Keypair
 from pyaver.market import AverMarket
 from solana.rpc.async_api import AsyncClient
 from construct import Container
-from .admin_constants import EVENT_QUEUE_HEADER_LAYOUT, EVENT_QUEUE_HEADER_LEN, REGISTER_SIZE, EVENT_LAYOUT
-from solana.transaction import AccountMeta
+from pyaver.layouts import EVENT_QUEUE_HEADER_LAYOUT, EVENT_QUEUE_HEADER_LEN, REGISTER_SIZE, EVENT_LAYOUT
 from anchorpy import Context
 from pyaver.utils import load_multiple_bytes_data
 from pyaver.refresh import refresh_market

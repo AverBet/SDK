@@ -3,7 +3,7 @@
 Run using `python3 FILENAME.PY`
 
 Make sure you have the latest version of pyaver installed.
-Currently: `pip install -i https://test.pypi.org/simple/ pyaver==0.0.6`
+Currently: `pip install -i https://test.pypi.org/simple/ pyaver==0.0.9`
 
 ## Uploading a new version
 

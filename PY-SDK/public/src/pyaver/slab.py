@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Iterable, List, NamedTuple, Optional
 from construct import ListContainer
 from solana.publickey import PublicKey
-from .layouts import SLAB_LAYOUT, NodeType, CALLBACK_INFO_LEN, PADDED_LEN, SLOT_SIZE
+from .layouts import SLAB_LAYOUT, NodeType, CALLBACK_INFO_LEN
 
 class Callback(NamedTuple):
     user_market: PublicKey
