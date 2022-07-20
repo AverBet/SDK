@@ -109,7 +109,7 @@ class SolanaNetwork(str, Enum):
 
 class Fill(NamedTuple):
     """
-    Structure of Fill Event Object on an Event Queue
+    A Fill event describes a matched trade between a maker and a taker, and contains all of the necessary information to facilitate update of the maker’s UserMarket account to reflect the trade.
     """
     taker_side: Side
     maker_order_id: int
@@ -122,7 +122,7 @@ class Fill(NamedTuple):
 
 class Out(NamedTuple):
     """
-    Structure of Out Event Object on an Event Queue
+    An Out event describes the removal of an order from the orderbook, and contains all of the necessary information to facilitate updating the order owner’s UserMarket account to reflect that this order (or residual part of an order) is no longer being offered. (i.e. unlocked positions previously locked to back the order)
     """
     side: Side
     order_id: int
