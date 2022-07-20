@@ -15,7 +15,7 @@ def check_market_active_pre_event(market_status: MarketStatus):
         raise Exception(f'The current market status does not permit this action. Market status {market_status}')
 
 def check_uhl_self_excluded(uhl: UserHostLifetime):
-    if(uhl.user_host_lifetime_state.is_self_excluded):
+    if(uhl.user_host_lifetime_state.is_self_excluded_until):
         raise Exception('This user is self excluded at this time.')
 
 def check_user_market_full(user_market_state: UserMarketState):

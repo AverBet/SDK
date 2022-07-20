@@ -12,21 +12,14 @@ class MarketState():
     market_status: MarketStatus
     market_store: PublicKey
     market_authority: PublicKey
-    #resolution_account: PublicKey
     quote_token_mint: PublicKey
     quote_vault: PublicKey
     vault_authority: PublicKey
     number_of_outcomes: int
     number_of_winners: int
-    #nonce: int
     decimals: int 
     cranker_reward: int 
-    #fee_tier_thresholds: int
-    #fee_tier_collection_bps_rates: int
-    #fee_tier_taker_bps_rates: int
-    #fee_tier_maker_bps_rebates: int
     matched_count: int
-    #accumulated_fees: int
     prize_balance: int
     withdrawable_quote_token_balance: int
     winning_outcome: int
@@ -34,7 +27,6 @@ class MarketState():
     going_in_play_flag: bool
     max_quote_tokens_in: int
     max_quote_tokens_in_permission_capped: str
-    #market_name: str
     outcome_names: list[str]
     version: float
     number_of_umas: int
@@ -72,12 +64,9 @@ class MarketStoreState():
     market: PublicKey
     orderbook_accounts: list[OrderbookAccountsState]
     number_of_outcomes: int
-    #min_base_order_size: int
-    #min_quote_order_size: int
     min_orderbook_base_size: int
     min_new_order_base_size: int
     min_new_order_quote_size: int
-    #tick_size: int
     version: float
     init_counter: float
 
@@ -106,20 +95,14 @@ class UserMarketState():
     """
     market: PublicKey
     user: PublicKey
-    #user_authentication_account: PublicKey
-    #user_quote_token_ata: PublicKey
-    #auto_collect: bool
-    #auto_close: bool
     number_of_outcomes: int
     number_of_orders: int
     max_number_of_orders: int
     net_quote_tokens_in: int
-    #accumulated_rebates: int
     accumulated_maker_quote_volume: int
     accumulated_maker_base_volume: int
     accumulated_taker_quote_volume: int
     accumulated_taker_base_volume: int
-    #fee_tier_last_checked: FeeTier
     outcome_positions: list[OutcomePosition]
     orders: list[UmaOrder]
     version: int
@@ -179,7 +162,7 @@ class UserHostLifetimeState():
     referral_revenue_share_total_generated: int
     referrer_fee_rate_bps: int
     last_fee_tier_check: FeeTier
-    is_self_excluded: bool or None
+    is_self_excluded_until: bool or None
     creation_date: int
     last_balance_update: int
     total_markets_traded: int

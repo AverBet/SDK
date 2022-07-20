@@ -108,6 +108,9 @@ class SolanaNetwork(str, Enum):
     MAINNET = 'mainnet-beta'
 
 class Fill(NamedTuple):
+    """
+    Structure of Fill Event Object on an Event Queue
+    """
     taker_side: Side
     maker_order_id: int
     quote_size: int
@@ -118,6 +121,9 @@ class Fill(NamedTuple):
     taker_fee_tier: int
 
 class Out(NamedTuple):
+    """
+    Structure of Out Event Object on an Event Queue
+    """
     side: Side
     order_id: int
     base_size: int

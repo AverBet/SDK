@@ -239,7 +239,7 @@ class Orderbook:
         ]
     
     @staticmethod
-    def __get_L1(slab: Slab, decimals: int, increasing: bool, is_inverted: bool):
+    def __get_L3(slab: Slab, decimals: int, increasing: bool, is_inverted: bool):
         """Get the Level 1 market information."""
         # The first element of the inner list is price, the second is quantity.
         orders: list[SlabOrder] = []
@@ -282,7 +282,7 @@ class Orderbook:
             size=p.size
             )
 
-    def get_bids_l1(self):
+    def get_bids_L3(self):
         """
         Gets level 1 market information for bids.
 
@@ -295,14 +295,14 @@ class Orderbook:
         if(self.is_inverted):
             is_increasing = True
         
-        return Orderbook.__get_L1(
+        return Orderbook.__get_L3(
             self.slab_bids,
             self.decimals,
             is_increasing,
             self.is_inverted
         )
 
-    def get_asks_l1(self):
+    def get_asks_L3(self):
         """
         Gets level 1 market information for asks
 
@@ -315,7 +315,7 @@ class Orderbook:
         if(self.is_inverted):
             is_increasing = False
         
-        return Orderbook.__get_L1(
+        return Orderbook.__get_L3(
             self.slab_asks,
             self.decimals,
             is_increasing,

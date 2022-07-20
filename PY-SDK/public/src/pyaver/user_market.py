@@ -12,10 +12,10 @@ from anchorpy import Context
 from .user_host_lifetime import UserHostLifetime
 from spl.token.instructions import get_associated_token_address
 from .aver_client import AverClient
-from .utils import sign_and_send_transaction_instructions, load_multiple_account_states
+from .utils import sign_and_send_transaction_instructions, load_multiple_account_states, parse_user_market_state
 from solana.rpc.types import TxOpts
 from solana.rpc.commitment import Finalized
-from .data_classes import UserMarketState, UserBalanceState
+from .data_classes import UserHostLifetimeState, UserMarketState, UserBalanceState
 # from constants import DEFAULT_QUOTE_TOKEN_DEVNET, AVER_PROGRAM_ID, DEFAULT_HOST_ACCOUNT_DEVNET
 from .constants import AVER_PROGRAM_ID, AVER_HOST_ACCOUNT
 from .enums import OrderType, SelfTradeBehavior, Side, SizeFormat
@@ -46,8 +46,13 @@ class UserMarket():
     """
     UserBalanceState object
     """
+    user_host_lifetime: UserHostLifetime
+    """
+    UserHostLifetime object
+    """
 
-    def __init__(self, aver_client: AverClient, pubkey: PublicKey, user_market_state: UserMarketState, market: AverMarket, user_balance_state: UserBalanceState):
+
+    def __init__(self, aver_client: AverClient, pubkey: PublicKey, user_market_state: UserMarketState, market: AverMarket, user_balance_state: UserBalanceState, user_host_lifetime: UserHostLifetime):
         """
          Initialise an UserMarket object. Do not use this function; use UserMarket.load() instead
 
@@ -57,12 +62,14 @@ class UserMarket():
             user_market_state (UserMarketState): UserMarketState object
             market (AverMarket): Market object
             user_balance_state (UserBalanceState): UserBalanceState object
+            user_host_lifetime (UserHostLifetime): UserHostLifetime object
         """
         self.user_market_state = user_market_state
         self.pubkey = pubkey
         self.aver_client = aver_client
         self.market = market
         self.user_balance_state = user_balance_state
+        self.user_host_lifetime = user_host_lifetime
 
     @staticmethod
     async def load(
@@ -88,14 +95,14 @@ class UserMarket():
                 UserMarket: UserMarket object
             """
             uma, bump = UserMarket.derive_pubkey_and_bump(owner, market.market_pubkey, host, program_id)
-            return await UserMarket.load_by_uma(aver_client, uma, market)
+            uhl = UserHostLifetime.derive_pubkey_and_bump(owner, host, program_id)[0]
+            return await UserMarket.load_by_uma(aver_client, uma, market, uhl)
 
-    #Should we instead have owners: list[PublicKey] here to allow for different owners
     @staticmethod
     async def load_multiple(
             aver_client: AverClient, 
             markets: list[AverMarket], 
-            owner: PublicKey, 
+            owners: list[PublicKey], 
             host: PublicKey = AVER_HOST_ACCOUNT,
             program_id: PublicKey = AVER_PROGRAM_ID,
         ):
@@ -109,21 +116,25 @@ class UserMarket():
             Args:
                 aver_client (AverClient): AverClient object
                 markets (list[AverMarket]): List of corresponding AverMarket objects (in correct order)
-                owner (PublicKey): Owner of UserMarket account
+                owner (PublicKey): List of owners of UserMarket account
                 host (PublicKey, optional): Host account public key. Defaults to AVER_HOST_ACCOUNT.
                 program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
 
             Returns:
                 list[UserMarket]: List of UserMarket objects
             """
-            umas = [UserMarket.derive_pubkey_and_bump(owner, m.market_pubkey, host, program_id)[0] for m in markets]
-            return await UserMarket.load_multiple_by_uma(aver_client, umas, markets)
+            umas = []
+            for i, m in enumerate(markets):
+                umas.append(UserMarket.derive_pubkey_and_bump(owners[i], m.market_pubkey, host, program_id)[0])
+            uhls = [UserHostLifetime.derive_pubkey_and_bump(owner, host, program_id)[0] for owner in owners]
+            return await UserMarket.load_multiple_by_uma(aver_client, umas, markets, uhls)
 
     @staticmethod
     async def load_by_uma(
             aver_client: AverClient,
             pubkey: PublicKey,
-            market: (AverMarket or PublicKey)
+            market: (AverMarket or PublicKey),
+            uhl: PublicKey
         ):
         """
         Initialises an UserMarket object from UserMarket account public key
@@ -134,11 +145,13 @@ class UserMarket():
             aver_client (AverClient): AverClient object
             pubkey (PublicKey): UserMarket account public key
             market (AverMarket or PublicKey): AverMarket object or AverMarket public key
+            uhl (PublicKey): UserHostLifetime account
 
         Returns:
             UserMarket: UserMarket object
         """
         res: UserMarketState = await aver_client.program.account['UserMarket'].fetch(pubkey)
+        uhl = await UserHostLifetime.load(aver_client, uhl)
 
         lamport_balance = await aver_client.request_lamport_balance(res.user)
         token_balance = await aver_client.request_token_balance(aver_client.quote_token, res.user)
@@ -150,16 +163,35 @@ class UserMarket():
         if(res.market.to_base58() != market.market_pubkey.to_base58()):
             raise Exception('UserMarket and Market do not match')
 
-        return UserMarket(aver_client, pubkey, res, market, user_balance_state)   
+        return UserMarket(aver_client, pubkey, res, market, user_balance_state, uhl)   
     
     @staticmethod
     async def load_multiple_by_uma(
             aver_client: AverClient,
             pubkeys: list[PublicKey],
-            markets: list[AverMarket]
+            markets: list[AverMarket],
+            uhls: list[PublicKey]
         ):
+        """
+        Initialises an multiple UserMarket objects from a list of UserMarket account public keys
+
+        To refresh data on an already loaded UserMarket use src.refresh.refresh_user_markets()
+
+        Args:
+            aver_client (AverClient): AverClient object 
+            pubkeys (list[PublicKey]): List of UserMarket account public keys
+            markets (list[AverMarket]): List of AverMarket objects
+            uhls (list[PublicKey]): List of UserHostLifetime  account public keys
+
+        Raises:
+            Exception: UserMarket and market do not match
+
+        Returns:
+            list[UserMarket]: List of UserMarket objects
+        """
 
         res: list[UserMarketState] = await aver_client.program.account['UserMarket'].fetch_multiple(pubkeys)
+        uhls = await UserHostLifetime.load_multiple(aver_client, uhls)
 
         user_pubkeys = [u.user for u in res]
         user_balances = (await load_multiple_account_states(aver_client, [], [], [], [], user_pubkeys))['user_balance_states']
@@ -168,7 +200,7 @@ class UserMarket():
         for i, pubkey in enumerate(pubkeys):
             if(res[i].market.to_base58() != markets[i].market_pubkey.to_base58()):
                 raise Exception('UserMarket and Market do not match')
-            umas.append(UserMarket(aver_client, pubkey, res[i], markets[i], user_balances[i]))
+            umas.append(UserMarket(aver_client, pubkey, res[i], markets[i], user_balances[i], uhls[i]))
         return umas
     
     @staticmethod
@@ -177,7 +209,9 @@ class UserMarket():
             pubkeys: list[PublicKey], 
             user_market_states: list[UserMarketState],
             aver_markets: list[AverMarket],
-            user_balance_states: list[UserBalanceState]
+            user_balance_states: list[UserBalanceState],
+            user_host_lifetime_states: list[UserHostLifetimeState],
+            user_host_lifetime_pubkeys: list[PublicKey]
         ):
         """
         Returns multiple UserMarket objects from their respective MarketStates, stores and orderbook objects
@@ -190,33 +224,18 @@ class UserMarket():
             user_market_states (list[UserMarketState]): List of UserMarketState objects
             aver_markets (list[AverMarket]): List of AverMarket objects
             user_balance_states (list[UserBalanceState]): List of UserBalanceState objects
+            user_host_lifetime_states: (List[UserHostLifetimeState]): List of UserHostLifetimeState objects
+            user_host_lifetime_pubkeys (list[PublicKey]): List of UserHostLifetime public keys
 
         Returns:
             list[UserMarket]: List of UserMarket objects
         """
         user_markets: list[UserMarket] = []
         for i, pubkey in enumerate(pubkeys):
-            user_market = UserMarket(aver_client, pubkey, user_market_states[i], aver_markets[i], user_balance_states[i])
+            user_market = UserMarket(aver_client, pubkey, user_market_states[i], aver_markets[i], user_balance_states[i], UserHostLifetime(user_host_lifetime_pubkeys[i],user_host_lifetime_states[i]))
             user_markets.append(user_market)
         return user_markets
     
-    @staticmethod
-    def parse_user_market_state(
-            buffer: bytes,
-            aver_client: AverClient
-        ):
-        """
-        Parses raw onchain data to UserMarketState object        
-        Args:
-            buffer (bytes): Raw bytes coming from onchain
-            aver_client (AverClient): AverClient object
-
-        Returns:
-            UserMarket: UserMarketState object
-        """
-        #uma_parsed = USER_MARKET_STATE_LAYOUT.parse(buffer)
-        uma_parsed = aver_client.program.account['UserMarket'].coder.accounts.decode(buffer)
-        return uma_parsed
     
     @staticmethod
     def parse_multiple_user_market_state(
@@ -233,7 +252,7 @@ class UserMarket():
         Returns:
             list[UserMarketState]: List of UserMarketState objects
         """
-        return [UserMarket.parse_user_market_state(b, aver_client) for b in buffer]
+        return [parse_user_market_state(b, aver_client) for b in buffer]
 
     @staticmethod
     def derive_pubkey_and_bump(
@@ -440,29 +459,6 @@ class UserMarket():
                 host,
                 program_id)
 
-    
-    @staticmethod
-    async def create_uma_and_get_or_create_associated_accounts(
-            aver_client: AverClient,
-            fee_payer: Keypair,
-            owner: PublicKey = None,
-            token_mint: PublicKey = None
-        ):
-        """
-        See src.aver_client.AverClient.get_or_create_associated_token_account()
-        """
-        
-        if(owner is None):
-            owner = aver_client.owner
-
-        token_mint = token_mint if token_mint is not None else aver_client.quote_token
-        ata = aver_client.get_or_create_associated_token_account(
-            owner,
-            fee_payer,
-            token_mint
-        )
-
-        return ata
 
 
     def make_place_order_instruction(
@@ -506,7 +502,7 @@ class UserMarket():
             check_sufficient_lamport_balance(self.user_balance_state)
             check_correct_uma_market_match(self.user_market_state, self.market)
             check_market_active_pre_event(self.market.market_state.market_status)
-            #check_uhl_self_excluded(self.user_market_state.user_host_lifetime) - Requires loading UHL
+            check_uhl_self_excluded(self.user_host_lifetime)
             check_user_market_full(self.user_market_state)
             check_limit_price_error(limit_price, self.market)
             check_outcome_outside_space(outcome_position, self.market)

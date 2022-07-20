@@ -8,10 +8,29 @@ from .layouts import EVENT_QUEUE_HEADER_LAYOUT, EVENT_QUEUE_HEADER_LEN, REGISTER
 
 
 async def load_all_event_queues(conn: AsyncClient, event_queues: list[PublicKey]):
+    """
+    Loads onchain data for multiple Event Queues
+
+    Args:
+        conn (AsyncClient): Solana AsyncClient object
+        event_queues (list[PublicKey]): List of EventQueue account pubkeys
+
+    Returns:
+        list[Tuple[Container, List[Fill | Out]]]: List of EventQueues
+    """
     data = await load_multiple_bytes_data(conn, event_queues)
     return [read_event_queue_from_bytes(d) for d in data]
 
 def read_event_queue_from_bytes(buffer: bytes) -> Tuple[Container, List[Union[Fill, Out]]]:
+    """
+    Parses raw event queue data into Event objects
+
+    Args:
+        buffer (bytes): Raw bytes coming from onchain
+
+    Returns:
+        Tuple[Container, List[Union[Fill, Out]]]: _description_
+    """
     header = EVENT_QUEUE_HEADER_LAYOUT.parse(buffer)
     buffer_len = len(buffer)
     nodes: List[Union[Fill, Out]] = []
@@ -44,6 +63,15 @@ def read_event_queue_from_bytes(buffer: bytes) -> Tuple[Container, List[Union[Fi
     return {"header": header, "nodes": nodes}
 
 def prepare_user_accounts_list(user_account: List[PublicKey]) -> List[PublicKey]:
+    """
+    Sorts list of user accounts by public key (alphabetically)
+
+    Args:
+        user_account (List[PublicKey]): List of User Account account pubkeys
+
+    Returns:
+        List[PublicKey]: Sorted list of User Account account pubkeys
+    """
     str_list = [str(pk) for pk in user_account]
     deduped_list = list(set(str_list))
     # TODO: Not clear if this sort is doing the same thing as dex_v4 - they use .sort_unstable()

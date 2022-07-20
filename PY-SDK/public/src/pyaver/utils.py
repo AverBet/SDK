@@ -203,31 +203,62 @@ def round_price_to_nearest_tick_size(limit_price: float):
 
     return rounded_limit_price
 
-#Duplicate function for fixing circular imports
 def parse_user_market_state(buffer: bytes, aver_client: AverClient):
         """
-        See src.user_market.UserMarket.parse_user_market_state()
+        Parses raw onchain data to UserMarketState object        
+        Args:
+            buffer (bytes): Raw bytes coming from onchain
+            aver_client (AverClient): AverClient object
+
+        Returns:
+            UserMarket: UserMarketState object
         """
         #uma_parsed = USER_MARKET_STATE_LAYOUT.parse(buffer)
         uma_parsed = aver_client.program.account['UserMarket'].coder.accounts.decode(buffer)
         return uma_parsed
 
-#Duplicate function for fixing circular imports
 def parse_market_state(buffer: bytes, aver_client: AverClient):
         """
-        See src.market.AverMarket.parse_market_state()
+        Parses raw onchain data to MarketState object        
+        Args:
+            buffer (bytes): Raw bytes coming from onchain
+            aver_client (AverClient): AverClient object
+
+        Returns:
+            MarketState: MarketState object
         """
+        
         market_account_info = aver_client.program.account['Market'].coder.accounts.decode(buffer)
         return market_account_info
 
-#Duplicate function for fixing circular imports
 def parse_market_store(buffer: bytes, aver_client: AverClient):
         """
-        See src.market.AverMarket.parse_market_store()
+        Parses onchain data for a MarketStore State
+
+        Args:
+            buffer (bytes): Raw bytes coming from onchain
+            aver_client (AverClient): AverClient
+
+        Returns:
+            MarketStore: MarketStore object
         """
         market_store_account_info = aver_client.program.account['MarketStore'].coder.accounts.decode(buffer)
         return market_store_account_info  
 
+
+def parse_user_host_lifetime_state(aver_client: AverClient, buffer):
+        """
+        Parses raw onchain data to UserHostLifetime object
+
+        Args:
+            aver_client (AverClient): AverClient object
+            buffer (bytes): Raw bytes coming from onchain
+
+        Returns:
+            UserHostLifetime: UserHostLifetime object
+        """
+        user_host_lifetime_info = aver_client.program.account['UserHostLifetime'].coder.accounts.decode(buffer)
+        return user_host_lifetime_info
 
 async def load_multiple_account_states(
         aver_client: AverClient,
@@ -236,6 +267,7 @@ async def load_multiple_account_states(
         slab_pubkeys: list[PublicKey],
         user_market_pubkeys: list[PublicKey] = [],
         user_pubkeys: list[PublicKey] = [],
+        uhl_pubkeys: list[PublicKey] = []
     ):
         """
         Fetchs account data for multiple account types at once
@@ -249,13 +281,14 @@ async def load_multiple_account_states(
             slab_pubkeys (list[PublicKey]): List of Slab public keys for orderbooks
             user_market_pubkeys (list[PublicKey], optional): List of UserMarketState object public keys. Defaults to [].
             user_pubkeys (list[PublicKey], optional): List of UserMarket owners' public keys. Defaults to [].
+            uhl_pubkeuys(list[PublicKey], optional): List of UserHostLifetime public keys. Defaults to []
 
         Returns:
             dict[str, list]: Dictionary containing `market_states`, `market_stores`, `slabs`, `user_market_states`, `user_balance_sheets`
         """
         all_ata_pubkeys = [get_associated_token_address(u, aver_client.quote_token) for u in user_pubkeys]
 
-        all_pubkeys = market_pubkeys + market_store_pubkeys + slab_pubkeys + user_market_pubkeys + user_pubkeys + all_ata_pubkeys
+        all_pubkeys = market_pubkeys + market_store_pubkeys + slab_pubkeys + user_market_pubkeys + user_pubkeys + all_ata_pubkeys + uhl_pubkeys
         data = await load_multiple_bytes_data(aver_client.provider.connection, all_pubkeys, [], False)
 
         deserialized_market_state = []
@@ -308,12 +341,22 @@ async def load_multiple_account_states(
             user_balance_state = UserBalanceState(lamport_balances[index], token_balances[index])
             user_balance_states.append(user_balance_state)
 
+        uhl_states = []
+        for index, pubkey in enumerate(uhl_pubkeys):
+            buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(slab_pubkeys) + len(user_market_pubkeys) + len(user_pubkeys) + len(all_ata_pubkeys)]
+            if(buffer is None):
+                uhl_states.append(None)
+                continue
+            uhl_state = parse_user_host_lifetime_state(aver_client, buffer['data'])
+            uhl_states.append(uhl_state)
+
         return {
             'market_states': deserialized_market_state,
             'market_stores': deserialized_market_store,
             'slabs': deserialized_slab_data,
             'user_market_states': deserialized_uma_data,
-            'user_balance_states': user_balance_states
+            'user_balance_states': user_balance_states,
+            'user_host_lifetime_states': uhl_states
         }
 
 def is_market_tradeable(market_status: MarketStatus):

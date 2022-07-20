@@ -6,7 +6,7 @@ from solana.publickey import PublicKey
 from solana.keypair import Keypair
 from .enums import Fill, MarketStatus
 from .constants import AVER_MARKET_AUTHORITY, AVER_PROGRAM_ID
-from .utils import load_multiple_bytes_data, sign_and_send_transaction_instructions
+from .utils import load_multiple_bytes_data, sign_and_send_transaction_instructions, parse_market_store, parse_market_state
 from .data_classes import MarketState, MarketStoreState, OrderbookAccountsState
 from .orderbook import Orderbook
 from solana.transaction import AccountMeta
@@ -204,8 +204,8 @@ class AverMarket():
         market_states_data = data[0:len(market_pubkeys)]
         market_stores_data = data[len(market_pubkeys):]
 
-        market_states = [AverMarket.parse_market_state(d, aver_client) for d in market_states_data]
-        market_stores = [AverMarket.parse_market_store(d, aver_client) if d is not None else None for d in market_stores_data]
+        market_states = [parse_market_state(d, aver_client) for d in market_states_data]
+        market_stores = [parse_market_store(d, aver_client) if d is not None else None for d in market_stores_data]
 
         return {'market_states': market_states, 'market_stores': market_stores}
 
@@ -285,20 +285,6 @@ class AverMarket():
 
 
     @staticmethod
-    def parse_market_state(buffer: bytes, aver_client: AverClient) -> MarketState:
-        """
-        Parses raw onchain data to MarketState object        
-        Args:
-            buffer (bytes): Raw bytes coming from onchain
-            aver_client (AverClient): AverClient object
-
-        Returns:
-            MarketState: MarketState object
-        """
-        market_account_info = aver_client.program.account['Market'].coder.accounts.decode(buffer)
-        return market_account_info
-
-    @staticmethod
     async def load_market_store_state(
         aver_client: AverClient, 
         is_market_status_closed: bool,
@@ -338,22 +324,7 @@ class AverMarket():
             list[MarketStoreState]: List of MarketStore public keys
         """
         res = await aver_client.program.account['MarketStore'].fetch_multiple(market_store_pubkeys)
-        return res
-    
-    @staticmethod
-    def parse_market_store(buffer: bytes, aver_client: AverClient):
-        """
-        Parses onchain data for a MarketStore State
-
-        Args:
-            buffer (bytes): Raw bytes coming from onchain
-            aver_client (AverClient): AverClient
-
-        Returns:
-            MarketStore: MarketStore object
-        """
-        market_store_account_info = aver_client.program.account['MarketStore'].coder.accounts.decode(buffer)
-        return market_store_account_info          
+        return res       
 
     @staticmethod
     def is_market_status_closed(market_status: MarketStatus):
@@ -470,10 +441,11 @@ class AverMarket():
         return orderbooks_market_list
 
     
-    # TODO adjust the accounts being passed in correctly
     def make_sweep_fees_instruction(self):
         """
-        NOT FINISHED
+        Creates instruction to sweeps fees and sends to relevant accounts
+
+        Returns TransactionInstruction object only. Does not send transaction.
 
         Returns:
             TransactionInstruction: TransactionInstruction object
@@ -503,24 +475,28 @@ class AverMarket():
             ),
         )
     
-    #TODO - Move to admin????
-    async def sweep_fees(self, owner: Keypair, send_options: TxOpts = None,):
+    async def sweep_fees(self, fee_payer: Keypair = None, send_options: TxOpts = None,):
         """
-        NOT FINISHED
+        Sweeps fees and sends to relevant accounts
+
+        Sends instructions on chain
 
         Args:
-            owner (Keypair): _description_
-            send_options (TxOpts, optional): _description_. Defaults to None.
+            fee_payer (Keypair): Pays transaction fees. Defaults to AverClient wallet
+            send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
 
         Returns:
-            _type_: _description_
+            RPCResponse: Response
         """
+        if(fee_payer == None):
+            fee_payer = self.aver_client.owner
+
         ix = self.make_sweep_fees_instruction()
 
         return await sign_and_send_transaction_instructions(
             self.aver_client,
             [],
-            owner,
+            fee_payer,
             [ix],
             send_options
         )
@@ -535,7 +511,7 @@ class AverMarket():
         list_of_pubkeys = [self.market_pubkey, self.market_state.quote_vault, self.market_state.oracle_feed]
         if not self.is_market_status_closed:
             for ob in self.orderbooks:
-                list_of_pubkeys += [ob.pubkey, ob.slab_asks_pubkey, ob.slab_asks_pubkey] # TODO: Event Queue?
+                list_of_pubkeys += [ob.pubkey, ob.slab_asks_pubkey, ob.slab_asks_pubkey]
         return list_of_pubkeys
     
     async def get_implied_market_status(
@@ -576,8 +552,6 @@ class AverMarket():
             outcome_idxs = [idx for idx in range(
                 1 if self.market_state.number_of_outcomes == 2 else self.market_state.number_of_outcomes)]
         if self.market_state.number_of_outcomes == 2 and (0 in outcome_idxs or 1 in outcome_idxs):
-            # OLD COMMENT: For binary markets, there is only one orderbook
-            ### ^ Not anymore. I've left the legacy code in there just in case.
             outcome_idxs = [0]
         if reward_target == None:
             reward_target = self.aver_client.owner.public_key
@@ -629,6 +603,21 @@ class AverMarket():
         reward_target: PublicKey = None,
         payer: Keypair = None,
     ):
+        """
+        Consume events
+
+        Sends instructions on chain
+
+        Args:
+            outcome_idx (int): index of the outcome
+            user_accounts (list[PublicKey]): List of User Account public keys
+            max_iterations (int, optional): Depth of events to iterate through. Defaults to MAX_ITERATIONS_FOR_CONSUME_EVENTS.
+            reward_target (PublicKey, optional): Target for reward. Defaults to AverClient wallet.
+            payer (Keypair, optional): Fee payer. Defaults to AverClient wallet.
+
+        Returns:
+            Transaction Signature: TransactionSignature object
+        """
         if reward_target == None:
             reward_target = self.aver_client.owner.public_key
         if payer == None:
@@ -656,4 +645,4 @@ class AverMarket():
                 ),
             )
 
-#TODO - Market Listener
+
