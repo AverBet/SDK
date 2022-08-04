@@ -32,16 +32,20 @@ export class AverClient {
 
   private _quoteTokenMint: PublicKey
 
+  private _keypair: Keypair
+
   private constructor(
     program: Program,
     averApiEndpoint: string,
-    solanaNetwork: SolanaNetwork
+    solanaNetwork: SolanaNetwork,
+    keypair: Keypair
   ) {
     this._connection = program.provider.connection
     this._program = program
     this._averApiEndpoint = averApiEndpoint
     this._solanaNetwork = solanaNetwork
     this._quoteTokenMint = getQuoteToken(solanaNetwork)
+    this._keypair = keypair
   }
 
   /**
@@ -56,17 +60,19 @@ export class AverClient {
   static async loadAverClient(
     connection: Connection,
     solanaNetwork: SolanaNetwork,
-    owner: null | Keypair | Wallet,
+    owner: null | Keypair,
     opts?: ConfirmOptions,
     averProgramId?: PublicKey
   ) {
     let wallet: Wallet
+    let keypair: Keypair = new Keypair()
     if (owner == null) {
       // create a dummy wallet
-      wallet = new NodeWallet(new Keypair())
+      wallet = new NodeWallet(keypair)
     } else if (owner instanceof Keypair) {
       // create a node wallet with the keypair
       wallet = new NodeWallet(owner)
+      keypair = owner
     } else if (owner.publicKey) {
       wallet = owner
     } else {
@@ -89,7 +95,7 @@ export class AverClient {
 
     if (idl) {
       const program = new Program(idl, averProgramId, provider)
-      return new AverClient(program, averApiEndpoint, solanaNetwork)
+      return new AverClient(program, averApiEndpoint, solanaNetwork, keypair)
     }
 
     return null
@@ -109,6 +115,10 @@ export class AverClient {
 
   get owner() {
     return this._program.provider.wallet.publicKey
+  }
+
+  get keypair() {
+    return this._keypair
   }
 
   get quoteTokenMint() {

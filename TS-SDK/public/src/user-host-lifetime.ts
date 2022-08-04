@@ -126,7 +126,7 @@ export class UserHostLifetime {
    */
   static async createUserHostLifetime(
     averClient: AverClient,
-    owner: Keypair,
+    owner: Keypair = averClient.keypair,
     userQuoteTokenAta: PublicKey,
     sendOptions?: SendOptions,
     manualMaxRetry?: number,
@@ -168,7 +168,7 @@ export class UserHostLifetime {
    */
   static async getOrCreateUserHostLifetime(
     averClient: AverClient,
-    owner: Keypair,
+    owner: Keypair = averClient.keypair,
     sendOptions?: SendOptions,
     quoteTokenMint: PublicKey = averClient.quoteTokenMint,
     host: PublicKey = AVER_HOST_ACCOUNT,

@@ -90,7 +90,7 @@ export class Referrer {
   static async createReferrerAccount(
     averClient: AverClient,
     host: PublicKey,
-    owner: Keypair,
+    owner: Keypair = averClient.keypair,
     feePayer: Keypair,
     sendOptions?: SendOptions,
     manualMaxRetry?: number,

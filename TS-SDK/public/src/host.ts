@@ -87,7 +87,7 @@ export class Host {
    */
   static async createHostAccount(
     averClient: AverClient,
-    owner: Keypair,
+    owner: Keypair = averClient.keypair,
     feePayer: Keypair,
     referrerFeeRateOfferedBps: BN = new BN(0),
     sendOptions?: SendOptions,

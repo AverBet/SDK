@@ -330,7 +330,7 @@ export class UserMarket {
   static async createUserMarketAccount(
     averClient: AverClient,
     market: Market,
-    owner: Keypair,
+    owner: Keypair = averClient.keypair,
     sendOptions?: SendOptions,
     manualMaxRetry?: number,
     host: PublicKey = AVER_HOST_ACCOUNT,
@@ -374,7 +374,7 @@ export class UserMarket {
    */
   static async getOrCreateUserMarketAccount(
     averClient: AverClient,
-    owner: Keypair,
+    owner: Keypair = averClient.keypair,
     market: Market,
     sendOptions?: SendOptions,
     quoteTokenMint: PublicKey = averClient.quoteTokenMint,
@@ -881,7 +881,7 @@ export class UserMarket {
    * @returns {Promise<string>}
    */
   async placeOrder(
-    owner: Keypair,
+    owner: Keypair = this._averClient.keypair,
     outcomeIndex: number,
     side: Side,
     limitPrice: number,
@@ -971,7 +971,7 @@ export class UserMarket {
    * @returns {Promise<string>}
    */
   cancelOrder(
-    feePayer: Keypair,
+    feePayer: Keypair = this._averClient.keypair,
     orderId: BN,
     outcomeIndex: number,
     sendOptions?: SendOptions,
@@ -1056,7 +1056,7 @@ export class UserMarket {
    * @returns {Promise<string>}
    */
   cancelAllOrders(
-    feePayer: Keypair,
+    feePayer: Keypair = this._averClient.keypair,
     outcomeIdsToCancel: number[],
     sendOptions?: SendOptions,
     manualMaxRetry?: number,
@@ -1117,7 +1117,7 @@ export class UserMarket {
    * @returns {Promise<string>}
    */
   async depositTokens(
-    owner: Keypair,
+    owner: Keypair = this._averClient.keypair,
     amount: BN,
     sendOptions?: SendOptions,
     manualMaxRetry?: number
@@ -1179,7 +1179,7 @@ export class UserMarket {
    * @returns {Promise<string>}
    */
   async withdrawIdleFunds(
-    owner: Keypair,
+    owner: Keypair = this._averClient.keypair,
     amount?: BN,
     sendOptions?: SendOptions,
     manualMaxRetry?: number
@@ -1246,7 +1246,7 @@ export class UserMarket {
    * @returns {Promise<string>}
    */
   async neutralizePosition(
-    owner: Keypair,
+    owner: Keypair = this._averClient.keypair,
     outcomeId: number,
     sendOptions?: SendOptions,
     manualMaxRetry?: number
@@ -1302,7 +1302,7 @@ export class UserMarket {
    * @returns {Promise<string>}
    */
   async collect(
-    owner: Keypair,
+    owner: Keypair = this._averClient.keypair,
     sendOptions?: SendOptions,
     manualMaxRetry?: number
   ) {
