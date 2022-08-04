@@ -3,3 +3,5 @@ TS-SDK/public/node_modules
 TS-SDK/public/dist
 *ignore.py
 *.ignore.ts
+*./ignore.py
+ignore.py

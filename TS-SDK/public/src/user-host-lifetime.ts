@@ -12,12 +12,7 @@ import {
   SystemProgram,
 } from "@solana/web3.js"
 import { AverClient } from "./aver-client"
-import {
-  AVER_PROGRAM_ID,
-  AVER_HOST_ACCOUNT,
-  getAverLaunchZeroFeesToken,
-  AVER_TOKEN,
-} from "./ids"
+import { AVER_PROGRAM_ID, AVER_HOST_ACCOUNT } from "./ids"
 import { FeeTier, UserHostLifetimeState } from "./types"
 import {
   getBestDiscountToken,

@@ -1,5 +1,4 @@
 // // PLACE ORDER CHECKS
-import { BN } from "@project-serum/anchor"
 import { Market } from "./market"
 import {
   MarketStatus,

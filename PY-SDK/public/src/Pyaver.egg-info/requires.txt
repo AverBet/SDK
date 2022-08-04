@@ -1,1 +1,3 @@
 solana
+anchorpy
+pydash

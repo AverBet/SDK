@@ -4,13 +4,7 @@ import {
   TypeDef,
 } from "@project-serum/anchor/dist/cjs/program/namespace/types"
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token"
-import {
-  Keypair,
-  PublicKey,
-  SendOptions,
-  SystemProgram,
-  TransactionInstruction,
-} from "@solana/web3.js"
+import { Keypair, PublicKey, SendOptions, SystemProgram } from "@solana/web3.js"
 import { AverClient } from "./aver-client"
 import { AVER_HOST_ACCOUNT, AVER_PROGRAM_ID } from "./ids"
 import { ReferrerState } from "./types"

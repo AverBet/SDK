@@ -26,10 +26,9 @@ import {
 } from "./types"
 import {
   getBestDiscountToken,
-  roundPriceToNearestTickSize,
   signAndSendTransactionInstructions,
 } from "./utils"
-import { canCancelOrderInMarket, isMarketTradable, Market } from "./market"
+import { Market } from "./market"
 import BN from "bn.js"
 import { AVER_PROGRAM_ID, AVER_HOST_ACCOUNT } from "./ids"
 import { UserHostLifetime } from "./user-host-lifetime"
@@ -45,11 +44,8 @@ import {
   checkOrderExists,
   checkOutcomeHasOrders,
   checkOutcomeOutsideSpace,
-  checkOutcomePositionAmountError,
-  checkPriceError,
   checkQuoteAndBaseSizeTooSmall,
   checkStakeNoop,
-  checkUhlSelfExcluded,
   checkUserMarketFull,
   checkUserPermissionAndQuoteTokenLimitExceeded,
 } from "./checks"

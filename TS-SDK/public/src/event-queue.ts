@@ -1,30 +1,7 @@
-import { Slab } from "@bonfida/aaob"
-import { Idl, IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl"
-import {
-  IdlTypes,
-  TypeDef,
-} from "@project-serum/anchor/dist/cjs/program/namespace/types"
-import {
-  AccountLayout,
-  ACCOUNT_SIZE,
-  getAssociatedTokenAddress,
-} from "@solana/spl-token"
-import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
-import { AverClient } from "./aver-client"
-import { AVER_PROGRAM_ID, CALLBACK_INFO_LEN, getQuoteToken } from "./ids"
-import { Orderbook } from "./orderbook"
-import {
-  MarketState,
-  MarketStatus,
-  MarketStoreState,
-  OrderbookAccountsState,
-  SolanaNetwork,
-  UserBalanceState,
-  UserMarketState,
-} from "./types"
-import { UserMarket } from "./user-market"
+import { Connection, PublicKey } from "@solana/web3.js"
+import { CALLBACK_INFO_LEN } from "./ids"
 import { chunkAndFetchMultiple } from "./utils"
-import { EventQueue, EventQueueHeader } from "@bonfida/aaob"
+import { EventQueue } from "@bonfida/aaob"
 
 export async function loadAllEventQueues(
   conn: Connection,

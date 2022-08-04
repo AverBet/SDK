@@ -2,7 +2,7 @@ import fnmatch
 from setuptools import find_packages, setup
 from setuptools.command.build_py import build_py as build_py_orig
 
-excluded = ['example.ignore.py']
+excluded = ['example.ignore.py', 'ignore.py']
 
 class build_py(build_py_orig):
     def find_package_modules(self, package, package_dir):
@@ -15,16 +15,18 @@ class build_py(build_py_orig):
 
 setup(
     name='pyaver',
-    version='0.0.10',
+    version='0.0.6',
     license='MIT',
     author="Aver Ramanujan",
     author_email='email@example.com',
     packages=find_packages('src'),
     package_dir={'': 'src'},
-    url='https://github.com/gmyrianthous/example-publish-pypi',
+    url='https://www.aver.exchange/',
     keywords='Aver Python SDK Solana',
     install_requires=[
-        'solana'
+        'solana',
+        'anchorpy',
+        'pydash'
       ],
 
 )

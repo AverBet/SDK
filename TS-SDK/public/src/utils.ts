@@ -1,4 +1,4 @@
-import { Program, ProgramError } from "@project-serum/anchor"
+import { ProgramError } from "@project-serum/anchor"
 import {
   Keypair,
   Connection,
