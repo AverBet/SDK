@@ -59,7 +59,7 @@ export class Market {
     this._marketStoreState = marketStoreState
     this._averClient = averClient
 
-    // store 2 orderbooks for binary markets
+    // Store 2 orderbooks for binary markets
     this._orderbooks =
       marketState.numberOfOutcomes == 2 && orderbooks?.length == 1
         ? orderbooks?.concat(Orderbook.invert(orderbooks[0]))
@@ -551,14 +551,12 @@ export class Market {
     this._orderbooks = market._orderbooks
   }
 
-  // NOT TESTED
   async loadMarketListener(callback: (marketState: MarketState) => void) {
     const ee = this._averClient.program.account["market"].subscribe(this.pubkey)
     ee.on("change", callback)
     return ee
   }
 
-  // NOT TESTED
   async loadMarketStoreListener(callback: (marketState: MarketState) => void) {
     const ee = this._averClient.program.account["marketStore"].subscribe(
       this.marketStore
@@ -720,8 +718,6 @@ export class Market {
       this.numberOfOutcomes == 2 &&
       (outcome_idxs.includes(0) || outcome_idxs.includes(1))
     ) {
-      // # OLD COMMENT: For binary markets, there is only one orderbook
-      //### ^ Not anymore. I've left the legacy code in there just in case.
       outcome_idxs = [0]
     }
     if (!reward_target) reward_target = this._averClient.owner
@@ -745,7 +741,6 @@ export class Market {
           loadedEventQueues[idx].header.count
         } events left to crank`
       )
-      //TODO - CHECK THIS
       if (loadedEventQueues[idx].header.count > 0) {
         let userAccounts = loadedEventQueues[idx]
           .parseFill(MAX_ITERATIONS_FOR_CONSUME_EVENTS)

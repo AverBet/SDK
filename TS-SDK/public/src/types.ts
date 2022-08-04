@@ -1,6 +1,6 @@
-import { Price } from '@bonfida/aaob'
-import { PublicKey } from '@solana/web3.js'
-import BN from 'bn.js'
+import { Price } from "@bonfida/aaob"
+import { PublicKey } from "@solana/web3.js"
+import BN from "bn.js"
 
 export type AverDbMint = {
   pubkey: string
@@ -10,7 +10,12 @@ export type AverDbMint = {
   decimals: number
 }
 
-// Note: This is called MarketState in the contract. However, it conflicts with the market state property of the market
+/**
+ * Status of a market
+ * @enum
+ *
+ * Note: This is called MarketState in the contract. However, it conflicts with the market state property of the market
+ */
 export enum MarketStatus {
   Uninitialised,
   Initialised,
@@ -24,14 +29,20 @@ export enum MarketStatus {
   Voided,
 }
 
+/**
+ * Level of fees paid
+ *
+ * This is determined by the number of AVER tokens held
+ * @enum{string}
+ */
 export enum FeeTier {
-  Base = 'base',
-  Aver1 = 'aver1',
-  Aver2 = 'aver2',
-  Aver3 = 'aver3',
-  Aver4 = 'aver4',
-  Aver5 = 'aver5',
-  Free = 'zeroFees',
+  Base = "base",
+  Aver1 = "aver1",
+  Aver2 = "aver2",
+  Aver3 = "aver3",
+  Aver4 = "aver4",
+  Aver5 = "aver5",
+  Free = "zeroFees",
 }
 
 export type MarketState = {
@@ -162,6 +173,13 @@ export type UmaOrder = {
   baseQty: BN
 }
 
+/**
+ * Type of order
+ * LIMIT = a Limit order, will attempt to fill against existing opposing orders and post any or all residual order to the orderbook
+ * IOC ('Immediate-or-Cancel') = will fill as much as available against existing opposing orders. Any residual unmatched part of the order will not be posted to the orderbook
+ * KILL_OR_FILL = The entire order will be aborted if it cannot be immediately matched with existing opposing orders
+ * POST_ONLY = The entire order will be aborted if it would have resulted in some or all of the order being filled against existing opposing orders.
+ */
 export enum OrderType {
   Limit = 0,
   Ioc = 1,
@@ -176,19 +194,45 @@ export type OrderbookAccountsState = {
   orderbook: PublicKey
 }
 
+/**
+ * Side of the orderbook to trade
+ * @enum{number}
+ */
 export enum Side {
   Bid = 0,
   Ask = 1,
 }
 
+/**
+ * Order size format
+ *
+ * Payout is the total amount paid out if a bet is won (stake + profit).
+ * Stake is the total amount at risk for a user (payout - profit).
+ * @enum{number}
+ */
 export enum SizeFormat {
   Payout = 0,
   Stake = 1,
 }
 
+/**
+ * Solana Network
+ *
+ * Currently only DEVNET and MAINNET are available
+ */
 export enum SolanaNetwork {
-  Devnet = 'devnet',
-  Mainnet = 'mainnet-beta',
+  Devnet = "devnet",
+  Mainnet = "mainnet-beta",
 }
 
-export type PriceAndSide = Price & {side: Side}
+export type PriceAndSide = Price & { side: Side }
+
+export type SlabOrder = {
+  id: BN
+  price: number
+  price_ui: number
+  base_quantity: number
+  base_quantity_ui: number
+  // user_market: PublicKey
+  // fee_tier: number
+}

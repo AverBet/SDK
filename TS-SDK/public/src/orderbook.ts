@@ -1,8 +1,8 @@
-import { Slab, Price, Side } from "@bonfida/aaob"
+import { Slab, Price, Side, LeafNode } from "@bonfida/aaob"
+import { BN } from "@project-serum/anchor"
 import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
-import BN from "bn.js"
 import { AVER_PROGRAM_ID, CALLBACK_INFO_LEN } from "./ids"
-import { PriceAndSide } from "./types"
+import { PriceAndSide, SlabOrder } from "./types"
 import { chunkAndFetchMultiple, throwIfNull } from "./utils"
 
 /**
@@ -232,6 +232,42 @@ export class Orderbook {
       : l2Depth
   }
 
+  //TEST THIS
+  /**
+   *
+   * @param slab
+   * @param increasing
+   * @param decimals
+   * @param isInverted
+   * @returns
+   */
+  static getL3ForSlab(
+    slab: Slab,
+    decimals: number,
+    increasing: boolean,
+    isInverted?: boolean
+  ) {
+    let orders: SlabOrder[] = []
+    for (let node of slab.items(!increasing)) {
+      node.getPrice()
+      orders.push({
+        id: node.key,
+        price: isInverted
+          ? (10 ** 9 - node.getPrice()) * 10 ** -9
+          : node.getPrice(),
+        base_quantity: node.baseQuantity,
+        base_quantity_ui: node.baseQuantity * 10 ** -decimals,
+        // user_market: new PublicKey(node.callBackInfoPt[0 - 32]), //TODO - CHECK THIS
+        // fee_tier: node.callBackInfoPt,
+      } as SlabOrder)
+    }
+    return orders
+  }
+
+  static getPriceFromSlab(node: LeafNode, decimals: number) {
+    return Math.round(((node.key >> 64) / 2 ** 32) * 10 ** decimals)
+  }
+
   /**
    * Derive the Orderbook pubkey based off the Market, OutcomeId and program
    *
@@ -327,7 +363,6 @@ export class Orderbook {
     }
   }
 
-  // NOT TESTED
   /**
    *
    * @param depth
@@ -346,7 +381,6 @@ export class Orderbook {
     )
   }
 
-  // NOT TESTED
   /**
    *
    * @param depth
@@ -365,7 +399,38 @@ export class Orderbook {
     )
   }
 
-  // NOT TESTED
+  /**
+   *
+   * @param depth
+   * @param uiAmount
+   * @returns
+   */
+  getBidsL3(depth: number, uiAmount?: boolean) {
+    const isIncreasing = this._isInverted ? true : false
+    return Orderbook.getL3ForSlab(
+      this._slabBids,
+      this.decimals,
+      isIncreasing,
+      this._isInverted
+    )
+  }
+
+  /**
+   *
+   * @param depth
+   * @param uiAmount
+   * @returns
+   */
+  getAsksL3(depth: number, uiAmount?: boolean) {
+    const isIncreasing = this._isInverted ? false : true
+    return Orderbook.getL3ForSlab(
+      this._slabAsks,
+      this.decimals,
+      isIncreasing,
+      this._isInverted
+    )
+  }
+
   /**
    *
    * @param uiAmount
@@ -376,7 +441,6 @@ export class Orderbook {
     return bids.length ? bids[0] : undefined
   }
 
-  // NOT TESTED
   /**
    *
    * @param uiAmount
@@ -510,7 +574,6 @@ export class Orderbook {
     return [bidsListener, asksListener]
   }
 
-  // NOT TESTED
   /**
    *
    * @param baseQty
@@ -521,7 +584,6 @@ export class Orderbook {
     this.estimateFillForQty(baseQty, side, false, uiAmount)
   }
 
-  // NOT TESTED
   /**
    *
    * @param quoteQty

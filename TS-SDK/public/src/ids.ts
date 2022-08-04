@@ -52,7 +52,7 @@ export const AVER_LAUNCH_ZERO_FEES_DEVNET = new PublicKey(
 
 // Mainnet constants
 export const AVER_API_ENDPOINT_MAINNET = "https://api.aver.exchange"
-export const SOLANA_ENDPOINT_MAINNET = "https://ssc-dao.genesysgo.net/"
+export const SOLANA_ENDPOINT_MAINNET = "https://api.mainnet-beta.solana.com"
 export const USDC_MAINNET = new PublicKey(
   "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 ) // (USDC)

@@ -73,8 +73,6 @@ export class AverClient {
       // create a node wallet with the keypair
       wallet = new NodeWallet(owner)
       keypair = owner
-    } else if (owner.publicKey) {
-      wallet = owner
     } else {
       wallet = new NodeWallet(new Keypair())
     }
