@@ -79,7 +79,7 @@ async def place_orders_for_crank_test(
     assert(uma_2.user_market_state.outcome_positions[outcome_id].free == payout * factor)
     assert(uma_2.user_market_state.outcome_positions[outcome_id].locked == 0)
 
-    sig = await crank_market(loaded_market, [outcome_id], None, owner_1)
+    sig = await loaded_market.crank_market([outcome_id], None, owner_1)
     await client.provider.connection.confirm_transaction(sig, commitment=Finalized) 
 
     uma_1, uma_2 = await refresh_multiple_user_markets(client, [uma_1, uma_2])

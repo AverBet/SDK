@@ -1,4 +1,6 @@
 from enum import IntEnum, Enum
+from typing import NamedTuple
+from solana.publickey import PublicKey
 
 class Side(IntEnum):
     """
@@ -10,6 +12,11 @@ class Side(IntEnum):
 class OrderType(IntEnum):
     """
     Type of order
+
+    LIMIT = a Limit order, will attempt to fill against existing opposing orders and post any or all residual order to the orderbook
+    IOC ('Immediate-or-Cancel') = will fill as much as available against existing opposing orders. Any residual unmatched part of the order will not be posted to the orderbook
+    KILL_OR_FILL = The entire order will be aborted if it cannot be immediately matched with existing opposing orders
+    POST_ONLY = The entire order will be aborted if it would have resulted in some or all of the order being filled against existing opposing orders.
     """
 
     LIMIT = 0
@@ -21,6 +28,10 @@ class OrderType(IntEnum):
 class SelfTradeBehavior(IntEnum):
     """
     Behavior when a user's trade is matched with themselves
+
+    DECREMENT_TAKE = Reduces the size of the new order
+    CANCEL_PROVIDE = Reduces the size of the existing (opposing) order
+    ABORT_TRANSACTION = Cancels the whole transaction if some or all of it would self-trade
     """
     DECREMENT_TAKE = 0
     CANCEL_PROVIDE = 1
@@ -95,3 +106,27 @@ class SolanaNetwork(str, Enum):
     """
     DEVNET = 'devnet'
     MAINNET = 'mainnet-beta'
+
+class Fill(NamedTuple):
+    """
+    A Fill event describes a matched trade between a maker and a taker, and contains all of the necessary information to facilitate update of the maker’s UserMarket account to reflect the trade.
+    """
+    taker_side: Side
+    maker_order_id: int
+    quote_size: int
+    base_size: int
+    maker_user_market: PublicKey
+    taker_user_market: PublicKey
+    maker_fee_tier: int
+    taker_fee_tier: int
+
+class Out(NamedTuple):
+    """
+    An Out event describes the removal of an order from the orderbook, and contains all of the necessary information to facilitate updating the order owner’s UserMarket account to reflect that this order (or residual part of an order) is no longer being offered. (i.e. unlocked positions previously locked to back the order)
+    """
+    side: Side
+    order_id: int
+    base_size: int
+    delete: bool
+    user_market: PublicKey
+    fee_tier: int

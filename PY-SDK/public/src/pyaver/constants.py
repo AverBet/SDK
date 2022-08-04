@@ -1,29 +1,8 @@
 from solana.publickey import PublicKey
-from solana.keypair import Keypair
-from base58 import b58decode
 from .enums import SolanaNetwork
 
-## OLD VARIABLES
-# DEVNET_SOLANA_URL = "https:#api.devnet.solana.com"
-# AVER_API_URL_DEVNET = 'https:#dev.api.aver.exchange'
-# AVER_MARKET_CONTRACT_PROGRAM_ID_OLD = '2vu7nbkQtEZq7gCBEQZnfsdnxFLf5Do8FzvMZRSmvCXY'
 
-# DEFAULT_QUOTE_TOKEN_DEVNET = PublicKey('BWvbxUTAxevm1NG8RHe1LhKmca9nz5ym2xqafTxr6ybj')
-
-# TEST_WALLET_PUBLICKEY = PublicKey('29gzGByYnUYj6AuLuKfFJv21kBRv4vUonJSN1wBjxu6x')
-# TEST_WALLET_KEYPAIR = Keypair(b58decode('qKeiqdB45yXiAo7wfMTCJaDcuePoFuJH9SEfT4A9PL2PdNobGQuaWgwqcXpoHvpxdFbn5Akb1BQsbt98KGjbbsv')[:32])
-
-# AVER_PROGRAM_ID_DEVNET_2 = PublicKey('6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ')
-
-# DEFAULT_HOST_ACCOUNT_DEVNET = PublicKey('5xhmqK1Dh48TiqvHxoZi6WWWKL6THtsUjh3GoiVEbbR8')
-
-# MARKET_STATE_LEN = 192
-
-# DEFAULT_MARKET_AUTHORITY = PublicKey('EEg375Q8wEsPTyaQ4jG4hmNsMojmMHs6gB58iVWUXSwF')
-
-# NEW VARIABLES
-
-# Devnet and Mainnet constants
+##### SHARED DEVNET AND MAINNET CONSTANTS
 AVER_PROGRAM_ID = PublicKey('6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ')
 AVER_TOKEN = PublicKey('AVERsCxn9wr9YZ4WVavPbjm13hrLTPAkdnu1QqK9ZL1y')
 AVER_MARKET_AUTHORITY = PublicKey('EEg375Q8wEsPTyaQ4jG4hmNsMojmMHs6gB58iVWUXSwF')
@@ -32,11 +11,11 @@ AVER_COMMUNITY_REWARDS_NFT = PublicKey(
   'AVERojzZ8649E1oLPvcgG2SSbVECxs8PcG5JkpuK2Dvq'
 )
 
-# Devnet constants
-AVER_API_ENDPOINT_DEVNET = 'https://dev.api.aver.exchange'
-# SOLANA_ENDPOINT_DEVNET = 'https://devnet.genesysgo.net/'
-SOLANA_ENDPOINT_DEVNET = 'https://api.devnet.solana.com' #Tests fail with genesysgo because of airdrop
 
+
+##### DEVNET ONLY CONSTANTS
+AVER_API_ENDPOINT_DEVNET = 'https://dev.api.aver.exchange'
+SOLANA_ENDPOINT_DEVNET = 'https://api.devnet.solana.com' 
 USDC_DEVNET = PublicKey('BWvbxUTAxevm1NG8RHe1LhKmca9nz5ym2xqafTxr6ybj')
 
 # ATA for market authority with USDC
@@ -61,11 +40,11 @@ AVER_MAINNET_LAUNCH_NFT_DEVNET = PublicKey(
   '4QwFUyLKtHZqbHvxZQqLGPz8eMjXBgedaWvuQTdKwKJx'
 )
 
-# Mainnet constants
+
+
+##### MAINNET ONLY CONSTANTS
 AVER_API_ENDPOINT_MAINNET = 'https://api.aver.exchange'
-SOLANA_ENDPOINT_MAINNET = 'https://holy-cold-glade.solana-mainnet.quiknode.pro/'
-# SOLANA_ENDPOINT_MAINNET = 'https://ssc-dao.genesysgo.net/'
-# SOLANA_ENDPOINT_MAINNET = 'https://api.mainnet-beta.solana.com'
+SOLANA_ENDPOINT_MAINET = 'https://api.mainnet-beta.solana.com/'
 USDC_MAINNET = PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') # (USDC)
 
 AVER_MARKET_AUTHORITY_VAULT_MAINNET = PublicKey(
@@ -86,7 +65,18 @@ AVER_MAINNET_LAUNCH_NFT_MAINNET = PublicKey(
   'BqSFP5CbfBfZeQqGbzYEipfzTDptTYHFL9AzZA8TBXjn'
 )
 
-# helpers
+##### OTHER CONSTANTS
+
+SYS_VAR_CLOCK = PublicKey('SysvarC1ock11111111111111111111111111111111')
+
+MAX_ITERATIONS_FOR_CONSUME_EVENTS = 5  
+
+CALLBACK_INFO_LEN = 33
+
+CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE = 5
+
+
+###### HELPER FUNCTIONS
 def get_aver_api_endpoint(solanaNetwork: SolanaNetwork):
   """
   Returns URL for Aver API based on solana network
@@ -121,5 +111,4 @@ def get_quote_token(solanaNetwork: SolanaNetwork):
   """
   return USDC_DEVNET if solanaNetwork == SolanaNetwork.DEVNET else USDC_MAINNET
 
-# other constants
-CALLBACK_INFO_LEN = 33
+

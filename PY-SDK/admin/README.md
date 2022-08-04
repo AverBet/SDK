@@ -3,11 +3,11 @@
 Run using `python3 FILENAME.PY`
 
 Make sure you have the latest version of pyaver installed.
-Currently: `pip install -i https://test.pypi.org/simple/ pyaver==0.0.6`
+Currently: `pip install -i https://test.pypi.org/simple/ pyaver==0.0.10`
 
 ## Uploading a new version
 
-1. Make sure the code is correct and version is correct
+1. Make sure the code is correct and version is correct (setup.py)
 2. Delete the old dist folder
 3. Run `python setup.py sdist`
 4. Run `twine upload --repository testpypi dist/*`

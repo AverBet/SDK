@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Iterable, List, NamedTuple, Optional
 from construct import ListContainer
 from solana.publickey import PublicKey
-from .layouts import SLAB_LAYOUT, NodeType, CALLBACK_INFO_LEN, PADDED_LEN, SLOT_SIZE
+from .layouts import SLAB_LAYOUT, NodeType, CALLBACK_INFO_LEN
 
 class Callback(NamedTuple):
     user_market: PublicKey
@@ -51,7 +51,7 @@ class Slab:
     """
     Slab object
 
-    Contains all information on a particular side for a particular outcome on a particular market
+    A Slab is one side of the orderbook (bids or asks), which contains all of the open orders for side and outcome in a given market
     """
     def __init__(self, header: SlabHeader, nodes: List[SlabNode]): 
         self._header: SlabHeader = header
@@ -157,7 +157,7 @@ class Slab:
 
     def items(self, descending=False) -> Iterable[SlabLeafNode]:
         """
-        Depth first traversal of the Binary Tree.
+        Depth first traversal of the Binary Tree of orders in the Slab
 
         Args:
             descending (bool, optional): Decides if the price should descending or not. Defaults to False.

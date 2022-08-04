@@ -1,11 +1,9 @@
 from .aver_client import AverClient
 from solana.publickey import PublicKey
 from .data_classes import UserHostLifetimeState
-# from constants import AVER_PROGRAM_ID, DEFAULT_HOST_ACCOUNT_DEVNET, DEFAULT_QUOTE_TOKEN_DEVNET
 from .constants import AVER_PROGRAM_ID, AVER_HOST_ACCOUNT
 from .utils import sign_and_send_transaction_instructions
 from solana.system_program import SYS_PROGRAM_ID
-from spl.token.constants import TOKEN_PROGRAM_ID
 from solana.rpc.commitment import Finalized
 from anchorpy import Context
 from solana.transaction import AccountMeta
@@ -44,7 +42,10 @@ class UserHostLifetime():
     @staticmethod
     async def load(aver_client: AverClient, pubkey: PublicKey):
         """
-        Initialises an UserHostLifetime object
+        Initialises an UserHostLifetime Account (UHLA) object.
+
+        A UHLA is an account which is initialized when a wallet interacts with Aver via a particular Host for the first time. It is used to store values related to 
+        a wallet's interactions with Aver Markets via this Host. It is required to be initialized before a wallet can interact with any Markets via a given Host.
 
         Args:
             aver_client (AverClient): AverClient object
@@ -90,7 +91,7 @@ class UserHostLifetime():
 
         Args:
             client (AverClient): AverClient object
-            owner (Keypair): Owner of UserHostLifetime account
+            owner (Keypair): Owner of UserHostLifetime account. Pays transaction and rent costs
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             quote_token_mint (PublicKey, optional): Quote token mint public key. Defaults to Defaults to USDC token according to chosen solana network in AverClient.
             host (PublicKey, optional): Host account public key. Defaults to AVER_HOST_ACCOUNT.
@@ -150,7 +151,7 @@ class UserHostLifetime():
         Args:
             aver_client (AverClient): AverClient object
             user_quote_token_ata (PublicKey): Quote token ATA public key (holds funds for this user)
-            owner (Keypair): Keypair of owner of UserHostLifetime account
+            owner (Keypair): Keypair of owner of UserHostLifetime account. Pays transaction and rent costs
             host (PublicKey, optional): Host account public key. Defaults to AVER_HOST_ACCOUNT.
             referrer (PublicKey, optional): Referrer account public key. Defaults to SYS_PROGRAM_ID.
             discount_token (PublicKey, optional): _description_. Defaults to SYS_PROGRAM_ID.
@@ -204,7 +205,7 @@ class UserHostLifetime():
 
         Args:
             aver_client (AverClient): AverClient object
-            owner (Keypair): Keypair of owner of UserHostLifetime account
+            owner (Keypair): Keypair of owner of UserHostLifetime account. Pays transaction and rent costs
             user_quote_token_ata (PublicKey): Quote token ATA public key (holds funds for this user)
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             host (PublicKey, optional): Host account public key. Defaults to AVER_HOST_ACCOUNT.
@@ -261,20 +262,6 @@ class UserHostLifetime():
             program_id
         )
 
-    @staticmethod
-    def parse_user_host_lifetime_state(aver_client: AverClient, buffer):
-        """
-        Parses raw onchain data to UserHostLifetime object
-
-        Args:
-            aver_client (AverClient): AverClient object
-            buffer (bytes): Raw bytes coming from onchain
-
-        Returns:
-            UserHostLifetime: UserHostLifetime object
-        """
-        user_host_lifetime_info = aver_client.program.account['UserHostLifetime'].coder.accounts.decode(buffer)
-        return user_host_lifetime_info
 
     def get_fee_tier_postion(self):
         """

@@ -53,6 +53,7 @@ class Host():
         host_result = await aver_client.program.account['Host'].fetch(pubkey)
         return Host(pubkey, host_result)
 
+
     @staticmethod
     def make_create_host_account_instruction(
         aver_client: AverClient,
@@ -69,7 +70,7 @@ class Host():
         Args:
             aver_client (AverClient): AverClient object
             owner (Keypair): Keypair of owner of host account
-            fee_payer (Keypair): Keypair to pay fee for transaction
+            fee_payer (Keypair): Keypair to pay fee for transaction.
             referrer_fee_rate_offerer_bps (int, optional): Fees given to referrer. Defaults to 0.
             program_id (_type_, optional): Program public key. Defaults to AVER_PROGRAM_ID.
 
@@ -95,7 +96,7 @@ class Host():
     async def create_host_account(
         aver_client: AverClient,
         owner: Keypair,
-        fee_payer: Keypair,
+        fee_payer: Keypair = None,
         send_options: TxOpts = None,
         referrer_fee_rate_offerer_bps: int = 0,
         program_id = AVER_PROGRAM_ID,
@@ -103,12 +104,12 @@ class Host():
         """
         Creates host account.
 
-        Sends instructions on chain
+        Sends an instructions to the on-chain program to create a new Host account.
 
         Args:
             aver_client (AverClient): AverClient object
             owner (Keypair): Keypair of owner of host account
-            fee_payer (Keypair): Keypair to pay fee for transaction and rent cost
+            fee_payer (Keypair): Keypair to pay fee for transaction and rent cost. Defaults to AverClient Wallet
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             referrer_fee_rate_offerer_bps (int, optional): Fees given to referrer. Defaults to 0.
             program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
@@ -116,6 +117,9 @@ class Host():
         Returns:
             RPCResponse: Response
         """
+        if(fee_payer is None):
+            fee_payer = aver_client.provider.wallet.payer
+
         ix = Host.make_create_host_account_instruction(
             aver_client,
             owner,

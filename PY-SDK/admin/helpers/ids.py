@@ -26,6 +26,8 @@ USER_MARKET_ACCOUNT_DISCRIMINATOR = sha256(
 TRANSACTION_EVENT_DISCRIMINATOR = sha256(
     f"event:TransactionEvent".encode()).digest()[:ACCOUNT_DISCRIMINATOR_SIZE]
 
+MAX_ITERATIONS_FOR_CONSUME_EVENTS = 5  
+
 # these are all network specific
 DEFAULT_NETWORK = os.getenv('ENV_NAME') or 'DEVNET'
 

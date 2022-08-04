@@ -1,9 +1,9 @@
-import { Slab, Price, Side } from '@bonfida/aaob'
-import { AccountInfo, Connection, PublicKey } from '@solana/web3.js'
-import BN from 'bn.js'
-import { AVER_PROGRAM_ID, CALLBACK_INFO_LEN } from './ids'
-import { PriceAndSide } from './types'
-import { chunkAndFetchMultiple, throwIfNull } from './utils'
+import { Slab, Price, Side } from "@bonfida/aaob"
+import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
+import BN from "bn.js"
+import { AVER_PROGRAM_ID, CALLBACK_INFO_LEN } from "./ids"
+import { PriceAndSide } from "./types"
+import { chunkAndFetchMultiple, throwIfNull } from "./utils"
 
 /**
  * Orderbook class
@@ -43,14 +43,14 @@ export class Orderbook {
 
   /**
    * Orderbook constructor. This can be used if the slab bids and asks are already known, otherwise use the load method.
-   * 
-   * @param pubkey 
-   * @param slabBids 
-   * @param slabAsks 
-   * @param slabBidsPubkey 
-   * @param slabAsksPubkey 
-   * @param decimals 
-   * @param isInverted 
+   *
+   * @param pubkey
+   * @param slabBids
+   * @param slabAsks
+   * @param slabBidsPubkey
+   * @param slabAsksPubkey
+   * @param decimals
+   * @param isInverted
    */
   constructor(
     pubkey: PublicKey,
@@ -100,9 +100,9 @@ export class Orderbook {
 
   /**
    * Function to invert the orderbook, this switches around the bids and asks
-   * 
-   * @param orderbook 
-   * @returns 
+   *
+   * @param orderbook
+   * @returns
    */
   static invert(orderbook: Orderbook) {
     // switch bids and asks around to invert
@@ -135,12 +135,15 @@ export class Orderbook {
    * @param slabAddress The address of the Slab
    * @returns Multiple deserialized Slab object
    */
-  static async loadMultipleSlabs(connection: Connection, slabAddresses: PublicKey[]) {
+  static async loadMultipleSlabs(
+    connection: Connection,
+    slabAddresses: PublicKey[]
+  ) {
     try {
       const data = await chunkAndFetchMultiple(connection, slabAddresses)
       return Orderbook.deserializeMultipleSlabData(data)
     } catch (error) {
-      console.error('There was an error loading multiple slabs. ', error)
+      console.error("There was an error loading multiple slabs. ", error)
       return slabAddresses.map(() => null)
     }
   }
@@ -153,14 +156,14 @@ export class Orderbook {
 
   /**
    * Load the Orderbook
-   * 
-   * @param connection 
-   * @param orderbook 
-   * @param bids 
-   * @param asks 
-   * @param decimals 
-   * @param isInverted 
-   * 
+   *
+   * @param connection
+   * @param orderbook
+   * @param bids
+   * @param asks
+   * @param decimals
+   * @param isInverted
+   *
    * @returns {Promise<Orderbook>} The Orderbook object
    */
   static async load(
@@ -173,7 +176,15 @@ export class Orderbook {
   ) {
     const slabBids = await Orderbook.loadSlab(connection, bids)
     const slabAsks = await Orderbook.loadSlab(connection, asks)
-    return new Orderbook(orderbook, slabBids, slabAsks, bids, asks, decimals, isInverted)
+    return new Orderbook(
+      orderbook,
+      slabBids,
+      slabAsks,
+      bids,
+      asks,
+      decimals,
+      isInverted
+    )
   }
 
   static convertPrice(p: Price, decimals: number) {
@@ -193,14 +204,14 @@ export class Orderbook {
   }
 
   /**
-   * 
-   * @param slab 
-   * @param depth 
-   * @param increasing 
-   * @param decimals 
-   * @param uiAmount 
-   * @param isInverted 
-   * @returns 
+   *
+   * @param slab
+   * @param depth
+   * @param increasing
+   * @param decimals
+   * @param uiAmount
+   * @param isInverted
+   * @returns
    */
   static getL2ForSlab(
     slab: Slab,
@@ -211,19 +222,23 @@ export class Orderbook {
     isInverted?: boolean
   ) {
     const l2Depth = isInverted
-      ? slab.getL2DepthJS(depth, increasing).map((p) => Orderbook.invertPrice(p))
+      ? slab
+          .getL2DepthJS(depth, increasing)
+          .map((p) => Orderbook.invertPrice(p))
       : slab.getL2DepthJS(depth, increasing)
 
-    return uiAmount ? l2Depth.map((p) => Orderbook.convertPrice(p, decimals)) : l2Depth
+    return uiAmount
+      ? l2Depth.map((p) => Orderbook.convertPrice(p, decimals))
+      : l2Depth
   }
 
   /**
    * Derive the Orderbook pubkey based off the Market, OutcomeId and program
-   * 
-   * @param market 
-   * @param outcomeId 
-   * @param programId 
-   * 
+   *
+   * @param market
+   * @param outcomeId
+   * @param programId
+   *
    * @returns {Promise<[PublicKey, number]>} The Orderbook pubkey
    */
   static async deriveOrderbookPubkeyAndBump(
@@ -232,17 +247,21 @@ export class Orderbook {
     programId: PublicKey = AVER_PROGRAM_ID
   ) {
     return PublicKey.findProgramAddress(
-      [Buffer.from('orderbook', 'utf-8'), market.toBuffer(), Buffer.of(outcomeId)],
+      [
+        Buffer.from("orderbook", "utf-8"),
+        market.toBuffer(),
+        Buffer.of(outcomeId),
+      ],
       programId
     )
   }
 
   /**
-   * 
-   * @param market 
-   * @param outcomeId 
-   * @param programId 
-   * @returns 
+   *
+   * @param market
+   * @param outcomeId
+   * @param programId
+   * @returns
    */
   static async deriveEventQueuePubkeyAndBump(
     market: PublicKey,
@@ -250,17 +269,21 @@ export class Orderbook {
     programId: PublicKey = AVER_PROGRAM_ID
   ) {
     return PublicKey.findProgramAddress(
-      [Buffer.from('event-queue', 'utf-8'), market.toBuffer(), Buffer.of(outcomeId)],
+      [
+        Buffer.from("event-queue", "utf-8"),
+        market.toBuffer(),
+        Buffer.of(outcomeId),
+      ],
       programId
     )
   }
 
   /**
-   * 
-   * @param market 
-   * @param outcomeId 
-   * @param programId 
-   * @returns 
+   *
+   * @param market
+   * @param outcomeId
+   * @param programId
+   * @returns
    */
   static async deriveBidsPubkeyAndBump(
     market: PublicKey,
@@ -268,17 +291,17 @@ export class Orderbook {
     programId: PublicKey = AVER_PROGRAM_ID
   ) {
     return PublicKey.findProgramAddress(
-      [Buffer.from('bids', 'utf-8'), market.toBuffer(), Buffer.of(outcomeId)],
+      [Buffer.from("bids", "utf-8"), market.toBuffer(), Buffer.of(outcomeId)],
       programId
     )
   }
 
   /**
-   * 
-   * @param market 
-   * @param outcomeId 
-   * @param programId 
-   * @returns 
+   *
+   * @param market
+   * @param outcomeId
+   * @param programId
+   * @returns
    */
   static async deriveAsksPubkeyAndBump(
     market: PublicKey,
@@ -286,16 +309,16 @@ export class Orderbook {
     programId: PublicKey = AVER_PROGRAM_ID
   ) {
     return PublicKey.findProgramAddress(
-      [Buffer.from('asks', 'utf-8'), market.toBuffer(), Buffer.of(outcomeId)],
+      [Buffer.from("asks", "utf-8"), market.toBuffer(), Buffer.of(outcomeId)],
       programId
     )
   }
 
   /**
-   * 
-   * @param price 
-   * @param uiAmount 
-   * @returns 
+   *
+   * @param price
+   * @param uiAmount
+   * @returns
    */
   private static invertPrice(price: Price, uiAmount?: boolean): Price {
     return {
@@ -306,10 +329,10 @@ export class Orderbook {
 
   // NOT TESTED
   /**
-   * 
-   * @param depth 
-   * @param uiAmount 
-   * @returns 
+   *
+   * @param depth
+   * @param uiAmount
+   * @returns
    */
   getBidsL2(depth: number, uiAmount?: boolean) {
     const isIncreasing = this._isInverted ? true : false
@@ -325,10 +348,10 @@ export class Orderbook {
 
   // NOT TESTED
   /**
-   * 
-   * @param depth 
-   * @param uiAmount 
-   * @returns 
+   *
+   * @param depth
+   * @param uiAmount
+   * @returns
    */
   getAsksL2(depth: number, uiAmount?: boolean) {
     const isIncreasing = this._isInverted ? false : true
@@ -344,9 +367,9 @@ export class Orderbook {
 
   // NOT TESTED
   /**
-   * 
-   * @param uiAmount 
-   * @returns 
+   *
+   * @param uiAmount
+   * @returns
    */
   getBestBidPrice(uiAmount?): Price | undefined {
     const bids = this.getBidsL2(1, uiAmount)
@@ -355,9 +378,9 @@ export class Orderbook {
 
   // NOT TESTED
   /**
-   * 
-   * @param uiAmount 
-   * @returns 
+   *
+   * @param uiAmount
+   * @returns
    */
   getBestAskPrice(uiAmount?): Price | undefined {
     const asks = this.getAsksL2(1, uiAmount)
@@ -366,9 +389,9 @@ export class Orderbook {
 
   // NOT TESTED
   /**
-   * 
-   * @param orderId 
-   * @returns 
+   *
+   * @param orderId
+   * @returns
    */
   getBidPriceByOrderId(orderId: BN): Price | undefined {
     const bid = this.slabBids.getNodeByKey(orderId)
@@ -384,9 +407,9 @@ export class Orderbook {
 
   // NOT TESTED
   /**
-   * 
-   * @param orderId 
-   * @returns 
+   *
+   * @param orderId
+   * @returns
    */
   getAskPriceByOrderId(orderId: BN): Price | undefined {
     const ask = this.slabAsks.getNodeByKey(orderId)
@@ -418,14 +441,16 @@ export class Orderbook {
           price: node.getPrice().toNumber(),
           size: node.baseQuantity.toNumber(),
         }
-    
-        bidPriceRaw = this._isInverted ? Orderbook.invertPrice(bidPriceRaw) : bidPriceRaw
+
+        bidPriceRaw = this._isInverted
+          ? Orderbook.invertPrice(bidPriceRaw)
+          : bidPriceRaw
 
         let bidPrice = {
-          ...this.convertPrice(bidPriceRaw)
+          ...this.convertPrice(bidPriceRaw),
         }
 
-        return {...bidPrice, side: Side.Bid}
+        return { ...bidPrice, side: Side.Bid }
       }
     }
 
@@ -435,14 +460,16 @@ export class Orderbook {
           price: node.getPrice().toNumber(),
           size: node.baseQuantity.toNumber(),
         }
-    
-        askPriceRaw = this._isInverted ? Orderbook.invertPrice(askPriceRaw) : askPriceRaw
+
+        askPriceRaw = this._isInverted
+          ? Orderbook.invertPrice(askPriceRaw)
+          : askPriceRaw
 
         let askPrice = {
-          ...this.convertPrice(askPriceRaw)
+          ...this.convertPrice(askPriceRaw),
         }
 
-        return {...askPrice, side: Side.Ask}
+        return { ...askPrice, side: Side.Ask }
       }
     }
 
@@ -451,12 +478,15 @@ export class Orderbook {
 
   // NOT TESTED
   /**
-   * 
-   * @param connection 
-   * @param callback 
-   * @returns 
+   *
+   * @param connection
+   * @param callback
+   * @returns
    */
-  loadOrderbookListener(connection: Connection, callback: (slab: Orderbook) => void) {
+  loadOrderbookListener(
+    connection: Connection,
+    callback: (slab: Orderbook) => void
+  ) {
     const onSlabChange = (slab: Slab, bids: boolean) =>
       callback(
         new Orderbook(
@@ -482,10 +512,10 @@ export class Orderbook {
 
   // NOT TESTED
   /**
-   * 
-   * @param baseQty 
-   * @param side 
-   * @param uiAmount 
+   *
+   * @param baseQty
+   * @param side
+   * @param uiAmount
    */
   estimateAvgFillForBaseQty(baseQty: number, side: Side, uiAmount?: boolean) {
     this.estimateFillForQty(baseQty, side, false, uiAmount)
@@ -493,17 +523,25 @@ export class Orderbook {
 
   // NOT TESTED
   /**
-   * 
-   * @param quoteQty 
-   * @param side 
-   * @param uiAmount 
+   *
+   * @param quoteQty
+   * @param side
+   * @param uiAmount
    */
   estimateAvgFillForQuoteQty(quoteQty: number, side: Side, uiAmount?: boolean) {
     this.estimateFillForQty(quoteQty, side, true, uiAmount)
   }
 
-  private estimateFillForQty(qty: number, side: Side, quote: boolean, uiAmount?: boolean) {
-    const prices = side == Side.Bid ? this.getBidsL2(100, uiAmount) : this.getAsksL2(100, uiAmount)
+  private estimateFillForQty(
+    qty: number,
+    side: Side,
+    quote: boolean,
+    uiAmount?: boolean
+  ) {
+    const prices =
+      side == Side.Bid
+        ? this.getBidsL2(100, uiAmount)
+        : this.getAsksL2(100, uiAmount)
     const accumulator = quote
       ? (price: Price) => price.size
       : (price: Price) => price.size * price.price
@@ -539,11 +577,15 @@ export class Orderbook {
     callback: (slab: Slab) => void,
     errorCallback?: (error: any) => void
   ) {
-    const account = side == Side.Ask ? this._slabAsksPubkey : this._slabBidsPubkey
+    const account =
+      side == Side.Ask ? this._slabAsksPubkey : this._slabBidsPubkey
 
     return connection.onAccountChange(account, (accountInfo) => {
       try {
-        const slab = Slab.deserialize(accountInfo.data, new BN(CALLBACK_INFO_LEN))
+        const slab = Slab.deserialize(
+          accountInfo.data,
+          new BN(CALLBACK_INFO_LEN)
+        )
         callback(slab)
       } catch (error) {
         if (errorCallback) errorCallback(error)
@@ -553,10 +595,10 @@ export class Orderbook {
 }
 
 /**
- * 
- * @param nums 
- * @param weights 
- * @returns 
+ *
+ * @param nums
+ * @param weights
+ * @returns
  */
 const weightedAverage = (nums, weights) => {
   const [sum, weightSum] = weights.reduce(

@@ -14,6 +14,8 @@ async def refresh_multiple_markets(
     """
     Refresh all data for multiple markets quickly
 
+    This function optimizes the calls to the Solana network batching them efficiently so that many can be reloaded in the fewest calls.
+
     Use instead instead of src.market.AverMarket.load_multiple()
 
     Args:
@@ -56,6 +58,8 @@ async def refresh_market(aver_client: AverClient, market: AverMarket) -> AverMar
     """
     Refresh all data for an AverMarket quickly
 
+    This function optimizes the calls to the Solana network batching them efficiently so that many can be reloaded in the fewest calls.
+
     Use instead instead of src.market.AverMarket.load()
 
     Args:
@@ -74,6 +78,8 @@ async def refresh_multiple_user_markets(
     """
     Refresh all data for multiple user markets quickly
 
+    This function optimizes the calls to the Solana network batching them efficiently so that many can be reloaded in the fewest calls.
+
     Also refreshes the underlying AverMarket objects
 
     Args:
@@ -87,6 +93,7 @@ async def refresh_multiple_user_markets(
     market_store_pubkeys = [u.market.market_state.market_store for u in user_markets]
     user_markets_pubkeys = [u.pubkey for u in user_markets]
     user_pubkeys = [u.user_market_state.user for u in user_markets]
+    uhl_pubkeys = [u.user_host_lifetime.pubkey for u in user_markets]
 
     slabs_pubkeys = []
     for u in user_markets:
@@ -103,7 +110,8 @@ async def refresh_multiple_user_markets(
         market_store_pubkeys,
         slabs_pubkeys,
         user_markets_pubkeys,
-        user_pubkeys
+        user_pubkeys,
+        uhl_pubkeys
         )
 
     markets = AverMarket.get_markets_from_account_states(
@@ -119,7 +127,9 @@ async def refresh_multiple_user_markets(
         user_markets_pubkeys,
         multiple_account_states['user_market_states'],
         markets,
-        multiple_account_states['user_balance_states'] 
+        multiple_account_states['user_balance_states'],
+        multiple_account_states['user_host_lifetime_states'],
+        uhl_pubkeys
     )
     
     return user_markets
@@ -127,6 +137,8 @@ async def refresh_multiple_user_markets(
 async def refresh_user_market(aver_client: AverClient, user_market: UserMarket) -> UserMarket:
     """
     Refresh all data for a user markets quickly
+
+    This function optimizes the calls to the Solana network batching them efficiently so that many can be reloaded in the fewest calls.
 
     Also refreshes the underlying AverMarket object
 

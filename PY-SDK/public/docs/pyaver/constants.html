@@ -61,130 +61,117 @@
                         <label class="view-source-button" for="constants-view-source"><span>View Source</span></label>
 
                         <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos">  1</span></a><span class="kn">from</span> <span class="nn">solana.publickey</span> <span class="kn">import</span> <span class="n">PublicKey</span>
-</span><span id="L-2"><a href="#L-2"><span class="linenos">  2</span></a><span class="kn">from</span> <span class="nn">solana.keypair</span> <span class="kn">import</span> <span class="n">Keypair</span>
-</span><span id="L-3"><a href="#L-3"><span class="linenos">  3</span></a><span class="kn">from</span> <span class="nn">base58</span> <span class="kn">import</span> <span class="n">b58decode</span>
-</span><span id="L-4"><a href="#L-4"><span class="linenos">  4</span></a><span class="kn">from</span> <span class="nn">.enums</span> <span class="kn">import</span> <span class="n">SolanaNetwork</span>
-</span><span id="L-5"><a href="#L-5"><span class="linenos">  5</span></a>
-</span><span id="L-6"><a href="#L-6"><span class="linenos">  6</span></a><span class="c1">## OLD VARIABLES</span>
-</span><span id="L-7"><a href="#L-7"><span class="linenos">  7</span></a><span class="c1"># DEVNET_SOLANA_URL = &quot;https:#api.devnet.solana.com&quot;</span>
-</span><span id="L-8"><a href="#L-8"><span class="linenos">  8</span></a><span class="c1"># AVER_API_URL_DEVNET = &#39;https:#dev.api.aver.exchange&#39;</span>
-</span><span id="L-9"><a href="#L-9"><span class="linenos">  9</span></a><span class="c1"># AVER_MARKET_CONTRACT_PROGRAM_ID_OLD = &#39;2vu7nbkQtEZq7gCBEQZnfsdnxFLf5Do8FzvMZRSmvCXY&#39;</span>
-</span><span id="L-10"><a href="#L-10"><span class="linenos"> 10</span></a>
-</span><span id="L-11"><a href="#L-11"><span class="linenos"> 11</span></a><span class="c1"># DEFAULT_QUOTE_TOKEN_DEVNET = PublicKey(&#39;BWvbxUTAxevm1NG8RHe1LhKmca9nz5ym2xqafTxr6ybj&#39;)</span>
-</span><span id="L-12"><a href="#L-12"><span class="linenos"> 12</span></a>
-</span><span id="L-13"><a href="#L-13"><span class="linenos"> 13</span></a><span class="c1"># TEST_WALLET_PUBLICKEY = PublicKey(&#39;29gzGByYnUYj6AuLuKfFJv21kBRv4vUonJSN1wBjxu6x&#39;)</span>
-</span><span id="L-14"><a href="#L-14"><span class="linenos"> 14</span></a><span class="c1"># TEST_WALLET_KEYPAIR = Keypair(b58decode(&#39;qKeiqdB45yXiAo7wfMTCJaDcuePoFuJH9SEfT4A9PL2PdNobGQuaWgwqcXpoHvpxdFbn5Akb1BQsbt98KGjbbsv&#39;)[:32])</span>
+</span><span id="L-2"><a href="#L-2"><span class="linenos">  2</span></a><span class="kn">from</span> <span class="nn">.enums</span> <span class="kn">import</span> <span class="n">SolanaNetwork</span>
+</span><span id="L-3"><a href="#L-3"><span class="linenos">  3</span></a>
+</span><span id="L-4"><a href="#L-4"><span class="linenos">  4</span></a>
+</span><span id="L-5"><a href="#L-5"><span class="linenos">  5</span></a><span class="c1">##### SHARED DEVNET AND MAINNET CONSTANTS</span>
+</span><span id="L-6"><a href="#L-6"><span class="linenos">  6</span></a><span class="n">AVER_PROGRAM_ID</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ&#39;</span><span class="p">)</span>
+</span><span id="L-7"><a href="#L-7"><span class="linenos">  7</span></a><span class="n">AVER_TOKEN</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;AVERsCxn9wr9YZ4WVavPbjm13hrLTPAkdnu1QqK9ZL1y&#39;</span><span class="p">)</span>
+</span><span id="L-8"><a href="#L-8"><span class="linenos">  8</span></a><span class="n">AVER_MARKET_AUTHORITY</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;EEg375Q8wEsPTyaQ4jG4hmNsMojmMHs6gB58iVWUXSwF&#39;</span><span class="p">)</span>
+</span><span id="L-9"><a href="#L-9"><span class="linenos">  9</span></a><span class="n">AVER_HOST_ACCOUNT</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;5xhmqK1Dh48TiqvHxoZi6WWWKL6THtsUjh3GoiVEbbR8&#39;</span><span class="p">)</span>
+</span><span id="L-10"><a href="#L-10"><span class="linenos"> 10</span></a><span class="n">AVER_COMMUNITY_REWARDS_NFT</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
+</span><span id="L-11"><a href="#L-11"><span class="linenos"> 11</span></a>  <span class="s1">&#39;AVERojzZ8649E1oLPvcgG2SSbVECxs8PcG5JkpuK2Dvq&#39;</span>
+</span><span id="L-12"><a href="#L-12"><span class="linenos"> 12</span></a><span class="p">)</span>
+</span><span id="L-13"><a href="#L-13"><span class="linenos"> 13</span></a>
+</span><span id="L-14"><a href="#L-14"><span class="linenos"> 14</span></a>
 </span><span id="L-15"><a href="#L-15"><span class="linenos"> 15</span></a>
-</span><span id="L-16"><a href="#L-16"><span class="linenos"> 16</span></a><span class="c1"># AVER_PROGRAM_ID_DEVNET_2 = PublicKey(&#39;6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ&#39;)</span>
-</span><span id="L-17"><a href="#L-17"><span class="linenos"> 17</span></a>
-</span><span id="L-18"><a href="#L-18"><span class="linenos"> 18</span></a><span class="c1"># DEFAULT_HOST_ACCOUNT_DEVNET = PublicKey(&#39;5xhmqK1Dh48TiqvHxoZi6WWWKL6THtsUjh3GoiVEbbR8&#39;)</span>
-</span><span id="L-19"><a href="#L-19"><span class="linenos"> 19</span></a>
-</span><span id="L-20"><a href="#L-20"><span class="linenos"> 20</span></a><span class="c1"># MARKET_STATE_LEN = 192</span>
-</span><span id="L-21"><a href="#L-21"><span class="linenos"> 21</span></a>
-</span><span id="L-22"><a href="#L-22"><span class="linenos"> 22</span></a><span class="c1"># DEFAULT_MARKET_AUTHORITY = PublicKey(&#39;EEg375Q8wEsPTyaQ4jG4hmNsMojmMHs6gB58iVWUXSwF&#39;)</span>
-</span><span id="L-23"><a href="#L-23"><span class="linenos"> 23</span></a>
-</span><span id="L-24"><a href="#L-24"><span class="linenos"> 24</span></a><span class="c1"># NEW VARIABLES</span>
+</span><span id="L-16"><a href="#L-16"><span class="linenos"> 16</span></a><span class="c1">##### DEVNET ONLY CONSTANTS</span>
+</span><span id="L-17"><a href="#L-17"><span class="linenos"> 17</span></a><span class="n">AVER_API_ENDPOINT_DEVNET</span> <span class="o">=</span> <span class="s1">&#39;https://dev.api.aver.exchange&#39;</span>
+</span><span id="L-18"><a href="#L-18"><span class="linenos"> 18</span></a><span class="n">SOLANA_ENDPOINT_DEVNET</span> <span class="o">=</span> <span class="s1">&#39;https://api.devnet.solana.com&#39;</span> 
+</span><span id="L-19"><a href="#L-19"><span class="linenos"> 19</span></a><span class="n">USDC_DEVNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;BWvbxUTAxevm1NG8RHe1LhKmca9nz5ym2xqafTxr6ybj&#39;</span><span class="p">)</span>
+</span><span id="L-20"><a href="#L-20"><span class="linenos"> 20</span></a>
+</span><span id="L-21"><a href="#L-21"><span class="linenos"> 21</span></a><span class="c1"># ATA for market authority with USDC</span>
+</span><span id="L-22"><a href="#L-22"><span class="linenos"> 22</span></a><span class="n">AVER_MARKET_AUTHORITY_VAULT_DEVNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
+</span><span id="L-23"><a href="#L-23"><span class="linenos"> 23</span></a>  <span class="s1">&#39;TxyectLDHmkzidS6RCat6uuZ385xaNbxg7R7vrfhTAD&#39;</span>
+</span><span id="L-24"><a href="#L-24"><span class="linenos"> 24</span></a><span class="p">)</span>
 </span><span id="L-25"><a href="#L-25"><span class="linenos"> 25</span></a>
-</span><span id="L-26"><a href="#L-26"><span class="linenos"> 26</span></a><span class="c1"># Devnet and Mainnet constants</span>
-</span><span id="L-27"><a href="#L-27"><span class="linenos"> 27</span></a><span class="n">AVER_PROGRAM_ID</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ&#39;</span><span class="p">)</span>
-</span><span id="L-28"><a href="#L-28"><span class="linenos"> 28</span></a><span class="n">AVER_TOKEN</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;AVERsCxn9wr9YZ4WVavPbjm13hrLTPAkdnu1QqK9ZL1y&#39;</span><span class="p">)</span>
-</span><span id="L-29"><a href="#L-29"><span class="linenos"> 29</span></a><span class="n">AVER_MARKET_AUTHORITY</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;EEg375Q8wEsPTyaQ4jG4hmNsMojmMHs6gB58iVWUXSwF&#39;</span><span class="p">)</span>
-</span><span id="L-30"><a href="#L-30"><span class="linenos"> 30</span></a><span class="n">AVER_HOST_ACCOUNT</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;5xhmqK1Dh48TiqvHxoZi6WWWKL6THtsUjh3GoiVEbbR8&#39;</span><span class="p">)</span>
-</span><span id="L-31"><a href="#L-31"><span class="linenos"> 31</span></a><span class="n">AVER_COMMUNITY_REWARDS_NFT</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
-</span><span id="L-32"><a href="#L-32"><span class="linenos"> 32</span></a>  <span class="s1">&#39;AVERojzZ8649E1oLPvcgG2SSbVECxs8PcG5JkpuK2Dvq&#39;</span>
-</span><span id="L-33"><a href="#L-33"><span class="linenos"> 33</span></a><span class="p">)</span>
-</span><span id="L-34"><a href="#L-34"><span class="linenos"> 34</span></a>
-</span><span id="L-35"><a href="#L-35"><span class="linenos"> 35</span></a><span class="c1"># Devnet constants</span>
-</span><span id="L-36"><a href="#L-36"><span class="linenos"> 36</span></a><span class="n">AVER_API_ENDPOINT_DEVNET</span> <span class="o">=</span> <span class="s1">&#39;https://dev.api.aver.exchange&#39;</span>
-</span><span id="L-37"><a href="#L-37"><span class="linenos"> 37</span></a><span class="c1"># SOLANA_ENDPOINT_DEVNET = &#39;https://devnet.genesysgo.net/&#39;</span>
-</span><span id="L-38"><a href="#L-38"><span class="linenos"> 38</span></a><span class="n">SOLANA_ENDPOINT_DEVNET</span> <span class="o">=</span> <span class="s1">&#39;https://api.devnet.solana.com&#39;</span> <span class="c1">#Tests fail with genesysgo because of airdrop</span>
-</span><span id="L-39"><a href="#L-39"><span class="linenos"> 39</span></a>
-</span><span id="L-40"><a href="#L-40"><span class="linenos"> 40</span></a><span class="n">USDC_DEVNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;BWvbxUTAxevm1NG8RHe1LhKmca9nz5ym2xqafTxr6ybj&#39;</span><span class="p">)</span>
-</span><span id="L-41"><a href="#L-41"><span class="linenos"> 41</span></a>
-</span><span id="L-42"><a href="#L-42"><span class="linenos"> 42</span></a><span class="c1"># ATA for market authority with USDC</span>
-</span><span id="L-43"><a href="#L-43"><span class="linenos"> 43</span></a><span class="n">AVER_MARKET_AUTHORITY_VAULT_DEVNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
-</span><span id="L-44"><a href="#L-44"><span class="linenos"> 44</span></a>  <span class="s1">&#39;TxyectLDHmkzidS6RCat6uuZ385xaNbxg7R7vrfhTAD&#39;</span>
-</span><span id="L-45"><a href="#L-45"><span class="linenos"> 45</span></a><span class="p">)</span>
-</span><span id="L-46"><a href="#L-46"><span class="linenos"> 46</span></a>
-</span><span id="L-47"><a href="#L-47"><span class="linenos"> 47</span></a><span class="c1"># PDA derivation of &#39;third-party-token-vault&#39; + USDC + AVER_PROGRAM_ID</span>
-</span><span id="L-48"><a href="#L-48"><span class="linenos"> 48</span></a><span class="n">AVER_THIRD_PARTY_REWARD_VAULT_AUTHORITY_DEVNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
-</span><span id="L-49"><a href="#L-49"><span class="linenos"> 49</span></a>  <span class="s1">&#39;Gb6DFbnMUdA1ReJqzfN7oeBpTNtz347bzgKUXgzzA58F&#39;</span>
-</span><span id="L-50"><a href="#L-50"><span class="linenos"> 50</span></a><span class="p">)</span>
-</span><span id="L-51"><a href="#L-51"><span class="linenos"> 51</span></a>
-</span><span id="L-52"><a href="#L-52"><span class="linenos"> 52</span></a><span class="c1"># ATA of vault authority PDA with USDC</span>
-</span><span id="L-53"><a href="#L-53"><span class="linenos"> 53</span></a><span class="n">AVER_THIRD_PARTY_REWARD_VAULT_DEVNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
-</span><span id="L-54"><a href="#L-54"><span class="linenos"> 54</span></a>  <span class="s1">&#39;DrWWingQnsb46bJg6ms5xPhnFz2YCuc9sihqeFFqGVXK&#39;</span>
-</span><span id="L-55"><a href="#L-55"><span class="linenos"> 55</span></a><span class="p">)</span>
-</span><span id="L-56"><a href="#L-56"><span class="linenos"> 56</span></a>
-</span><span id="L-57"><a href="#L-57"><span class="linenos"> 57</span></a><span class="c1"># bump of third party vault authority PDA</span>
-</span><span id="L-58"><a href="#L-58"><span class="linenos"> 58</span></a><span class="n">AVER_THIRD_PARTY_REWARD_VAULT_BUMP_DEVNET</span> <span class="o">=</span> <span class="mi">253</span>
-</span><span id="L-59"><a href="#L-59"><span class="linenos"> 59</span></a>
-</span><span id="L-60"><a href="#L-60"><span class="linenos"> 60</span></a><span class="n">AVER_MAINNET_LAUNCH_NFT_DEVNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
-</span><span id="L-61"><a href="#L-61"><span class="linenos"> 61</span></a>  <span class="s1">&#39;4QwFUyLKtHZqbHvxZQqLGPz8eMjXBgedaWvuQTdKwKJx&#39;</span>
-</span><span id="L-62"><a href="#L-62"><span class="linenos"> 62</span></a><span class="p">)</span>
+</span><span id="L-26"><a href="#L-26"><span class="linenos"> 26</span></a><span class="c1"># PDA derivation of &#39;third-party-token-vault&#39; + USDC + AVER_PROGRAM_ID</span>
+</span><span id="L-27"><a href="#L-27"><span class="linenos"> 27</span></a><span class="n">AVER_THIRD_PARTY_REWARD_VAULT_AUTHORITY_DEVNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
+</span><span id="L-28"><a href="#L-28"><span class="linenos"> 28</span></a>  <span class="s1">&#39;Gb6DFbnMUdA1ReJqzfN7oeBpTNtz347bzgKUXgzzA58F&#39;</span>
+</span><span id="L-29"><a href="#L-29"><span class="linenos"> 29</span></a><span class="p">)</span>
+</span><span id="L-30"><a href="#L-30"><span class="linenos"> 30</span></a>
+</span><span id="L-31"><a href="#L-31"><span class="linenos"> 31</span></a><span class="c1"># ATA of vault authority PDA with USDC</span>
+</span><span id="L-32"><a href="#L-32"><span class="linenos"> 32</span></a><span class="n">AVER_THIRD_PARTY_REWARD_VAULT_DEVNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
+</span><span id="L-33"><a href="#L-33"><span class="linenos"> 33</span></a>  <span class="s1">&#39;DrWWingQnsb46bJg6ms5xPhnFz2YCuc9sihqeFFqGVXK&#39;</span>
+</span><span id="L-34"><a href="#L-34"><span class="linenos"> 34</span></a><span class="p">)</span>
+</span><span id="L-35"><a href="#L-35"><span class="linenos"> 35</span></a>
+</span><span id="L-36"><a href="#L-36"><span class="linenos"> 36</span></a><span class="c1"># bump of third party vault authority PDA</span>
+</span><span id="L-37"><a href="#L-37"><span class="linenos"> 37</span></a><span class="n">AVER_THIRD_PARTY_REWARD_VAULT_BUMP_DEVNET</span> <span class="o">=</span> <span class="mi">253</span>
+</span><span id="L-38"><a href="#L-38"><span class="linenos"> 38</span></a>
+</span><span id="L-39"><a href="#L-39"><span class="linenos"> 39</span></a><span class="n">AVER_MAINNET_LAUNCH_NFT_DEVNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
+</span><span id="L-40"><a href="#L-40"><span class="linenos"> 40</span></a>  <span class="s1">&#39;4QwFUyLKtHZqbHvxZQqLGPz8eMjXBgedaWvuQTdKwKJx&#39;</span>
+</span><span id="L-41"><a href="#L-41"><span class="linenos"> 41</span></a><span class="p">)</span>
+</span><span id="L-42"><a href="#L-42"><span class="linenos"> 42</span></a>
+</span><span id="L-43"><a href="#L-43"><span class="linenos"> 43</span></a>
+</span><span id="L-44"><a href="#L-44"><span class="linenos"> 44</span></a>
+</span><span id="L-45"><a href="#L-45"><span class="linenos"> 45</span></a><span class="c1">##### MAINNET ONLY CONSTANTS</span>
+</span><span id="L-46"><a href="#L-46"><span class="linenos"> 46</span></a><span class="n">AVER_API_ENDPOINT_MAINNET</span> <span class="o">=</span> <span class="s1">&#39;https://api.aver.exchange&#39;</span>
+</span><span id="L-47"><a href="#L-47"><span class="linenos"> 47</span></a><span class="n">SOLANA_ENDPOINT_MAINET</span> <span class="o">=</span> <span class="s1">&#39;https://api.mainnet-beta.solana.com/&#39;</span>
+</span><span id="L-48"><a href="#L-48"><span class="linenos"> 48</span></a><span class="n">USDC_MAINNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&#39;</span><span class="p">)</span> <span class="c1"># (USDC)</span>
+</span><span id="L-49"><a href="#L-49"><span class="linenos"> 49</span></a>
+</span><span id="L-50"><a href="#L-50"><span class="linenos"> 50</span></a><span class="n">AVER_MARKET_AUTHORITY_VAULT_MAINNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
+</span><span id="L-51"><a href="#L-51"><span class="linenos"> 51</span></a>  <span class="s1">&#39;8M33TSnT9qDnTS2nSiECtfn7uhxNYZ9oJRVumYqgo2NX&#39;</span>
+</span><span id="L-52"><a href="#L-52"><span class="linenos"> 52</span></a><span class="p">)</span>
+</span><span id="L-53"><a href="#L-53"><span class="linenos"> 53</span></a>
+</span><span id="L-54"><a href="#L-54"><span class="linenos"> 54</span></a><span class="n">AVER_THIRD_PARTY_REWARD_VAULT_MAINNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
+</span><span id="L-55"><a href="#L-55"><span class="linenos"> 55</span></a>  <span class="s1">&#39;2FMt5pb8oJGAyvSN6Ytw1nD3Np6MUJ2jRZrv63Zy4nqT&#39;</span>
+</span><span id="L-56"><a href="#L-56"><span class="linenos"> 56</span></a><span class="p">)</span>
+</span><span id="L-57"><a href="#L-57"><span class="linenos"> 57</span></a>
+</span><span id="L-58"><a href="#L-58"><span class="linenos"> 58</span></a><span class="n">AVER_THIRD_PARTY_REWARD_VAULT_AUTHORITY_MAINNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
+</span><span id="L-59"><a href="#L-59"><span class="linenos"> 59</span></a>  <span class="s1">&#39;5sRuNV4LqvroWF1EiUmPuUYAzti4Biikou8jRYMuxVaR&#39;</span>
+</span><span id="L-60"><a href="#L-60"><span class="linenos"> 60</span></a><span class="p">)</span>
+</span><span id="L-61"><a href="#L-61"><span class="linenos"> 61</span></a>
+</span><span id="L-62"><a href="#L-62"><span class="linenos"> 62</span></a><span class="n">AVER_THIRD_PARTY_REWARD_VAULT_BUMP_MAINNET</span> <span class="o">=</span> <span class="mi">250</span>
 </span><span id="L-63"><a href="#L-63"><span class="linenos"> 63</span></a>
-</span><span id="L-64"><a href="#L-64"><span class="linenos"> 64</span></a><span class="c1"># Mainnet constants</span>
-</span><span id="L-65"><a href="#L-65"><span class="linenos"> 65</span></a><span class="n">AVER_API_ENDPOINT_MAINNET</span> <span class="o">=</span> <span class="s1">&#39;https://api.aver.exchange&#39;</span>
-</span><span id="L-66"><a href="#L-66"><span class="linenos"> 66</span></a><span class="n">SOLANA_ENDPOINT_MAINNET</span> <span class="o">=</span> <span class="s1">&#39;https://holy-cold-glade.solana-mainnet.quiknode.pro/&#39;</span>
-</span><span id="L-67"><a href="#L-67"><span class="linenos"> 67</span></a><span class="c1"># SOLANA_ENDPOINT_MAINNET = &#39;https://ssc-dao.genesysgo.net/&#39;</span>
-</span><span id="L-68"><a href="#L-68"><span class="linenos"> 68</span></a><span class="c1"># SOLANA_ENDPOINT_MAINNET = &#39;https://api.mainnet-beta.solana.com&#39;</span>
-</span><span id="L-69"><a href="#L-69"><span class="linenos"> 69</span></a><span class="n">USDC_MAINNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&#39;</span><span class="p">)</span> <span class="c1"># (USDC)</span>
-</span><span id="L-70"><a href="#L-70"><span class="linenos"> 70</span></a>
-</span><span id="L-71"><a href="#L-71"><span class="linenos"> 71</span></a><span class="n">AVER_MARKET_AUTHORITY_VAULT_MAINNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
-</span><span id="L-72"><a href="#L-72"><span class="linenos"> 72</span></a>  <span class="s1">&#39;8M33TSnT9qDnTS2nSiECtfn7uhxNYZ9oJRVumYqgo2NX&#39;</span>
-</span><span id="L-73"><a href="#L-73"><span class="linenos"> 73</span></a><span class="p">)</span>
-</span><span id="L-74"><a href="#L-74"><span class="linenos"> 74</span></a>
-</span><span id="L-75"><a href="#L-75"><span class="linenos"> 75</span></a><span class="n">AVER_THIRD_PARTY_REWARD_VAULT_MAINNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
-</span><span id="L-76"><a href="#L-76"><span class="linenos"> 76</span></a>  <span class="s1">&#39;2FMt5pb8oJGAyvSN6Ytw1nD3Np6MUJ2jRZrv63Zy4nqT&#39;</span>
-</span><span id="L-77"><a href="#L-77"><span class="linenos"> 77</span></a><span class="p">)</span>
+</span><span id="L-64"><a href="#L-64"><span class="linenos"> 64</span></a><span class="n">AVER_MAINNET_LAUNCH_NFT_MAINNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
+</span><span id="L-65"><a href="#L-65"><span class="linenos"> 65</span></a>  <span class="s1">&#39;BqSFP5CbfBfZeQqGbzYEipfzTDptTYHFL9AzZA8TBXjn&#39;</span>
+</span><span id="L-66"><a href="#L-66"><span class="linenos"> 66</span></a><span class="p">)</span>
+</span><span id="L-67"><a href="#L-67"><span class="linenos"> 67</span></a>
+</span><span id="L-68"><a href="#L-68"><span class="linenos"> 68</span></a><span class="c1">##### OTHER CONSTANTS</span>
+</span><span id="L-69"><a href="#L-69"><span class="linenos"> 69</span></a>
+</span><span id="L-70"><a href="#L-70"><span class="linenos"> 70</span></a><span class="n">SYS_VAR_CLOCK</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span><span class="s1">&#39;SysvarC1ock11111111111111111111111111111111&#39;</span><span class="p">)</span>
+</span><span id="L-71"><a href="#L-71"><span class="linenos"> 71</span></a>
+</span><span id="L-72"><a href="#L-72"><span class="linenos"> 72</span></a><span class="n">MAX_ITERATIONS_FOR_CONSUME_EVENTS</span> <span class="o">=</span> <span class="mi">5</span>  
+</span><span id="L-73"><a href="#L-73"><span class="linenos"> 73</span></a>
+</span><span id="L-74"><a href="#L-74"><span class="linenos"> 74</span></a><span class="n">CALLBACK_INFO_LEN</span> <span class="o">=</span> <span class="mi">33</span>
+</span><span id="L-75"><a href="#L-75"><span class="linenos"> 75</span></a>
+</span><span id="L-76"><a href="#L-76"><span class="linenos"> 76</span></a><span class="n">CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE</span> <span class="o">=</span> <span class="mi">5</span>
+</span><span id="L-77"><a href="#L-77"><span class="linenos"> 77</span></a>
 </span><span id="L-78"><a href="#L-78"><span class="linenos"> 78</span></a>
-</span><span id="L-79"><a href="#L-79"><span class="linenos"> 79</span></a><span class="n">AVER_THIRD_PARTY_REWARD_VAULT_AUTHORITY_MAINNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
-</span><span id="L-80"><a href="#L-80"><span class="linenos"> 80</span></a>  <span class="s1">&#39;5sRuNV4LqvroWF1EiUmPuUYAzti4Biikou8jRYMuxVaR&#39;</span>
-</span><span id="L-81"><a href="#L-81"><span class="linenos"> 81</span></a><span class="p">)</span>
-</span><span id="L-82"><a href="#L-82"><span class="linenos"> 82</span></a>
-</span><span id="L-83"><a href="#L-83"><span class="linenos"> 83</span></a><span class="n">AVER_THIRD_PARTY_REWARD_VAULT_BUMP_MAINNET</span> <span class="o">=</span> <span class="mi">250</span>
-</span><span id="L-84"><a href="#L-84"><span class="linenos"> 84</span></a>
-</span><span id="L-85"><a href="#L-85"><span class="linenos"> 85</span></a><span class="n">AVER_MAINNET_LAUNCH_NFT_MAINNET</span> <span class="o">=</span> <span class="n">PublicKey</span><span class="p">(</span>
-</span><span id="L-86"><a href="#L-86"><span class="linenos"> 86</span></a>  <span class="s1">&#39;BqSFP5CbfBfZeQqGbzYEipfzTDptTYHFL9AzZA8TBXjn&#39;</span>
-</span><span id="L-87"><a href="#L-87"><span class="linenos"> 87</span></a><span class="p">)</span>
-</span><span id="L-88"><a href="#L-88"><span class="linenos"> 88</span></a>
-</span><span id="L-89"><a href="#L-89"><span class="linenos"> 89</span></a><span class="c1"># helpers</span>
-</span><span id="L-90"><a href="#L-90"><span class="linenos"> 90</span></a><span class="k">def</span> <span class="nf">get_aver_api_endpoint</span><span class="p">(</span><span class="n">solanaNetwork</span><span class="p">:</span> <span class="n">SolanaNetwork</span><span class="p">):</span>
-</span><span id="L-91"><a href="#L-91"><span class="linenos"> 91</span></a>  <span class="sd">&quot;&quot;&quot;</span>
-</span><span id="L-92"><a href="#L-92"><span class="linenos"> 92</span></a><span class="sd">  Returns URL for Aver API based on solana network</span>
-</span><span id="L-93"><a href="#L-93"><span class="linenos"> 93</span></a>
-</span><span id="L-94"><a href="#L-94"><span class="linenos"> 94</span></a><span class="sd">  Args:</span>
-</span><span id="L-95"><a href="#L-95"><span class="linenos"> 95</span></a><span class="sd">      solanaNetwork (SolanaNetwork): Solana network</span>
-</span><span id="L-96"><a href="#L-96"><span class="linenos"> 96</span></a>
-</span><span id="L-97"><a href="#L-97"><span class="linenos"> 97</span></a><span class="sd">  Returns:</span>
-</span><span id="L-98"><a href="#L-98"><span class="linenos"> 98</span></a><span class="sd">      string: URL </span>
-</span><span id="L-99"><a href="#L-99"><span class="linenos"> 99</span></a><span class="sd">  &quot;&quot;&quot;</span>
-</span><span id="L-100"><a href="#L-100"><span class="linenos">100</span></a>  <span class="k">return</span> <span class="n">AVER_API_ENDPOINT_DEVNET</span> <span class="k">if</span> <span class="n">solanaNetwork</span> <span class="o">==</span> <span class="n">SolanaNetwork</span><span class="o">.</span><span class="n">DEVNET</span> <span class="k">else</span> <span class="n">AVER_API_ENDPOINT_MAINNET</span>
-</span><span id="L-101"><a href="#L-101"><span class="linenos">101</span></a><span class="k">def</span> <span class="nf">get_solana_endpoint</span><span class="p">(</span><span class="n">solanaNetwork</span><span class="p">:</span> <span class="n">SolanaNetwork</span><span class="p">):</span>
-</span><span id="L-102"><a href="#L-102"><span class="linenos">102</span></a>  <span class="sd">&quot;&quot;&quot;</span>
-</span><span id="L-103"><a href="#L-103"><span class="linenos">103</span></a><span class="sd">  Returns URL for solana endpoint based on solana network</span>
-</span><span id="L-104"><a href="#L-104"><span class="linenos">104</span></a>
-</span><span id="L-105"><a href="#L-105"><span class="linenos">105</span></a><span class="sd">  Args:</span>
-</span><span id="L-106"><a href="#L-106"><span class="linenos">106</span></a><span class="sd">      solanaNetwork (SolanaNetwork): Solana network</span>
-</span><span id="L-107"><a href="#L-107"><span class="linenos">107</span></a>
-</span><span id="L-108"><a href="#L-108"><span class="linenos">108</span></a><span class="sd">  Returns:</span>
-</span><span id="L-109"><a href="#L-109"><span class="linenos">109</span></a><span class="sd">      string: URL</span>
-</span><span id="L-110"><a href="#L-110"><span class="linenos">110</span></a><span class="sd">  &quot;&quot;&quot;</span>
-</span><span id="L-111"><a href="#L-111"><span class="linenos">111</span></a>  <span class="k">return</span> <span class="n">SOLANA_ENDPOINT_DEVNET</span> <span class="k">if</span> <span class="n">solanaNetwork</span> <span class="o">==</span> <span class="n">SolanaNetwork</span><span class="o">.</span><span class="n">DEVNET</span> <span class="k">else</span> <span class="n">SOLANA_ENDPOINT_MAINNET</span>
-</span><span id="L-112"><a href="#L-112"><span class="linenos">112</span></a><span class="k">def</span> <span class="nf">get_quote_token</span><span class="p">(</span><span class="n">solanaNetwork</span><span class="p">:</span> <span class="n">SolanaNetwork</span><span class="p">):</span>
-</span><span id="L-113"><a href="#L-113"><span class="linenos">113</span></a>  <span class="sd">&quot;&quot;&quot;</span>
-</span><span id="L-114"><a href="#L-114"><span class="linenos">114</span></a><span class="sd">  Returns default quote token public key based on solana network</span>
-</span><span id="L-115"><a href="#L-115"><span class="linenos">115</span></a>
-</span><span id="L-116"><a href="#L-116"><span class="linenos">116</span></a><span class="sd">  Args:</span>
-</span><span id="L-117"><a href="#L-117"><span class="linenos">117</span></a><span class="sd">      solanaNetwork (SolanaNetwork): _description_</span>
-</span><span id="L-118"><a href="#L-118"><span class="linenos">118</span></a>
-</span><span id="L-119"><a href="#L-119"><span class="linenos">119</span></a><span class="sd">  Returns:</span>
-</span><span id="L-120"><a href="#L-120"><span class="linenos">120</span></a><span class="sd">      PublicKey: Quote token public key</span>
-</span><span id="L-121"><a href="#L-121"><span class="linenos">121</span></a><span class="sd">  &quot;&quot;&quot;</span>
-</span><span id="L-122"><a href="#L-122"><span class="linenos">122</span></a>  <span class="k">return</span> <span class="n">USDC_DEVNET</span> <span class="k">if</span> <span class="n">solanaNetwork</span> <span class="o">==</span> <span class="n">SolanaNetwork</span><span class="o">.</span><span class="n">DEVNET</span> <span class="k">else</span> <span class="n">USDC_MAINNET</span>
-</span><span id="L-123"><a href="#L-123"><span class="linenos">123</span></a>
-</span><span id="L-124"><a href="#L-124"><span class="linenos">124</span></a><span class="c1"># other constants</span>
-</span><span id="L-125"><a href="#L-125"><span class="linenos">125</span></a><span class="n">CALLBACK_INFO_LEN</span> <span class="o">=</span> <span class="mi">33</span>
+</span><span id="L-79"><a href="#L-79"><span class="linenos"> 79</span></a><span class="c1">###### HELPER FUNCTIONS</span>
+</span><span id="L-80"><a href="#L-80"><span class="linenos"> 80</span></a><span class="k">def</span> <span class="nf">get_aver_api_endpoint</span><span class="p">(</span><span class="n">solanaNetwork</span><span class="p">:</span> <span class="n">SolanaNetwork</span><span class="p">):</span>
+</span><span id="L-81"><a href="#L-81"><span class="linenos"> 81</span></a>  <span class="sd">&quot;&quot;&quot;</span>
+</span><span id="L-82"><a href="#L-82"><span class="linenos"> 82</span></a><span class="sd">  Returns URL for Aver API based on solana network</span>
+</span><span id="L-83"><a href="#L-83"><span class="linenos"> 83</span></a>
+</span><span id="L-84"><a href="#L-84"><span class="linenos"> 84</span></a><span class="sd">  Args:</span>
+</span><span id="L-85"><a href="#L-85"><span class="linenos"> 85</span></a><span class="sd">      solanaNetwork (SolanaNetwork): Solana network</span>
+</span><span id="L-86"><a href="#L-86"><span class="linenos"> 86</span></a>
+</span><span id="L-87"><a href="#L-87"><span class="linenos"> 87</span></a><span class="sd">  Returns:</span>
+</span><span id="L-88"><a href="#L-88"><span class="linenos"> 88</span></a><span class="sd">      string: URL </span>
+</span><span id="L-89"><a href="#L-89"><span class="linenos"> 89</span></a><span class="sd">  &quot;&quot;&quot;</span>
+</span><span id="L-90"><a href="#L-90"><span class="linenos"> 90</span></a>  <span class="k">return</span> <span class="n">AVER_API_ENDPOINT_DEVNET</span> <span class="k">if</span> <span class="n">solanaNetwork</span> <span class="o">==</span> <span class="n">SolanaNetwork</span><span class="o">.</span><span class="n">DEVNET</span> <span class="k">else</span> <span class="n">AVER_API_ENDPOINT_MAINNET</span>
+</span><span id="L-91"><a href="#L-91"><span class="linenos"> 91</span></a><span class="k">def</span> <span class="nf">get_solana_endpoint</span><span class="p">(</span><span class="n">solanaNetwork</span><span class="p">:</span> <span class="n">SolanaNetwork</span><span class="p">):</span>
+</span><span id="L-92"><a href="#L-92"><span class="linenos"> 92</span></a>  <span class="sd">&quot;&quot;&quot;</span>
+</span><span id="L-93"><a href="#L-93"><span class="linenos"> 93</span></a><span class="sd">  Returns URL for solana endpoint based on solana network</span>
+</span><span id="L-94"><a href="#L-94"><span class="linenos"> 94</span></a>
+</span><span id="L-95"><a href="#L-95"><span class="linenos"> 95</span></a><span class="sd">  Args:</span>
+</span><span id="L-96"><a href="#L-96"><span class="linenos"> 96</span></a><span class="sd">      solanaNetwork (SolanaNetwork): Solana network</span>
+</span><span id="L-97"><a href="#L-97"><span class="linenos"> 97</span></a>
+</span><span id="L-98"><a href="#L-98"><span class="linenos"> 98</span></a><span class="sd">  Returns:</span>
+</span><span id="L-99"><a href="#L-99"><span class="linenos"> 99</span></a><span class="sd">      string: URL</span>
+</span><span id="L-100"><a href="#L-100"><span class="linenos">100</span></a><span class="sd">  &quot;&quot;&quot;</span>
+</span><span id="L-101"><a href="#L-101"><span class="linenos">101</span></a>  <span class="k">return</span> <span class="n">SOLANA_ENDPOINT_DEVNET</span> <span class="k">if</span> <span class="n">solanaNetwork</span> <span class="o">==</span> <span class="n">SolanaNetwork</span><span class="o">.</span><span class="n">DEVNET</span> <span class="k">else</span> <span class="n">SOLANA_ENDPOINT_MAINNET</span>
+</span><span id="L-102"><a href="#L-102"><span class="linenos">102</span></a><span class="k">def</span> <span class="nf">get_quote_token</span><span class="p">(</span><span class="n">solanaNetwork</span><span class="p">:</span> <span class="n">SolanaNetwork</span><span class="p">):</span>
+</span><span id="L-103"><a href="#L-103"><span class="linenos">103</span></a>  <span class="sd">&quot;&quot;&quot;</span>
+</span><span id="L-104"><a href="#L-104"><span class="linenos">104</span></a><span class="sd">  Returns default quote token public key based on solana network</span>
+</span><span id="L-105"><a href="#L-105"><span class="linenos">105</span></a>
+</span><span id="L-106"><a href="#L-106"><span class="linenos">106</span></a><span class="sd">  Args:</span>
+</span><span id="L-107"><a href="#L-107"><span class="linenos">107</span></a><span class="sd">      solanaNetwork (SolanaNetwork): _description_</span>
+</span><span id="L-108"><a href="#L-108"><span class="linenos">108</span></a>
+</span><span id="L-109"><a href="#L-109"><span class="linenos">109</span></a><span class="sd">  Returns:</span>
+</span><span id="L-110"><a href="#L-110"><span class="linenos">110</span></a><span class="sd">      PublicKey: Quote token public key</span>
+</span><span id="L-111"><a href="#L-111"><span class="linenos">111</span></a><span class="sd">  &quot;&quot;&quot;</span>
+</span><span id="L-112"><a href="#L-112"><span class="linenos">112</span></a>  <span class="k">return</span> <span class="n">USDC_DEVNET</span> <span class="k">if</span> <span class="n">solanaNetwork</span> <span class="o">==</span> <span class="n">SolanaNetwork</span><span class="o">.</span><span class="n">DEVNET</span> <span class="k">else</span> <span class="n">USDC_MAINNET</span>
 </span></pre></div>
 
 
@@ -200,17 +187,17 @@
 
     </div>
     <a class="headerlink" href="#get_aver_api_endpoint"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_aver_api_endpoint-91"><a href="#get_aver_api_endpoint-91"><span class="linenos"> 91</span></a><span class="k">def</span> <span class="nf">get_aver_api_endpoint</span><span class="p">(</span><span class="n">solanaNetwork</span><span class="p">:</span> <span class="n">SolanaNetwork</span><span class="p">):</span>
-</span><span id="get_aver_api_endpoint-92"><a href="#get_aver_api_endpoint-92"><span class="linenos"> 92</span></a>  <span class="sd">&quot;&quot;&quot;</span>
-</span><span id="get_aver_api_endpoint-93"><a href="#get_aver_api_endpoint-93"><span class="linenos"> 93</span></a><span class="sd">  Returns URL for Aver API based on solana network</span>
-</span><span id="get_aver_api_endpoint-94"><a href="#get_aver_api_endpoint-94"><span class="linenos"> 94</span></a>
-</span><span id="get_aver_api_endpoint-95"><a href="#get_aver_api_endpoint-95"><span class="linenos"> 95</span></a><span class="sd">  Args:</span>
-</span><span id="get_aver_api_endpoint-96"><a href="#get_aver_api_endpoint-96"><span class="linenos"> 96</span></a><span class="sd">      solanaNetwork (SolanaNetwork): Solana network</span>
-</span><span id="get_aver_api_endpoint-97"><a href="#get_aver_api_endpoint-97"><span class="linenos"> 97</span></a>
-</span><span id="get_aver_api_endpoint-98"><a href="#get_aver_api_endpoint-98"><span class="linenos"> 98</span></a><span class="sd">  Returns:</span>
-</span><span id="get_aver_api_endpoint-99"><a href="#get_aver_api_endpoint-99"><span class="linenos"> 99</span></a><span class="sd">      string: URL </span>
-</span><span id="get_aver_api_endpoint-100"><a href="#get_aver_api_endpoint-100"><span class="linenos">100</span></a><span class="sd">  &quot;&quot;&quot;</span>
-</span><span id="get_aver_api_endpoint-101"><a href="#get_aver_api_endpoint-101"><span class="linenos">101</span></a>  <span class="k">return</span> <span class="n">AVER_API_ENDPOINT_DEVNET</span> <span class="k">if</span> <span class="n">solanaNetwork</span> <span class="o">==</span> <span class="n">SolanaNetwork</span><span class="o">.</span><span class="n">DEVNET</span> <span class="k">else</span> <span class="n">AVER_API_ENDPOINT_MAINNET</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_aver_api_endpoint-81"><a href="#get_aver_api_endpoint-81"><span class="linenos">81</span></a><span class="k">def</span> <span class="nf">get_aver_api_endpoint</span><span class="p">(</span><span class="n">solanaNetwork</span><span class="p">:</span> <span class="n">SolanaNetwork</span><span class="p">):</span>
+</span><span id="get_aver_api_endpoint-82"><a href="#get_aver_api_endpoint-82"><span class="linenos">82</span></a>  <span class="sd">&quot;&quot;&quot;</span>
+</span><span id="get_aver_api_endpoint-83"><a href="#get_aver_api_endpoint-83"><span class="linenos">83</span></a><span class="sd">  Returns URL for Aver API based on solana network</span>
+</span><span id="get_aver_api_endpoint-84"><a href="#get_aver_api_endpoint-84"><span class="linenos">84</span></a>
+</span><span id="get_aver_api_endpoint-85"><a href="#get_aver_api_endpoint-85"><span class="linenos">85</span></a><span class="sd">  Args:</span>
+</span><span id="get_aver_api_endpoint-86"><a href="#get_aver_api_endpoint-86"><span class="linenos">86</span></a><span class="sd">      solanaNetwork (SolanaNetwork): Solana network</span>
+</span><span id="get_aver_api_endpoint-87"><a href="#get_aver_api_endpoint-87"><span class="linenos">87</span></a>
+</span><span id="get_aver_api_endpoint-88"><a href="#get_aver_api_endpoint-88"><span class="linenos">88</span></a><span class="sd">  Returns:</span>
+</span><span id="get_aver_api_endpoint-89"><a href="#get_aver_api_endpoint-89"><span class="linenos">89</span></a><span class="sd">      string: URL </span>
+</span><span id="get_aver_api_endpoint-90"><a href="#get_aver_api_endpoint-90"><span class="linenos">90</span></a><span class="sd">  &quot;&quot;&quot;</span>
+</span><span id="get_aver_api_endpoint-91"><a href="#get_aver_api_endpoint-91"><span class="linenos">91</span></a>  <span class="k">return</span> <span class="n">AVER_API_ENDPOINT_DEVNET</span> <span class="k">if</span> <span class="n">solanaNetwork</span> <span class="o">==</span> <span class="n">SolanaNetwork</span><span class="o">.</span><span class="n">DEVNET</span> <span class="k">else</span> <span class="n">AVER_API_ENDPOINT_MAINNET</span>
 </span></pre></div>
 
 
@@ -242,17 +229,17 @@
 
     </div>
     <a class="headerlink" href="#get_solana_endpoint"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_solana_endpoint-102"><a href="#get_solana_endpoint-102"><span class="linenos">102</span></a><span class="k">def</span> <span class="nf">get_solana_endpoint</span><span class="p">(</span><span class="n">solanaNetwork</span><span class="p">:</span> <span class="n">SolanaNetwork</span><span class="p">):</span>
-</span><span id="get_solana_endpoint-103"><a href="#get_solana_endpoint-103"><span class="linenos">103</span></a>  <span class="sd">&quot;&quot;&quot;</span>
-</span><span id="get_solana_endpoint-104"><a href="#get_solana_endpoint-104"><span class="linenos">104</span></a><span class="sd">  Returns URL for solana endpoint based on solana network</span>
-</span><span id="get_solana_endpoint-105"><a href="#get_solana_endpoint-105"><span class="linenos">105</span></a>
-</span><span id="get_solana_endpoint-106"><a href="#get_solana_endpoint-106"><span class="linenos">106</span></a><span class="sd">  Args:</span>
-</span><span id="get_solana_endpoint-107"><a href="#get_solana_endpoint-107"><span class="linenos">107</span></a><span class="sd">      solanaNetwork (SolanaNetwork): Solana network</span>
-</span><span id="get_solana_endpoint-108"><a href="#get_solana_endpoint-108"><span class="linenos">108</span></a>
-</span><span id="get_solana_endpoint-109"><a href="#get_solana_endpoint-109"><span class="linenos">109</span></a><span class="sd">  Returns:</span>
-</span><span id="get_solana_endpoint-110"><a href="#get_solana_endpoint-110"><span class="linenos">110</span></a><span class="sd">      string: URL</span>
-</span><span id="get_solana_endpoint-111"><a href="#get_solana_endpoint-111"><span class="linenos">111</span></a><span class="sd">  &quot;&quot;&quot;</span>
-</span><span id="get_solana_endpoint-112"><a href="#get_solana_endpoint-112"><span class="linenos">112</span></a>  <span class="k">return</span> <span class="n">SOLANA_ENDPOINT_DEVNET</span> <span class="k">if</span> <span class="n">solanaNetwork</span> <span class="o">==</span> <span class="n">SolanaNetwork</span><span class="o">.</span><span class="n">DEVNET</span> <span class="k">else</span> <span class="n">SOLANA_ENDPOINT_MAINNET</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_solana_endpoint-92"><a href="#get_solana_endpoint-92"><span class="linenos"> 92</span></a><span class="k">def</span> <span class="nf">get_solana_endpoint</span><span class="p">(</span><span class="n">solanaNetwork</span><span class="p">:</span> <span class="n">SolanaNetwork</span><span class="p">):</span>
+</span><span id="get_solana_endpoint-93"><a href="#get_solana_endpoint-93"><span class="linenos"> 93</span></a>  <span class="sd">&quot;&quot;&quot;</span>
+</span><span id="get_solana_endpoint-94"><a href="#get_solana_endpoint-94"><span class="linenos"> 94</span></a><span class="sd">  Returns URL for solana endpoint based on solana network</span>
+</span><span id="get_solana_endpoint-95"><a href="#get_solana_endpoint-95"><span class="linenos"> 95</span></a>
+</span><span id="get_solana_endpoint-96"><a href="#get_solana_endpoint-96"><span class="linenos"> 96</span></a><span class="sd">  Args:</span>
+</span><span id="get_solana_endpoint-97"><a href="#get_solana_endpoint-97"><span class="linenos"> 97</span></a><span class="sd">      solanaNetwork (SolanaNetwork): Solana network</span>
+</span><span id="get_solana_endpoint-98"><a href="#get_solana_endpoint-98"><span class="linenos"> 98</span></a>
+</span><span id="get_solana_endpoint-99"><a href="#get_solana_endpoint-99"><span class="linenos"> 99</span></a><span class="sd">  Returns:</span>
+</span><span id="get_solana_endpoint-100"><a href="#get_solana_endpoint-100"><span class="linenos">100</span></a><span class="sd">      string: URL</span>
+</span><span id="get_solana_endpoint-101"><a href="#get_solana_endpoint-101"><span class="linenos">101</span></a><span class="sd">  &quot;&quot;&quot;</span>
+</span><span id="get_solana_endpoint-102"><a href="#get_solana_endpoint-102"><span class="linenos">102</span></a>  <span class="k">return</span> <span class="n">SOLANA_ENDPOINT_DEVNET</span> <span class="k">if</span> <span class="n">solanaNetwork</span> <span class="o">==</span> <span class="n">SolanaNetwork</span><span class="o">.</span><span class="n">DEVNET</span> <span class="k">else</span> <span class="n">SOLANA_ENDPOINT_MAINNET</span>
 </span></pre></div>
 
 
@@ -284,17 +271,17 @@
 
     </div>
     <a class="headerlink" href="#get_quote_token"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_quote_token-113"><a href="#get_quote_token-113"><span class="linenos">113</span></a><span class="k">def</span> <span class="nf">get_quote_token</span><span class="p">(</span><span class="n">solanaNetwork</span><span class="p">:</span> <span class="n">SolanaNetwork</span><span class="p">):</span>
-</span><span id="get_quote_token-114"><a href="#get_quote_token-114"><span class="linenos">114</span></a>  <span class="sd">&quot;&quot;&quot;</span>
-</span><span id="get_quote_token-115"><a href="#get_quote_token-115"><span class="linenos">115</span></a><span class="sd">  Returns default quote token public key based on solana network</span>
-</span><span id="get_quote_token-116"><a href="#get_quote_token-116"><span class="linenos">116</span></a>
-</span><span id="get_quote_token-117"><a href="#get_quote_token-117"><span class="linenos">117</span></a><span class="sd">  Args:</span>
-</span><span id="get_quote_token-118"><a href="#get_quote_token-118"><span class="linenos">118</span></a><span class="sd">      solanaNetwork (SolanaNetwork): _description_</span>
-</span><span id="get_quote_token-119"><a href="#get_quote_token-119"><span class="linenos">119</span></a>
-</span><span id="get_quote_token-120"><a href="#get_quote_token-120"><span class="linenos">120</span></a><span class="sd">  Returns:</span>
-</span><span id="get_quote_token-121"><a href="#get_quote_token-121"><span class="linenos">121</span></a><span class="sd">      PublicKey: Quote token public key</span>
-</span><span id="get_quote_token-122"><a href="#get_quote_token-122"><span class="linenos">122</span></a><span class="sd">  &quot;&quot;&quot;</span>
-</span><span id="get_quote_token-123"><a href="#get_quote_token-123"><span class="linenos">123</span></a>  <span class="k">return</span> <span class="n">USDC_DEVNET</span> <span class="k">if</span> <span class="n">solanaNetwork</span> <span class="o">==</span> <span class="n">SolanaNetwork</span><span class="o">.</span><span class="n">DEVNET</span> <span class="k">else</span> <span class="n">USDC_MAINNET</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_quote_token-103"><a href="#get_quote_token-103"><span class="linenos">103</span></a><span class="k">def</span> <span class="nf">get_quote_token</span><span class="p">(</span><span class="n">solanaNetwork</span><span class="p">:</span> <span class="n">SolanaNetwork</span><span class="p">):</span>
+</span><span id="get_quote_token-104"><a href="#get_quote_token-104"><span class="linenos">104</span></a>  <span class="sd">&quot;&quot;&quot;</span>
+</span><span id="get_quote_token-105"><a href="#get_quote_token-105"><span class="linenos">105</span></a><span class="sd">  Returns default quote token public key based on solana network</span>
+</span><span id="get_quote_token-106"><a href="#get_quote_token-106"><span class="linenos">106</span></a>
+</span><span id="get_quote_token-107"><a href="#get_quote_token-107"><span class="linenos">107</span></a><span class="sd">  Args:</span>
+</span><span id="get_quote_token-108"><a href="#get_quote_token-108"><span class="linenos">108</span></a><span class="sd">      solanaNetwork (SolanaNetwork): _description_</span>
+</span><span id="get_quote_token-109"><a href="#get_quote_token-109"><span class="linenos">109</span></a>
+</span><span id="get_quote_token-110"><a href="#get_quote_token-110"><span class="linenos">110</span></a><span class="sd">  Returns:</span>
+</span><span id="get_quote_token-111"><a href="#get_quote_token-111"><span class="linenos">111</span></a><span class="sd">      PublicKey: Quote token public key</span>
+</span><span id="get_quote_token-112"><a href="#get_quote_token-112"><span class="linenos">112</span></a><span class="sd">  &quot;&quot;&quot;</span>
+</span><span id="get_quote_token-113"><a href="#get_quote_token-113"><span class="linenos">113</span></a>  <span class="k">return</span> <span class="n">USDC_DEVNET</span> <span class="k">if</span> <span class="n">solanaNetwork</span> <span class="o">==</span> <span class="n">SolanaNetwork</span><span class="o">.</span><span class="n">DEVNET</span> <span class="k">else</span> <span class="n">USDC_MAINNET</span>
 </span></pre></div>
 
 

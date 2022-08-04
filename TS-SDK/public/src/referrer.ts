@@ -1,11 +1,20 @@
-import { Idl, IdlTypeDef } from '@project-serum/anchor/dist/cjs/idl'
-import { IdlTypes, TypeDef } from '@project-serum/anchor/dist/cjs/program/namespace/types'
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
-import { Keypair, PublicKey, SendOptions, SystemProgram, TransactionInstruction } from '@solana/web3.js'
-import { AverClient } from './aver-client'
-import { AVER_HOST_ACCOUNT, AVER_PROGRAM_ID } from './ids'
-import { ReferrerState } from './types'
-import { signAndSendTransactionInstructions } from './utils'
+import { Idl, IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl"
+import {
+  IdlTypes,
+  TypeDef,
+} from "@project-serum/anchor/dist/cjs/program/namespace/types"
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token"
+import {
+  Keypair,
+  PublicKey,
+  SendOptions,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js"
+import { AverClient } from "./aver-client"
+import { AVER_HOST_ACCOUNT, AVER_PROGRAM_ID } from "./ids"
+import { ReferrerState } from "./types"
+import { signAndSendTransactionInstructions } from "./utils"
 
 export class Referrer {
   private _pubkey: PublicKey
@@ -19,15 +28,17 @@ export class Referrer {
 
   /**
    * Load the Referrer Object
-   * 
-   * @param averClient 
-   * @param pubkey 
-   * 
+   *
+   * @param averClient
+   * @param pubkey
+   *
    * @returns {Referrer}
    */
   static async load(averClient: AverClient, pubkey: PublicKey) {
     const program = averClient.program
-    const referrerResult = await program.account['referrer'].fetch(pubkey.toBase58())
+    const referrerResult = await program.account["referrer"].fetch(
+      pubkey.toBase58()
+    )
     const referrerState = Referrer.parseReferrerState(referrerResult)
 
     return new Referrer(pubkey, referrerState)
@@ -35,13 +46,13 @@ export class Referrer {
 
   /**
    * Format the instruction to create a Referrer account
-   * 
-   * @param averClient 
-   * @param host 
-   * @param owner 
-   * @param feePayer 
-   * @param programId 
-   * 
+   *
+   * @param averClient
+   * @param host
+   * @param owner
+   * @param feePayer
+   * @param programId
+   *
    * @returns {Promise<TransactionInstruction>}
    */
   static async makeCreateReferrerAccountInstruction(
@@ -52,9 +63,13 @@ export class Referrer {
     programId = AVER_PROGRAM_ID
   ) {
     const program = averClient.program
-    const [referrer, bump] = await Referrer.derivePubkeyAndBump(owner, host, programId)
+    const [referrer, bump] = await Referrer.derivePubkeyAndBump(
+      owner,
+      host,
+      programId
+    )
 
-    return program.instruction['initReferrer'](bump, {
+    return program.instruction["initReferrer"](bump, {
       accounts: {
         payer: feePayer,
         owner: owner,
@@ -67,15 +82,15 @@ export class Referrer {
 
   /**
    * Create the Referrer Account
-   * 
-   * @param averClient 
-   * @param host 
-   * @param owner 
-   * @param feePayer 
-   * @param sendOptions 
-   * @param manualMaxRetry 
-   * @param programId 
-   * 
+   *
+   * @param averClient
+   * @param host
+   * @param owner
+   * @param feePayer
+   * @param sendOptions
+   * @param manualMaxRetry
+   * @param programId
+   *
    * @returns {Promise<string>}
    */
   static async createReferrerAccount(
@@ -96,7 +111,7 @@ export class Referrer {
     )
 
     return signAndSendTransactionInstructions(
-      averClient.connection,
+      averClient,
       [owner, feePayer],
       feePayer,
       [ix],
@@ -108,13 +123,13 @@ export class Referrer {
   // TODO
   /**
    * Format the instruction to collect the revenue share
-   * 
-   * @param averClient 
-   * @param referrer 
-   * @param thirdPartyTokenVault 
-   * @param thirdPartyVaultAuthority 
-   * @param referrerTokenAccount 
-   * @returns 
+   *
+   * @param averClient
+   * @param referrer
+   * @param thirdPartyTokenVault
+   * @param thirdPartyVaultAuthority
+   * @param referrerTokenAccount
+   * @returns
    */
   static makeCollectRevenueShareInstruction(
     averClient: AverClient,
@@ -125,7 +140,7 @@ export class Referrer {
   ) {
     const program = averClient.program
 
-    return program.instruction['referrerCollectRevenueShare']({
+    return program.instruction["referrerCollectRevenueShare"]({
       accounts: {
         referrer: referrer,
         thirdPartyTokenVault: thirdPartyTokenVault,
@@ -139,17 +154,17 @@ export class Referrer {
   // TODO
   /**
    * Collect the revenue share
-   * 
-   * @param averClient 
-   * @param referrer 
-   * @param thirdPartyTokenVault 
-   * @param thirdPartyVaultAuthority 
-   * @param referrerTokenAccount 
-   * @param feePayer 
-   * @param sendOptions 
-   * @param manualMaxRetry 
-   * 
-   * @returns {Promise<string>} 
+   *
+   * @param averClient
+   * @param referrer
+   * @param thirdPartyTokenVault
+   * @param thirdPartyVaultAuthority
+   * @param referrerTokenAccount
+   * @param feePayer
+   * @param sendOptions
+   * @param manualMaxRetry
+   *
+   * @returns {Promise<string>}
    */
   static async collectRevenueShare(
     averClient: AverClient,
@@ -170,7 +185,7 @@ export class Referrer {
     )
 
     return signAndSendTransactionInstructions(
-      averClient.connection,
+      averClient,
       [],
       feePayer,
       [ix],
@@ -179,22 +194,28 @@ export class Referrer {
     )
   }
 
-  private static parseReferrerState(referrerResult: TypeDef<IdlTypeDef, IdlTypes<Idl>>): ReferrerState {
+  private static parseReferrerState(
+    referrerResult: TypeDef<IdlTypeDef, IdlTypes<Idl>>
+  ): ReferrerState {
     return referrerResult as ReferrerState
   }
 
   /**
    * Derive the referrer pubkey based on the owner, host and the program
-   * 
-   * @param owner 
-   * @param host 
-   * @param programId 
-   * 
+   *
+   * @param owner
+   * @param host
+   * @param programId
+   *
    * @returns {Promise<[PublicKey, number]>} The Referrer Public Key
    */
-  static async derivePubkeyAndBump(owner: PublicKey, host = AVER_HOST_ACCOUNT, programId = AVER_PROGRAM_ID) {
+  static async derivePubkeyAndBump(
+    owner: PublicKey,
+    host = AVER_HOST_ACCOUNT,
+    programId = AVER_PROGRAM_ID
+  ) {
     return PublicKey.findProgramAddress(
-      [Buffer.from('referrer', 'utf-8'), host.toBuffer(), owner.toBuffer()],
+      [Buffer.from("referrer", "utf-8"), host.toBuffer(), owner.toBuffer()],
       programId
     )
   }
