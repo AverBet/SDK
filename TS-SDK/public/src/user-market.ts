@@ -30,7 +30,11 @@ import {
 } from "./utils"
 import { Market } from "./market"
 import BN from "bn.js"
-import { AVER_PROGRAM_ID, AVER_HOST_ACCOUNT } from "./ids"
+import {
+  AVER_PROGRAM_ID,
+  AVER_HOST_ACCOUNT,
+  CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE,
+} from "./ids"
 import { UserHostLifetime } from "./user-host-lifetime"
 import { chunk } from "lodash"
 import {
@@ -694,7 +698,7 @@ export class UserMarket {
       checkSufficientLamportBalance(this._userBalanceState)
       checkCorrectUmaMarketMatch(this._userMarketState, this._market)
       checkMarketActivePreEvent(this._market.marketStatus)
-      //checkUHLSelfExcluded() -Requires loading UHL
+      checkUHLSelfExcluded(this.userHostLifetime)
       checkUserMarketFull(this._userMarketState)
       checkLimitPriceError(limitPrice, this._market)
       checkOutcomeOutsideSpace(outcomeIndex, this._market)
@@ -788,7 +792,6 @@ export class UserMarket {
     )
   }
 
-  // need a static method to use for first place order
   /**
    *
    * @param outcomeIndex
@@ -1053,7 +1056,7 @@ export class UserMarket {
           } as AccountMeta)
       )
 
-    const chunkSize = 5
+    const chunkSize = CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
     const chunkedOutcomeIds = chunk(outcomeIdsToCancel, chunkSize)
     const chunkedRemainingAccounts = chunk(remainingAccounts, 4 * chunkSize)
 
@@ -1104,62 +1107,6 @@ export class UserMarket {
           manualMaxRetry
         )
       )
-    )
-  }
-
-  /**
-   * Format instruction to deposit tokens
-   *
-   * @param amount
-   *
-   * @returns {Promise<TransactionInstruction>}
-   */
-  async makeDepositTokensInstruction(amount: BN) {
-    const userQuoteTokenAta = await getAssociatedTokenAddress(
-      this.market.quoteTokenMint,
-      this.user
-    )
-
-    return this._averClient.program.instruction["depositTokens"](amount, {
-      accounts: {
-        user: this.user,
-        userMarket: this.pubkey,
-        userQuoteTokenAta,
-        market: this.market.pubkey,
-        quoteVault: this.market.quoteVault,
-        splTokenProgram: TOKEN_PROGRAM_ID,
-      },
-    })
-  }
-
-  /**
-   * Deposit tokens
-   *
-   * @param owner
-   * @param amount
-   * @param sendOptions
-   * @param manualMaxRetry
-   *
-   * @returns {Promise<string>}
-   */
-  async depositTokens(
-    owner: Keypair = this._averClient.keypair,
-    amount: BN,
-    sendOptions?: SendOptions,
-    manualMaxRetry?: number
-  ) {
-    if (!owner.publicKey.equals(this.user))
-      throw new Error("Owner must be same as user market owner")
-
-    const ix = await this.makeDepositTokensInstruction(amount)
-
-    return signAndSendTransactionInstructions(
-      this._averClient,
-      [],
-      owner,
-      [ix],
-      sendOptions,
-      manualMaxRetry
     )
   }
 
@@ -1292,62 +1239,6 @@ export class UserMarket {
     )
   }
 
-  // NOT TESTED
-  /**
-   * Format instruction to collect funds from the User Market
-   *
-   * @returns {Promise<string>}
-   */
-  async makeCollectInstruction() {
-    const userQuoteTokenAta = await getAssociatedTokenAddress(
-      this.market.quoteTokenMint,
-      this.user
-    )
-
-    return this._averClient.program.instruction["collect"](true, {
-      accounts: {
-        market: this.market.pubkey,
-        userMarket: this.pubkey,
-        user: this.user,
-        userQuoteTokenAta,
-        quoteVault: this.market.quoteVault,
-        vaultAuthority: this.market.vaultAuthority,
-        splTokenProgram: TOKEN_PROGRAM_ID,
-      },
-    })
-  }
-
-  // NOT TESTED
-  /**
-   * Collect funds from the User Market
-   *
-   * @param owner
-   * @param sendOptions
-   * @param manualMaxRetry
-   *
-   * @returns {Promise<string>}
-   */
-  async collect(
-    owner: Keypair = this._averClient.keypair,
-    sendOptions?: SendOptions,
-    manualMaxRetry?: number
-  ) {
-    if (!owner.publicKey.equals(this.user))
-      throw new Error("Owner must be same as user market owner")
-
-    const ix = await this.makeCollectInstruction()
-
-    return signAndSendTransactionInstructions(
-      this._averClient,
-      [],
-      owner,
-      [ix],
-      sendOptions,
-      manualMaxRetry
-    )
-  }
-
-  // NOT TESTED
   async loadUserMarketListener(callback: (userMarket: UserMarket) => void) {
     const ee = this._averClient.program.account["userMarket"].subscribe(
       this.pubkey
@@ -1379,7 +1270,6 @@ export class UserMarket {
     )
   }
 
-  // NOT TESTED
   /**
    * Calculate funds available to collect based on the winning outcome
    *

@@ -53,7 +53,6 @@ export class AverClient {
    *
    * @param {Connection} connection Solana Client Object
    * @param {PublicKey | null} owner Public Key to pay transaction costs
-   * @param {string} averApiEndpoint
    * @param {PublicKey} averProgramId Program public key. Defaults to AVER_PROGRAM_ID.
    * @returns {AverClient | null} The Aver Client object or null if unsuccesful
    */

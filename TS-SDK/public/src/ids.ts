@@ -95,3 +95,5 @@ export const getAverLaunchZeroFeesToken = (solanaNetwork: SolanaNetwork) =>
 
 // other constants
 export const CALLBACK_INFO_LEN = 33
+
+export const CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE = 5
