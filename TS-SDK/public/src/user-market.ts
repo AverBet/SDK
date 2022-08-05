@@ -60,18 +60,22 @@ export class UserMarket {
 
   private _userBalanceState: UserBalanceState
 
+  private _userHostLifetime: UserHostLifetime
+
   private constructor(
     averClient: AverClient,
     pubkey: PublicKey,
     userMarketState: UserMarketState,
     market: Market,
-    userBalanceState: UserBalanceState
+    userBalanceState: UserBalanceState,
+    userHostLifetime: UserHostLifetime
   ) {
     this._userMarketState = userMarketState
     this._pubkey = pubkey
     this._averClient = averClient
     this._market = market
     this._userBalanceState = userBalanceState
+    this._userHostLifetime = userHostLifetime
   }
 
   /**
@@ -100,7 +104,8 @@ export class UserMarket {
       host,
       programId
     )
-    return UserMarket.loadByUma(averClient, uma, market)
+    const uhl = UserHostLifetime.derivePubkeyAndBump(umaOwner, host, programId)
+    return UserMarket.loadByUma(averClient, uma, market, uhl)
   }
 
   /**
@@ -115,11 +120,14 @@ export class UserMarket {
   static async loadByUma(
     averClient: AverClient,
     pubkey: PublicKey,
-    market: Market
+    market: Market,
+    uhl: PublicKey
   ) {
     const program = averClient.program
 
     const userMarketResult = await program.account["userMarket"].fetch(pubkey)
+
+    const uhlAccount = await UserHostLifetime.load(averClient, uhl)
 
     const userMarketState = UserMarket.parseUserMarketState(userMarketResult)
 
@@ -144,7 +152,8 @@ export class UserMarket {
       pubkey,
       userMarketState,
       market,
-      userBalanceState
+      userBalanceState,
+      uhlAccount
     )
   }
 
@@ -161,20 +170,31 @@ export class UserMarket {
   static async loadMultiple(
     averClient: AverClient,
     markets: Market[],
-    owner?: PublicKey,
+    owners?: PublicKey[],
     host: PublicKey = AVER_HOST_ACCOUNT,
     programId: PublicKey = AVER_PROGRAM_ID
   ) {
-    const umaOwner = owner || averClient.owner
+    const umaOwners = owners || Array(markets.length).fill(averClient.owner)
 
     const umasAndBumps = await Promise.all(
-      markets.map((m) =>
-        UserMarket.derivePubkeyAndBump(umaOwner, m.pubkey, host, programId)
+      markets.map((m, i) =>
+        UserMarket.derivePubkeyAndBump(umaOwners[i], m.pubkey, host, programId)
       )
     )
     const umasPubkeys = umasAndBumps.map((u) => u[0])
+    const uhlPubkeysAndBumps = await Promise.all(
+      umaOwners?.map((o) =>
+        UserHostLifetime.derivePubkeyAndBump(o, host, programId)
+      )
+    )
+    const uhlPubkeys = uhlPubkeysAndBumps.map((u) => u[0])
 
-    return UserMarket.loadMultipleByUma(averClient, umasPubkeys, markets)
+    return UserMarket.loadMultipleByUma(
+      averClient,
+      umasPubkeys,
+      markets,
+      uhlPubkeys
+    )
   }
 
   /**
@@ -188,13 +208,15 @@ export class UserMarket {
   static async loadMultipleByUma(
     averClient: AverClient,
     pubkeys: PublicKey[],
-    markets: Market[]
+    markets: Market[],
+    uhls: PublicKey[]
   ) {
     const program = averClient.program
 
     const userMarketResult = await program.account["userMarket"].fetchMultiple(
       pubkeys
     )
+    const uhlAccounts = await UserHostLifetime.loadMultiple(averClient, uhls)
     const userMarketStates = userMarketResult.map((umr) =>
       umr ? UserMarket.parseUserMarketState(umr) : null
     )
@@ -228,7 +250,8 @@ export class UserMarket {
             pubkeys[i],
             ums,
             markets[i],
-            userBalances[i]
+            userBalances[i],
+            uhlAccounts[i]
           )
         : undefined
     )
@@ -418,7 +441,7 @@ export class UserMarket {
       )
     }
 
-    await UserHostLifetime.getOrCreateUserHostLifetime(
+    const uhl = await UserHostLifetime.getOrCreateUserHostLifetime(
       averClient,
       owner,
       sendOptions,
@@ -447,7 +470,8 @@ export class UserMarket {
     const userMarketAccount = await UserMarket.loadByUma(
       averClient,
       userMarket,
-      market
+      market,
+      uhl.pubkey
     )
 
     return userMarketAccount
@@ -503,7 +527,8 @@ export class UserMarket {
         ordAcc?.flatMap((acc) => [acc.bids, acc.asks])
       ),
       userMarkets.map((u) => u.pubkey),
-      userMarkets.map((u) => u.user)
+      userMarkets.map((u) => u.user),
+      userMarkets.map((u) => u._userHostLifetime.pubkey)
     )
 
     const newMarkets = Market.getMarketsFromAccountStates(
@@ -521,7 +546,8 @@ export class UserMarket {
             userMarkets[i].pubkey,
             userMarketState,
             newMarkets[i],
-            multipleAccountStates.userBalanceStates[i]
+            multipleAccountStates.userBalanceStates[i],
+            multipleAccountStates.userHostLifetimes[i]
           )
         : undefined
     )
@@ -606,7 +632,7 @@ export class UserMarket {
   }
 
   get userHostLifetime() {
-    return this._userMarketState.userHostLifetime
+    return this._userHostLifetime
   }
 
   get lamportBalance() {

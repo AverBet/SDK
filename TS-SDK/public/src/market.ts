@@ -33,6 +33,7 @@ import {
   UserBalanceState,
   UserMarketState,
 } from "./types"
+import { UserHostLifetime } from "./user-host-lifetime"
 import { UserMarket } from "./user-market"
 import { chunkAndFetchMultiple } from "./utils"
 
@@ -256,13 +257,15 @@ export class Market {
     marketStorePubkeys: PublicKey[] = [],
     slabPubkeys: PublicKey[] = [],
     userMarketPubkeys: PublicKey[] = [],
-    userPubkeys: PublicKey[] = []
+    userPubkeys: PublicKey[] = [],
+    userHostLifetimePubkeys: PublicKey[] = []
   ): Promise<{
     marketStates: (MarketState | null)[]
     marketStoreStates: (MarketStoreState | null)[]
     slabs: (Slab | null)[]
     userMarketStates: (UserMarketState | null)[]
     userBalanceStates: UserBalanceState[]
+    userHostLifetimes: UserHostLifetime[]
   }> {
     const connection = averClient.connection
 
@@ -278,6 +281,7 @@ export class Market {
       .concat(userMarketPubkeys)
       .concat(userPubkeys)
       .concat(allAtaPubkeys)
+      .concat(userHostLifetimePubkeys)
 
     const accountsData = await chunkAndFetchMultiple(connection, allPubkeys)
 
@@ -313,15 +317,32 @@ export class Market {
       )
 
     const lamportBalances: number[] = accountsData
-      .slice(-userPubkeys.length * 2, -userPubkeys.length)
+      .slice(
+        -userPubkeys.length * 2 + userHostLifetimePubkeys.length,
+        -userPubkeys.length + userHostLifetimePubkeys.length
+      )
       .map((info) => info?.lamports || 0)
 
     const tokenBalances = accountsData
-      .slice(-userPubkeys.length)
+      .slice(
+        -userPubkeys.length + userHostLifetimePubkeys.length,
+        -userPubkeys.length
+      )
       .map((info) =>
         info?.data?.length == ACCOUNT_SIZE
           ? Number(AccountLayout.decode(info.data).amount)
           : 0
+      )
+
+    const userHostLifetimes = accountsData
+      .slice(-userHostLifetimePubkeys.length)
+      .map(
+        (info, i) =>
+          new UserHostLifetime(
+            averClient,
+            userHostLifetimePubkeys[i],
+            UserHostLifetime.parseHostState(info.data)
+          )
       )
 
     const userBalanceStates: UserBalanceState[] = lamportBalances.map(
@@ -337,6 +358,7 @@ export class Market {
       slabs: deserializedSlabsData,
       userMarketStates: deserializedUserMarketData,
       userBalanceStates,
+      userHostLifetimes: userHostLifetimes,
     }
   }
 

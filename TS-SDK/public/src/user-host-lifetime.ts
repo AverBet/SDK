@@ -57,6 +57,30 @@ export class UserHostLifetime {
   }
 
   /**
+   * Load the User Host Lifetime Account
+   *
+   * @param averClient
+   * @param pubkeys
+   *
+   * @returns {Promise<UserHostLifetime[]>}
+   */
+  static async loadMultiple(averClient: AverClient, pubkeys: PublicKey[]) {
+    const program = averClient.program
+    const userHostLifetimeResult = await program.account[
+      "userHostLifetime"
+    ].fetchMultiple(pubkeys.map((p) => p.toBase58()))
+
+    const userHostLifetimeStates = userHostLifetimeResult.map((r) =>
+      r ? UserHostLifetime.parseHostState(r) : null
+    )
+
+    return userHostLifetimeStates.map((s, i) => {
+      if (!s) throw new Error("User Host Lifetime account is null")
+      return new UserHostLifetime(averClient, pubkeys[i], s)
+    })
+  }
+
+  /**
    * Formats the instruction to create the User Host Lifetime Account
    *
    * @param averClient

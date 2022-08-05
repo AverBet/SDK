@@ -232,7 +232,6 @@ export class Orderbook {
       : l2Depth
   }
 
-  //TEST THIS
   /**
    *
    * @param slab
