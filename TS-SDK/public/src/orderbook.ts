@@ -253,8 +253,8 @@ export class Orderbook {
       orders.push({
         id: node.key,
         price: isInverted
-          ? (10 ** 9 - node.getPrice()) * 10 ** -9
-          : node.getPrice(),
+          ? 1 - node.getPrice() / 2 ** 32
+          : node.getPrice() / 2 ** 32,
         base_quantity: node.baseQuantity,
         base_quantity_ui: node.baseQuantity * 10 ** -decimals,
         // user_market: new PublicKey(node.callBackInfoPt[0 - 32]), //TODO - CHECK THIS
@@ -262,10 +262,6 @@ export class Orderbook {
       } as SlabOrder)
     }
     return orders
-  }
-
-  static getPriceFromSlab(node: LeafNode, decimals: number) {
-    return Math.round(((node.key >> 64) / 2 ** 32) * 10 ** decimals)
   }
 
   /**
