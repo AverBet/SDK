@@ -54,7 +54,7 @@ export class AverClient {
    * @param {Connection} connection Solana Client Object
    * @param {PublicKey | null} owner Public Key to pay transaction costs
    * @param {PublicKey} averProgramId Program public key. Defaults to AVER_PROGRAM_ID.
-   * @returns {AverClient | null} The Aver Client object or null if unsuccesful
+   * @returns {AverClient} The Aver Client object
    */
   static async loadAverClient(
     connection: Connection,
@@ -95,7 +95,7 @@ export class AverClient {
       return new AverClient(program, averApiEndpoint, solanaNetwork, keypair)
     }
 
-    return null
+    throw new Error("Client could not be loaded")
   }
 
   get connection() {

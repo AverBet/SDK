@@ -5,7 +5,15 @@ import { Connection, Keypair, ConfirmOptions, PublicKey } from "@solana/web3.js"
 import axios from "axios"
 import { AverClient } from "./aver-client"
 import { AVER_PROGRAM_ID, getAverApiEndpoint, getSolanaEndpoint } from "./ids"
-import { SolanaNetwork } from "./types"
+import { Market } from "./market"
+import {
+  MarketStatus,
+  OrderType,
+  Side,
+  SizeFormat,
+  SolanaNetwork,
+} from "./types"
+import { UserMarket } from "./user-market"
 
 // ----------------------------------------------------
 //    DEVNET AVER INTERACTION EXAMPLE
@@ -112,6 +120,197 @@ async function main() {
   const marketPubkeys = allMarkets.data
     .filter((d) => d.internal_status === "active")
     .map((d) => new PublicKey(d.pubkey))
+
+  // ----------------------------------------------------
+  //    LOAD THE AVERMARKET IN-MEMORY
+  // ----------------------------------------------------
+  // An AverMarket object can be initialized using only an AverClient and the PublicKey of a valid market
+  // This must be awaited, as the class will autopopulate state from all of the related
+  //  on-chain accounts which make up this market.
+
+  //Loads market data from onchain
+  const loadedMarkets = await Market.loadMultiple(client, marketPubkeys)
+  //Ensure market is in ACTIVE_PRE_EVENT status so we can place orders on it
+  //Also make sure the market is not past its trading cease time
+  const activePreEventMarkets = loadedMarkets
+    .filter((m) => m?.marketStatus === MarketStatus.ActivePreEvent)
+    .filter((m) =>
+      m?.tradingCeaseTime ? m?.tradingCeaseTime > new Date(Date.now()) : true
+    )
+  let market = activePreEventMarkets[0]
+
+  if (!market) throw new Error("Market is undefined")
+
+  // console.log market data or specific properties
+  console.log("-".repeat(10))
+  console.log(`Market ${market?.pubkey} loaded...`)
+  console.log(`Market name: ${market?.name}`)
+  market?.outcomeNames.map((o, i) => {
+    console.log(` - ${i} - ${o}`)
+  })
+  console.log("-".repeat(10))
+  console.log("Market status:")
+  console.log(market.marketStatus)
+
+  // console.log one or more of the orderbooks or orderbook properties from memory
+  if (!market.orderbooks || !market.orderbooks[0])
+    throw new Error("Orderbooks don't exist")
+
+  const outcome1Orderbook = market.orderbooks[0]
+  console.log("Best Ask Price", outcome1Orderbook.getBestAskPrice(true))
+  console.log("Best Bid Price", outcome1Orderbook.getBestBidPrice(true))
+
+  // ----------------------------------------------------
+  //    INITIALIZE (OR LOAD) A USER-MARKET ACCOUNT
+  //                  FOR THIS MARKET
+  // ----------------------------------------------------
+  // A User-Market Account (UMA) stores a given wallets matched and
+  //  unmatched orders on-chain
+  // A UMA must be initialized before a user can interact with a
+  //  market, so that their bets and orders can be stored.
+  // If required, this method will also initialized a User-Host-Lifetime
+  //  account (UHLA) if necessary automatically.
+  // There are some optional parameters to consider when initializing
+  //  a UMA - for example, allocating a particular number of slots
+  //  for how many unmatched orders can remain open in this market
+  //  at the same time. (e.g. a typicla user may only need a few,
+  //  while a market maker may wish to have capacity to place
+  //  several orders per outcome and side.)
+
+  const uma = await UserMarket.getOrCreateUserMarketAccount(
+    client,
+    ownerKeypair,
+    market,
+    undefined,
+    undefined,
+    undefined,
+    3 * market.numberOfOutcomes // Optional argument
+  )
+  console.log("-".repeat(10))
+  console.log(`UMA created at pubkey ${uma.pubkey}`)
+
+  // ----------------------------------------------------
+  //                 PLACE AN ORDER
+  // ----------------------------------------------------
+  // The UMA object can now be used to interact with the market.
+  // Actions like placing and order can be called on the UMA object
+  // Familiarize yourself with the list and format arguments
+  //  for the place_order() method can accomodate.
+  // Some additional example of different formats are provided
+  //  and have been commmented out.
+
+  // This order a BUY side on outcome 1 at a price of 0.5 and size 10
+  const txn_signature = await uma.placeOrder(
+    ownerKeypair, // Required in keypair format, as the owned needs to 'sign' this transaction to approve it
+    0, // Specifies which outcome/selection in the market to trade. Outcomes in a given market are indexed 0,1,..,n.
+    Side.Bid, // Whether we wish to buy/back or sell/lay
+    0.05, // Limit price (in probability format - range (0,1))
+    25, // The trade size - specified in size_format (units of payout here)
+    SizeFormat.Payout // The format to specify the trade size. Payout units are the number of dollars that would be returned in a back-win. Stake = Payout * Price (Probability)
+  )
+  //Wait to ensure transaction has been confirmed before moving on
+  await client.connection.confirmTransaction(txn_signature, "confirmed")
+
+  //Another order example - in Decimal Odds and Stake Size
+  //   const decimalPrice = 3.0
+  //   const desiredStake = 10.0
+  //   const txnSignature2 = await uma.placeOrder(
+  //       ownerKeypair,
+  //       1,
+  //       Side.Ask,                                           // Laying/selling
+  //       (1/decimalPrice),                                   // limit_price must be provided as a probability price, but it is easy to convert from decimal or other odds formats
+  //       desiredStake,                                       // Size here is provided as a STAKE, as the size_format is set to STAKE
+  //         SizeFormat.Stake,
+  //       // --- Optional arguments ----
+  //       // send_options = TxOpts(),                                  // Additional control could be exercised in terms of how the transaction is sent or confirmed
+  //       // order_type = OrderType.POST_ONLY,                         // Additional control to specify a particular order_type (i.e. post only in this case)
+  //       // self_trade_behavior = SelfTradeBehavior.CANCEL_PROVIDE,   // Additional control to specify self-trade behavior
+  //       // active_pre_flight_check = True,                           // You can turn off client-side checks if you'd prefer to perform your own validations / attempt transactions which may fail on-chain due to invalid inputs or conditions
+  //   )
+
+  // Another order example - Placing a 'Market Order' - fill up to the size specified at best available price
+
+  // const targetPayoutUnits = 50
+  //   const txnSignature3 = await uma.placeOrder(
+  //      ownerKeypair,
+  //       1,
+  //       Side.Bid,                                            // Buying/backing
+  //       1,
+  //       10,                                            // Setting limit_price = 1 for a BUY/BACK or to 0 for a SELL/LAY for a market order
+  //      targetPayoutUnits,
+  //      undefined,                              // Size here is provided as a PAYOUT, as market orders cannot currently be supported in STAKE format
+  //      SizeFormat.Payout,
+  //       OrderType.Ioc,                                 // A 'market order' (i.e. limit_price or 0 or 1) will only be accpeted if the order_type is IOC of KILL_OR_FILL (to prevent users from inadvertently putting exposed orders on the book)
+  //   )
+
+  // ----------------------------------------------------
+  //                 PLACE AN ORDER
+  // ----------------------------------------------------
+  // The UMA object needs to be refreshed to ensure it
+  //  reflects the latest on-chain state.
+  // Depending on the configuration (speed vs confirmations
+  //  trade-off) it may take some time before some state
+  //  changes show-up. If using 'Confirmed' Commitment, it
+  //  should show up almost immediately.
+  // Refreshing a User Market also automatically refreshes
+  //  the data for the corresponding AverMarket object.
+  // There are a number of tools for efficiently refreshing
+  //  data within the refresh.py file. In particular this
+  //  should be used where a script is trading on multiple
+  //  markets at a time.
+
+  await uma.refresh()
+  market = uma.market
+
+  console.log("-".repeat(10))
+  console.log("UMA after placing order...")
+  console.log("- Unmatched Bets / Open Orders")
+  uma.orders.map((o) => console.log(o))
+  console.log("- Matched exposures")
+  uma.outcomePositions.map((o) => console.log(o))
+
+  // ----------------------------------------------------
+  //             CANCEL AN ORDER / ORDERS
+  // ----------------------------------------------------
+  // The UMA object needs to be refreshed to ensure it
+  //  reflects the latest on-chain state.
+  // There are other methods available for cancelling orders
+  //  in a group. For example, all orders for a market, or
+  //  all orders for an outcome within a market.
+
+  // NOTE: If the earlier order resulted in a complete fill/match
+  //  there may be no residual posted order, and therefore no
+  //  order to cancel. Try adjusting the price to one that won't
+  //  fill/match to demonstrate.
+
+  if (uma.numberOfOrders > 0) {
+    const myOrder = uma.orders[0]
+
+    const signature = await uma.cancelOrder(
+      ownerKeypair,
+      myOrder.orderId,
+      myOrder.outcomeId,
+      undefined, //Default Send Options will be used
+      undefined, //Don't re-try this if it fails
+      true
+    )
+
+    //Wait to ensure transaction has been confirmed before moving on
+    await client.connection.confirmTransaction(signature, "confirmed")
+
+    // Reload the UMA and console.log it out
+    await uma.refresh()
+    market = uma.market
+
+    console.log("-".repeat(10))
+    console.log("UMA after canceling order...")
+    console.log("- Unmatched Bets / Open Orders")
+    uma.orders.map((o) => console.log(o))
+    console.log("- Matched exposures")
+    uma.outcomePositions.map((o) => console.log(o))
+  } else {
+    console.log("No orders to cancel.")
+  }
 }
 
 main()

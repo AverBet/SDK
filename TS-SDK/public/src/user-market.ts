@@ -46,6 +46,7 @@ import {
   checkIsOrderValid,
   checkLimitPriceError,
   checkOrderExists,
+  checkUhlSelfExcluded,
   checkOutcomeHasOrders,
   checkOutcomeOutsideSpace,
   checkQuoteAndBaseSizeTooSmall,
@@ -436,12 +437,21 @@ export class UserMarket {
         lamportBalance: lamportBalance,
         tokenBalance: parseInt(tokenBalance.amount),
       }
+      const uhlPubkey = (
+        await UserHostLifetime.derivePubkeyAndBump(
+          owner.publicKey,
+          host,
+          programId
+        )
+      )[0]
+      const uhlAccount = await UserHostLifetime.load(averClient, uhlPubkey)
       return new UserMarket(
         averClient,
         userMarket,
         userMarketState,
         market,
-        userBalanceState
+        userBalanceState,
+        uhlAccount
       )
     }
 
@@ -668,6 +678,8 @@ export class UserMarket {
     )[0]
     this._market = refreshedUserMarket._market
     this._userMarketState = refreshedUserMarket._userMarketState
+    this._userBalanceState = refreshedUserMarket._userBalanceState
+    this._userHostLifetime = refreshedUserMarket._userHostLifetime
   }
 
   /**
@@ -698,7 +710,7 @@ export class UserMarket {
       checkSufficientLamportBalance(this._userBalanceState)
       checkCorrectUmaMarketMatch(this._userMarketState, this._market)
       checkMarketActivePreEvent(this._market.marketStatus)
-      checkUHLSelfExcluded(this.userHostLifetime)
+      checkUhlSelfExcluded(this.userHostLifetime)
       checkUserMarketFull(this._userMarketState)
       checkLimitPriceError(limitPrice, this._market)
       checkOutcomeOutsideSpace(outcomeIndex, this._market)
@@ -775,7 +787,7 @@ export class UserMarket {
       {
         accounts: {
           user: this.user,
-          userHostLifetime: this.userHostLifetime,
+          userHostLifetime: this.userHostLifetime.pubkey,
           userMarket: this.pubkey,
           userQuoteTokenAta: userQuoteTokenAta,
           market: this.market.pubkey,
@@ -960,7 +972,7 @@ export class UserMarket {
     if (averPreFlightCheck) {
       checkSufficientLamportBalance(this._userBalanceState)
       checkCancelOrderMarketStatus(this._market.marketStatus)
-      checkOrderExists(this._userMarketState, order)
+      checkOrderExists(this._userMarketState, orderId)
     }
 
     // account for binary markets where there is only one order book
@@ -1189,7 +1201,7 @@ export class UserMarket {
       {
         accounts: {
           user: this.user,
-          userHostLifetime: this.userHostLifetime,
+          userHostLifetime: this.userHostLifetime.pubkey,
           userMarket: this.pubkey,
           userQuoteTokenAta: quoteTokenAta,
           market: this.market.pubkey,

@@ -318,14 +318,14 @@ export class Market {
 
     const lamportBalances: number[] = accountsData
       .slice(
-        -userPubkeys.length * 2 + userHostLifetimePubkeys.length,
-        -userPubkeys.length + userHostLifetimePubkeys.length
+        -userPubkeys.length * 2 - userHostLifetimePubkeys.length,
+        -userPubkeys.length - userHostLifetimePubkeys.length
       )
       .map((info) => info?.lamports || 0)
 
     const tokenBalances = accountsData
       .slice(
-        -userPubkeys.length + userHostLifetimePubkeys.length,
+        -userPubkeys.length - userHostLifetimePubkeys.length,
         -userPubkeys.length
       )
       .map((info) =>
@@ -481,6 +481,10 @@ export class Market {
 
   get winningOutcome() {
     return this._marketState.winningOutcome
+  }
+
+  get outcomeNames() {
+    return this._marketState.outcomeNames
   }
 
   get numberOfOutcomes() {

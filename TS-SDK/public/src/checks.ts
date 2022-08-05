@@ -1,3 +1,4 @@
+import { BN } from "@project-serum/anchor"
 import { Market } from "./market"
 import {
   MarketStatus,
@@ -205,8 +206,9 @@ export function checkUserPermissionAndQuoteTokenLimitExceeded(
     )
 
   if (
-    balance_required + user_market_state.netQuoteTokensIn >
-    quote_tokens_limit
+    user_market_state.netQuoteTokensIn
+      .add(new BN(balance_required))
+      .gt(quote_tokens_limit)
   )
     throw Error(
       `This order would lead to the maximum number of tokens for this market being exceeded. Please adjust your order to remain within market limits. Tokens required for this order ${balance_required}; Remaining tokens until limit reached: ${
