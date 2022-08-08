@@ -3,26 +3,45 @@ import { CALLBACK_INFO_LEN } from "./ids"
 import { chunkAndFetchMultiple } from "./utils"
 import { EventQueue } from "@bonfida/aaob"
 
+/**
+ * Loads onchain data for multiple Event Queues
+ *
+ * @param {Connection} conn - Connection object
+ * @param {PublicKey[]} event_queues - Solana AsyncClient object
+ * @returns {Promise<EventQueue[]>} - List of EventQueues
+ */
 export async function loadAllEventQueues(
   conn: Connection,
   event_queues: PublicKey[]
 ): Promise<EventQueue[]> {
   const data = await chunkAndFetchMultiple(conn, event_queues)
   console.log(data)
-  return data.map((d) => readEventQueuFromBytes(d.data))
+  return data.map((d) => readEventQueueFromBytes(d.data))
 }
 
-export function readEventQueuFromBytes(buffer: Buffer) {
+/**
+ * Parses raw event queue data into Event objects
+ *
+ * @param {Bufer} buffer - Raw bytes coming from onchain
+ * @returns {EventQueue} - EventQueue
+ */
+export function readEventQueueFromBytes(buffer: Buffer) {
   const eventQueue = EventQueue.parse(CALLBACK_INFO_LEN, buffer)
 
   return eventQueue
 }
 
 //TODO - Check if this sort fucntion is the same as python
+/**
+ * Sorts list of user accounts by public key (alphabetically)
+ *
+ * @param {PublicKey[]} userAccounts - List of User Account account pubkeys
+ * @returns {PublicKey[]} - Sorted list of User Account account pubkeys
+ */
 export function prepareUserAccountsList(
-  user_account: PublicKey[]
+  userAccounts: PublicKey[]
 ): PublicKey[] {
-  return user_account.sort((a, b) => {
+  return userAccounts.sort((a, b) => {
     return a.toString().localeCompare(b.toString())
   })
 }

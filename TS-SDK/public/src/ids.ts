@@ -78,16 +78,42 @@ export const AVER_LAUNCH_ZERO_FEES_MAINNET = new PublicKey(
 export const MAX_ITERATIONS_FOR_CONSUME_EVENTS = 5
 
 // helpers
+/**
+ * Returns URL for Aver API based on solana network
+ *
+ * @param {SolanaNetwork} solanaNetwork - Solana network
+ * @returns {string} - URL
+ */
 export const getAverApiEndpoint = (solanaNetwork: SolanaNetwork) =>
   solanaNetwork == SolanaNetwork.Devnet
     ? AVER_API_ENDPOINT_DEVNET
     : AVER_API_ENDPOINT_MAINNET
+
+/**
+ * Returns URL for solana endpoint based on solana network
+ *
+ * @param {SolanaNetwork} solanaNetwork - Solana network
+ * @returns {string} - URL
+ */
 export const getSolanaEndpoint = (solanaNetwork: SolanaNetwork) =>
   solanaNetwork == SolanaNetwork.Devnet
     ? SOLANA_ENDPOINT_DEVNET
     : SOLANA_ENDPOINT_MAINNET
+
+/**
+ * Returns default quote token public key based on solana network
+ *
+ * @param {SolanaNetwork} solanaNetwork - Solana network
+ * @returns {PublicKey} - PublicKey
+ */
 export const getQuoteToken = (solanaNetwork: SolanaNetwork) =>
   solanaNetwork == SolanaNetwork.Devnet ? USDC_DEVNET : USDC_MAINNET
+
+/**
+ *
+ * @param {SolanaNetwork} solanaNetwork - Solana network
+ * @returns {PublicKey} - Public key of zero fees token
+ */
 export const getAverLaunchZeroFeesToken = (solanaNetwork: SolanaNetwork) =>
   solanaNetwork == SolanaNetwork.Devnet
     ? AVER_LAUNCH_ZERO_FEES_DEVNET

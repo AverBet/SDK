@@ -38,16 +38,55 @@ import { UserMarket } from "./user-market"
 import { chunkAndFetchMultiple } from "./utils"
 
 export class Market {
+  /**
+   * AverMarket object
+   *
+   * Contains information, references and and orderbooks on a particular market
+   */
+
+  /**
+   * @private
+   * Market pubkey
+   */
   private _pubkey: PublicKey
 
+  /**
+   * @private
+   * MarketState object holding data about the market
+   */
   private _marketState: MarketState
 
+  /**
+   * @private
+   * MarketStoreStateobject holding data about the market required during active trading.
+   *
+   * This does not exist if the market has stopped trading, voided or resolved
+   */
   private _marketStoreState?: MarketStoreState
 
+  /**
+   * @private
+   * Ordered list of Orderbooks for this market.
+   *
+   * Note: Binary (two-outcome) markets only have 1 orderbook on chain.
+   */
   private _orderbooks?: Orderbook[]
 
+  /**
+   * @private
+   * AverClient object
+   */
   private _averClient: AverClient
 
+  /**
+   * Initialise an AverMarket object. Do not use this function; use Market.load() instead.
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {PublicKey} pubkey - Market public key
+   * @param {MarketState} marketState - MarketState object
+   * @param {MarketStoreState} marketStoreState - MarketStoreState object
+   * @param {Orderbook[]} orderbooks - List of Orderbook objects
+   */
   private constructor(
     averClient: AverClient,
     pubkey: PublicKey,
@@ -68,12 +107,14 @@ export class Market {
   }
 
   /**
-   * Load the Aver Market
+   * Initialises an AverMarket object
    *
-   * @param {AverClient} averClient The aver client instance
-   * @param {PublicKey} pubkey The market public key
+   * To refresh data on an already loaded market use refreshMarkets()
    *
-   * @returns {Promise<Market>} the market once it has loaded
+   * @param {AverClient} averClient - AverClient object
+   * @param {PublicKey} pubkey - Market public key
+   *
+   * @returns {Promise<Market>} - AverMarket object
    */
   static async load(averClient: AverClient, pubkey: PublicKey) {
     const program = averClient.program
@@ -117,12 +158,16 @@ export class Market {
   }
 
   /**
-   * Load multiple Aver Markets
+   * Initialises multiple AverMarket objects
    *
-   * @param {AverClient} averClient The aver client instance
-   * @param {PublicKey[]} pubkeys The market public keys
+   * This method is quicker that using Market.load() multiple times
    *
-   * @returns {Promise<(Market |  null)[]>} the markets once they have loaded
+   * To refresh data on already loaded markets use refreshMultipleMarkets()
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {PublicKey[]} pubkeys - List of Market public keys
+   *
+   * @returns {Promise<(Market |  null)[]>} List of AverMarket objects
    */
   static async loadMultiple(
     averClient: AverClient,
@@ -173,12 +218,16 @@ export class Market {
   }
 
   /**
-   * Refresh multiple markets
+   * Refresh all data for multiple markets quickly
    *
-   * @param {AverClient} averClient The aver client instance
-   * @param {Market[]} markets The markets to be refreshed
+   * This function optimizes the calls to the Solana network batching them efficiently so that many can be reloaded in the fewest calls.
    *
-   * @returns {Promise<Market[]>} The refreshed markets
+   * Use instead instead of loadMultiple()
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {Market[]} markets - List of AverMarket objects
+   *
+   * @returns {Promise<Market[]>} - List of refreshed AverMarket objects
    */
   static async refreshMultipleMarkets(
     averClient: AverClient,
@@ -251,6 +300,20 @@ export class Market {
     )
   }
 
+  /**
+   * Fetchs account data for multiple account types at once
+   *
+   * Used to quickly and efficiently pull all account data at once
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {PublicKey[]} marketPubkeys - List of MarketState object public keys
+   * @param {PublicKey[]} marketStorePubkeys - List of MarketStoreStore object public keys
+   * @param {PublicKey[]} slabPubkeys - List of Slab public keys for orderbooks
+   * @param {PublicKey[]} userMarketPubkeys - List of UserMarketState object public keys
+   * @param {PublicKey[]} userPubkeys - List of UserMarket owners' public keys
+   * @param {PublicKey[]} userHostLifetimePubkeys - List of UserHostLifetime public keys
+   * @returns - Object containing loaded accounts
+   */
   static async loadMultipleAccountStates(
     averClient: AverClient,
     marketPubkeys: PublicKey[] = [],
@@ -362,6 +425,13 @@ export class Market {
     }
   }
 
+  /**
+   * Parses onchain data for multiple MarketStore States
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {AccountInfo<Buffer | null>[]} marketsData - Raw bytes coming from onchain
+   * @returns {(MarketState | null)[]} - MarketStore objects
+   */
   private static deserializeMultipleMarketData(
     averClient: AverClient,
     marketsData: AccountInfo<Buffer | null>[]
@@ -376,6 +446,13 @@ export class Market {
     )
   }
 
+  /**
+   * Parses onchain data for multiple MarketStore State
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {AccountInfo<Buffer | null>[]} marketStoresData - Raw bytes coming from onchain
+   * @returns {(MarketStoreState | null)[]} - MarketStoreState objects
+   */
   private static deserializeMultipleMarketStoreData(
     averClient: AverClient,
     marketStoresData: AccountInfo<Buffer | null>[]
@@ -390,18 +467,39 @@ export class Market {
     )
   }
 
+  /**
+   * Parses onchain data for a MarketStore State object
+   *
+   * @param {TypeDef<IdlTypeDef, IdlTypes<Idl>>} marketResult - On chain market result
+   * @returns {MarketState} - MarketState object
+   */
   private static parseMarketState(
     marketResult: TypeDef<IdlTypeDef, IdlTypes<Idl>>
   ): MarketState {
     return marketResult as MarketState
   }
 
+  /**
+   * Parses onchain data for a MarketStoreStore object
+   *
+   * @param {TypeDef<IdlTypeDef, IdlTypes<Idl>>} marketResult - On chain market result
+   * @returns {MarketStoreState} - MarketStoreState object
+   */
   private static parseMarketStoreState(
     marketStoreResult: TypeDef<IdlTypeDef, IdlTypes<Idl>>
   ): MarketStoreState {
     return marketStoreResult as MarketStoreState
   }
 
+  /**
+   * Derives PDA (Program Derived Account) for MarketStore public key.
+   *
+   * MarketStore account addresses are derived deterministically using the market's pubkey.
+   *
+   * @param {PublicKey} marketPubkey - Market public key
+   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   * @returns {PublicKey} - MarketStore public key
+   */
   static async deriveMarketStorePubkeyAndBump(
     marketPubkey: PublicKey,
     programId: PublicKey = AVER_PROGRAM_ID
@@ -412,6 +510,15 @@ export class Market {
     )
   }
 
+  /**
+   * Derives PDA (Program Derived Account) for MarketStore public keys.
+   *
+   * MarketStore account addresses are derived deterministically using the market's pubkey.
+   *
+   * @param {PublicKey[]} marketPubkeys - Markets' public keys
+   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   * @returns {PublicKey[]} - MarketStore public key
+   */
   private static async deriveMarketStorePubkeysAndBump(
     marketPubkeys: PublicKey[],
     programId: PublicKey = AVER_PROGRAM_ID
@@ -426,6 +533,15 @@ export class Market {
     )
   }
 
+  /**
+   * Derives PDA (Program Derived Account)for Quote Vault Authority public key.
+   *
+   * Quote Vault Authority account addresses are derived deterministically using the market's pubkey.
+   *
+   * @param {PublicKey} marketPubkey - Market public key
+   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   * @returns {PublicKey} - Quote Vault Authority public key
+   */
   private static async deriveQuoteVaultAuthorityPubkeyAndBump(
     marketPubkey: PublicKey,
     programId: PublicKey = AVER_PROGRAM_ID
@@ -433,6 +549,15 @@ export class Market {
     return PublicKey.findProgramAddress([marketPubkey.toBuffer()], programId)
   }
 
+  /**
+   * Derives PDA (Program Derived Account)for Quote Vault public key.
+   *
+   * Quote Vault account addresses are derived deterministically using the market's pubkey.
+   *
+   * @param {PublicKey} marketPubkey - Market public key
+   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   * @returns {PublicKey} - Quote Vault public key
+   */
   static async deriveQuoteVaultPubkey(
     marketPubkey: PublicKey,
     network: SolanaNetwork,
@@ -566,7 +691,11 @@ export class Market {
   }
 
   /**
-   * Refresh the Market instance
+   * Refresh all data for an AverMarket quickly
+   *
+   * This function optimizes the calls to the Solana network batching them efficiently so that many can be reloaded in the fewest calls.
+   *
+   * Use instead instead of load()
    */
   async refresh() {
     const market = (
@@ -577,12 +706,24 @@ export class Market {
     this._orderbooks = market._orderbooks
   }
 
+  /**
+   * Loads Market Listener
+   *
+   * @param {(marketState: MarketState) => void} callback - Callback function
+   * @returns
+   */
   async loadMarketListener(callback: (marketState: MarketState) => void) {
     const ee = this._averClient.program.account["market"].subscribe(this.pubkey)
     ee.on("change", callback)
     return ee
   }
 
+  /**
+   * Loads Market Store Listener
+   *
+   * @param {(marketStoreState: MarketStoreState) => void} callback - Callback function
+   * @returns
+   */
   async loadMarketStoreListener(callback: (marketState: MarketState) => void) {
     const ee = this._averClient.program.account["marketStore"].subscribe(
       this.marketStore
@@ -591,6 +732,14 @@ export class Market {
     return ee
   }
 
+  /**
+   * Returns Orderbook objects from Orderbook Account objects, by fetching and parsing.
+   *
+   * @param {Connection} connection - Solana Connection object
+   * @param {(OrderbookAccountsState | undefined)[]} orderbookAccounts - List of orderbook account objects
+   * @param {number[]} decimals - List of decimal precision for each orderbook account state. Variable normally found in MarketState object
+   * @returns {Promise<Orderbook[]>} - List of orderbook objects
+   */
   private static async getOrderbooksFromOrderbookAccounts(
     connection: Connection,
     orderbookAccounts: (OrderbookAccountsState | undefined)[],
@@ -619,6 +768,16 @@ export class Market {
     )
   }
 
+  /**
+   * Returns Orderbook objects from MarketState and MarketStoreStateobjects, by fetching and parsing for multiple markets.
+   *
+   * Use when fetching orderbooks for multiple markets
+   *
+   * @param {Connection} connection - Solana Connection object
+   * @param {(MarketState | null)[]} marketStates - List of MarketState objects
+   * @param {(MarketStoreState | null)[]} marketStoreStates - List of MarketStoreStateobjects
+   * @returns {Promise<(Orderbook[] | undefined)[]>} - List of orderbooks for each market
+   */
   private static async getOrderbooksFromOrderbookAccountsMultipleMarkets(
     connection: Connection,
     marketStates: (MarketState | null)[],
@@ -691,6 +850,18 @@ export class Market {
     return this.marketStatus
   }
 
+  /**
+   * Consume events
+   *
+   * Sends instructions on chain
+   *
+   * @param {number} outcome_idx - Index of the outcome
+   * @param {PublicKey[]} user_accounts - List of User Account public keys
+   * @param {Keypair} payer - Fee payer. Defaults to AverClient wallet.
+   * @param {number} max_iterations - Depth of events to iterate through. Defaults to MAX_ITERATIONS_FOR_CONSUME_EVENTS.
+   * @param {PublicKey} reward_target - Target for reward. Defaults to AverClient wallet
+   * @returns {Promise<string>} - Transaction Signature
+   */
   async consumeEvents(
     outcome_idx: number,
     user_accounts: PublicKey[],
@@ -728,6 +899,16 @@ export class Market {
     )
   }
 
+  /**
+   * Refresh market before cranking
+   *
+   * If no outcome_idx are passed, all outcomes are cranked if they meet the criteria to be cranked.
+   *
+   * @param {Keypair} payer - Fee payer. Defaults to AverClient wallet.
+   * @param {number[]} outcome_idxs - Indices of the outcomes
+   * @param {PublicKey} reward_target - Target for reward. Defaults to AverClient wallet
+   * @returns {Promise<string>} Transaction signature
+   */
   async crankMarket(
     payer: Keypair,
     outcome_idxs?: number[],
@@ -799,6 +980,14 @@ export class Market {
   }
 }
 
+/**
+ * Checks if a market no longer in a trading status, and therefore will have no Orderbook or MarketStore accounts.
+ *
+ * Note: Once trading has ceased for a market, these accounts are closed.
+ *
+ * @param {MarketStatus} marketStatus - Market status (find in MarketState object)
+ * @returns {boolean} - Market status closed
+ */
 export const isMarketStatusClosed = (marketStatus: MarketStatus) =>
   [
     MarketStatus.CeasedCrankedClosed,
@@ -806,11 +995,23 @@ export const isMarketStatusClosed = (marketStatus: MarketStatus) =>
     MarketStatus.Voided,
   ].includes(marketStatus)
 
+/**
+ * Checks if a market no longer in Active
+ *
+ * @param {MarketStatus} marketStatus - Market status (find in MarketState object)
+ * @returns {boolean} - Market status tradeable
+ */
 export const isMarketTradable = (marketStatus: MarketStatus) =>
   [MarketStatus.ActiveInPlay, MarketStatus.ActivePreEvent].includes(
     marketStatus
   )
 
+/**
+ * Checks if it is possible to cancel orders in a market
+ *
+ * @param {MarketStatus} marketStatus - Market status (find in MarketState object)
+ * @returns {boolean} - Market status order cancellable
+ */
 export const canCancelOrderInMarket = (marketStatus: MarketStatus) =>
   [
     MarketStatus.ActiveInPlay,
