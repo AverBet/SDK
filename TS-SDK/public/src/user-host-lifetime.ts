@@ -10,6 +10,7 @@ import {
   PublicKey,
   SendOptions,
   SystemProgram,
+  TransactionInstruction,
 } from "@solana/web3.js"
 import { AverClient } from "./aver-client"
 import { AVER_PROGRAM_ID, AVER_HOST_ACCOUNT } from "./ids"
@@ -20,12 +21,37 @@ import {
 } from "./utils"
 
 export class UserHostLifetime {
+  /**
+   * User data and statistics for a particular host
+   *
+   * Contains aggregated lifetime data on a user's trades for a particular host
+   */
+
+  /**
+   * @private
+   * UserHostLifetime public key
+   */
   private _pubkey: PublicKey
 
+  /**
+   * @private
+   * UserHostLifetimeState object
+   */
   private _userHostLifetimeState: UserHostLifetimeState
 
+  /**
+   * @private
+   * AverClient object
+   */
   private _averClient: AverClient
 
+  /**
+   * Initialise an UserHostLifetime object. Do not use this function; use load() instead
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {PublicKey} pubkey - UserHostLifetime public key
+   * @param {UserHostLifetimeState} userHostLifetimeState - UserHostLifetimeState public key
+   */
   constructor(
     averClient: AverClient,
     pubkey: PublicKey,
@@ -37,12 +63,17 @@ export class UserHostLifetime {
   }
 
   /**
-   * Load the User Host Lifetime Account
+   * Initialises an UserHostLifetime Account (UHLA) object.
    *
-   * @param averClient
-   * @param pubkey
+   * A UHLA is an account which is initialized when a wallet interacts with Aver via a
+   * particular Host for the first time. It is used to store values related to
+   * a wallet's interactions with Aver Markets via this Host. It is required to be
+   * initialized before a wallet can interact with any Markets via a given Host.
    *
-   * @returns {Promise<UserHostLifetime>}
+   * @param {AverClient} averClient - AverClient object
+   * @param {PublicKey} pubkey - UserHostLifetime public key
+   *
+   * @returns {Promise<UserHostLifetime>} UserHostLifetime object
    */
   static async load(averClient: AverClient, pubkey: PublicKey) {
     const program = averClient.program
@@ -57,12 +88,17 @@ export class UserHostLifetime {
   }
 
   /**
-   * Load the User Host Lifetime Account
+   * Initialised multiple UserHostLifetime objects
    *
-   * @param averClient
-   * @param pubkeys
+   * A UHLA is an account which is initialized when a wallet interacts with Aver via a
+   * particular Host for the first time. It is used to store values related to
+   * a wallet's interactions with Aver Markets via this Host. It is required to be
+   * initialized before a wallet can interact with any Markets via a given Host.
    *
-   * @returns {Promise<UserHostLifetime[]>}
+   * @param {AverClient} averClient - AverClient object
+   * @param {PublicKey[]} pubkeys - UserHostLifetime public keys
+   *
+   * @returns {Promise<UserHostLifetime[]>} UserHostLifetime objects
    */
   static async loadMultiple(averClient: AverClient, pubkeys: PublicKey[]) {
     const program = averClient.program
@@ -81,16 +117,18 @@ export class UserHostLifetime {
   }
 
   /**
-   * Formats the instruction to create the User Host Lifetime Account
+   * Creates instruction for UserHostLifetime account creation
    *
-   * @param averClient
-   * @param userQuoteTokenAta
-   * @param owner
-   * @param host
-   * @param referrer
-   * @param programId
+   * Returns TransactionInstruction object only. Does not send transaction.
    *
-   * @returns {Promise<UserHostLifetime>}
+   * @param {PublicKey} averClient - AverClient object
+   * @param {PublicKey} userQuoteTokenAta - Quote token ATA public key (holds funds for this user)
+   * @param {PublicKey} owner - Keypair of owner of UserHostLifetime account. Pays transaction and rent costs
+   * @param {PublicKey} host - Host account public key. Defaults to AVER_HOST_ACCOUNT.
+   * @param {PublicKey} referrer - Referrer account public key. Defaults to SYS_PROGRAM_ID.
+   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   *
+   * @returns {Promise<TransactionInstruction>} TransactionInstruction object
    */
   static async makeCreateUserHostLifetimeInstruction(
     averClient: AverClient,
@@ -135,18 +173,20 @@ export class UserHostLifetime {
   }
 
   /**
-   * Create the User Host Lifetime Account
+   * Creates UserHostLifetime account
    *
-   * @param averClient
-   * @param owner
-   * @param userQuoteTokenAta
-   * @param sendOptions
-   * @param manualMaxRetry
-   * @param host
-   * @param referrer
-   * @param programId
+   * Sends instructions on chain
    *
-   * @returns {Promise<UserHostLifetime>}
+   * @param {AverClient} averClient - AverClient object
+   * @param {Keypair} owner - Keypair of owner of UserHostLifetime account. Pays transaction and rent costs
+   * @param {PublicKey} userQuoteTokenAta - Quote token ATA public key (holds funds for this user)
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction
+   * @param {number} manualMaxRetry - Maximum number of times to retry.
+   * @param {PublicKey} host - Host account public key. Defaults to AVER_HOST_ACCOUNT.
+   * @param {PublicKey} referrer - Referrer account public key. Defaults to SYS_PROGRAM_ID.
+   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   *
+   * @returns {Promise<UserHostLifetime>} Transaction signature
    */
   static async createUserHostLifetime(
     averClient: AverClient,
@@ -178,17 +218,17 @@ export class UserHostLifetime {
   }
 
   /**
-   * Gets the User Host Lifetime account if present, or creates one if not
+   * Attempts to load a UserHostLifetime account and creates one if not found
    *
-   * @param averClient
-   * @param owner
-   * @param sendOptions
-   * @param quoteTokenMint
-   * @param host
-   * @param referrer
-   * @param programId
+   * @param {AverClient} averClient - AverClient object
+   * @param {Keypair} owner - Owner of UserHostLifetime account. Pays transaction and rent costs
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction
+   * @param {PublicKey} quoteTokenMint - Quote token mint public key. Defaults to Defaults to USDC token according to chosen solana network in AverClient.
+   * @param {PublicKey} host - Host account public key. Defaults to AVER_HOST_ACCOUNT
+   * @param {PublicKey} referrer - Referrer account public key. Defaults to SYS_PROGRAM_ID
+   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID
    *
-   * @returns {Promise<UserHostLifetime>}
+   * @returns {Promise<UserHostLifetime>} - UserHostLifetime object
    */
   static async getOrCreateUserHostLifetime(
     averClient: AverClient,
@@ -263,13 +303,15 @@ export class UserHostLifetime {
   }
 
   /**
-   * Derive the User Host Lifetime Public Key based on the owner, host and program
+   * Derives PDA for UserHostLifetime public key
    *
-   * @param owner
-   * @param host
-   * @param programId
+   * MarketStore account addresses are derived deterministically using the owner and host.
    *
-   * @returns {Promise<PublicKey>}
+   * @param owner - Owner of HostLifetime account
+   * @param host - Public key of corresponding Host account. Defaults to AVER_HOST_ACCOUNT.
+   * @param programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   *
+   * @returns {Promise<[PublicKey, number]>} Public key and bump
    */
   static async derivePubkeyAndBump(
     owner: PublicKey,
@@ -377,9 +419,11 @@ export class UserHostLifetime {
   }
 
   /**
-   * Get the Fee Tier Position
+   * Gets user's fee tier position
    *
-   * @returns
+   * This determines the percentage fee taken by the host on winnings
+   *
+   * @returns {FeeTier} FeeTier for user
    */
   getFeeTierPosition() {
     switch (this.lastFeeTierCheck) {

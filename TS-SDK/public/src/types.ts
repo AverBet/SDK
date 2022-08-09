@@ -106,7 +106,6 @@ export type UserMarketState = {
   orders: UmaOrder[]
 }
 
-// custom type
 export type UserBalanceState = {
   lamportBalance: number
   tokenBalance: number
@@ -219,6 +218,7 @@ export enum SizeFormat {
  * Solana Network
  *
  * Currently only DEVNET and MAINNET are available
+ * @enum
  */
 export enum SolanaNetwork {
   Devnet = "devnet",
