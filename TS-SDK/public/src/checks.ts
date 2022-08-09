@@ -1,4 +1,3 @@
-// // PLACE ORDER CHECKS
 import { BN } from "@project-serum/anchor"
 import { Market } from "./market"
 import {
@@ -12,17 +11,20 @@ import {
 import { UserHostLifetime } from "./user-host-lifetime"
 import { roundPriceToNearestTickSize } from "./utils"
 
-//TODO - Waiting on Adi for cost of creating UHL/UMA and add this to calculation
 export function checkSufficientLamportBalance(
   user_balance_state: UserBalanceState
 ) {
   if (user_balance_state.lamportBalance < 5000)
-    throw Error("Payer has insufficient funds")
+    throw Error(
+      `Payer has insufficient lamports. Lamport balance: ${user_balance_state.lamportBalance}`
+    )
 }
 
 export function checkMarketActivePreEvent(market_status: MarketStatus) {
   if (market_status !== MarketStatus.ActivePreEvent)
-    throw Error("Market status is invalid for operation.")
+    throw Error(
+      `The current market status does not permit this action. Market status ${market_status}`
+    )
 }
 
 export function checkUhlSelfExcluded(uhl: UserHostLifetime) {
@@ -33,33 +35,42 @@ export function checkUhlSelfExcluded(uhl: UserHostLifetime) {
 export function checkUserMarketFull(user_market_state: UserMarketState) {
   if (user_market_state.numberOfOrders == user_market_state.maxNumberOfOrders)
     throw Error(
-      "The user account has reached its maximum capacity for open orders."
+      `The UserMarketAccount for this market has reach its maximum capacity for open orders. Open orders: ${user_market_state.numberOfOrders} Slots: ${user_market_state.maxNumberOfOrders}`
     )
 }
 
 export function checkLimitPriceError(limit_price: number, market: Market) {
   const one_in_market_decimals = 10 ** market.decimals
   if (limit_price > one_in_market_decimals)
-    throw Error("Limit price too high for market decimals")
+    throw Error(
+      `Limit prices must be in the range 0 to 1 USDC (0 - 1,000,000). Value provided: ${limit_price}`
+    )
 }
 
 export function checkPriceError(limit_price: number, side: Side) {
-  const error_message =
-    'If buy: price must be strictly greater than zero, sell: price strictly less than 1"'
   if (side == Side.Bid) {
     if (!(limit_price > 0)) {
-      throw Error(error_message)
+      throw Error(
+        `The price provided for a BUY order must be strictly greater than 0. Limit price provided: ${limit_price}`
+      )
     }
   }
 
   if (side == Side.Ask) {
-    if (!(limit_price < 1)) throw Error(error_message)
+    if (!(limit_price < 1))
+      throw Error(
+        `The price provided for a SELL order must be strictly less than 1 USDC (1,000,000). Limit price provided: ${limit_price}`
+      )
   }
 }
 
 export function checkOutcomeOutsideSpace(outcome_id: number, market: Market) {
   if (!(outcome_id >= 0 && outcome_id < market.numberOfOutcomes))
-    throw Error("Given outcome is outside the outcome space for this market")
+    throw Error(
+      `The outcome index provided is not within the outcome space for this market. Outcome index provided: ${outcome_id}; Outcome indices in this market: 0 to ${
+        market.numberOfOutcomes - 1
+      }`
+    )
 }
 
 export function checkIncorrectOrderTypeForMarketOrder(
@@ -73,7 +84,9 @@ export function checkIncorrectOrderTypeForMarketOrder(
     (limit_price == 0 && side == Side.Ask)
   if (market_order) {
     if (order_type != OrderType.KillOrFill && order_type != OrderType.Ioc)
-      throw Error('"Market order type needs to be IOC or KOF')
+      throw Error(
+        `When placing a market order (BUY with price = 1, or SELL with price = 0), the order type must to be IOC or KOF`
+      )
   }
 }
 
@@ -86,7 +99,9 @@ export function checkStakeNoop(
     (limit_price == 1 && side == Side.Bid) ||
     (limit_price == 0 && side == Side.Ask)
   if (size_format == SizeFormat.Stake && market_order)
-    throw Error('The operation is a no-op"')
+    throw Error(
+      `Market orders are currently not supports for orders specified in STAKE.`
+    )
 }
 
 export function checkIsOrderValid(
@@ -105,11 +120,12 @@ export function checkIsOrderValid(
   const current_balance =
     side == Side.Ask ? tokens_available_to_sell : tokens_available_to_buy
 
-  if (current_balance < balance_required) throw Error("")
+  if (current_balance < balance_required)
+    throw Error(
+      `Insufficient token balance to support this order. Balance: ${current_balance}; Required: ${balance_required}`
+    )
 }
 
-//TODO - Please check this function
-//Here one_in_market_decimals has been replaced by 1, as price is not in market decimals
 export function checkQuoteAndBaseSizeTooSmall(
   market: Market,
   side: Side,
@@ -150,16 +166,23 @@ export function checkQuoteAndBaseSizeTooSmall(
     side == Side.Bid &&
     max_base_qty - max_quote_qty < market.minNewOrderQuoteSize
   )
-    throw Error("The quote order size is too small.")
+    throw Error(
+      `The resulting STAKE size for this order is below the market minimum. Stake: ${
+        max_base_qty - max_quote_qty
+      }, Minimum stake: ${market.minNewOrderQuoteSize}`
+    )
 
   if (!binary_second_outcome && max_quote_qty < market.minNewOrderQuoteSize)
-    throw Error("The quote order size is too small.")
+    throw Error(
+      `The resulting STAKE size for this order is below the market minimum. Stake: ${max_quote_qty}, Minimum stake: ${market.minNewOrderQuoteSize}`
+    )
 
   if (max_base_qty < market.minNewOrderBaseSize)
-    throw Error("The base order size is too small.")
+    throw Error(
+      `The resulting PAYOUT size for this order is below the market minimum. Payout: ${max_base_qty}, Minimum payout: ${market.minOrderbookBaseSize}`
+    )
 }
 
-//TODO - check this
 export function checkUserPermissionAndQuoteTokenLimitExceeded(
   market: Market,
   user_market_state: UserMarketState,
@@ -177,17 +200,22 @@ export function checkUserPermissionAndQuoteTokenLimitExceeded(
     quote_tokens_limit = market.maxQuoteTokensIn
   else if (pmf && user_market_state.userVerificationAccount)
     quote_tokens_limit = market.maxQuoteTokensInPermissionCapped
-  else throw Error("Something went wrong with user permissioning")
+  else
+    throw Error(
+      "This wallet does not have the required permissions to interact with this market."
+    )
 
   if (
-    balance_required + user_market_state.netQuoteTokensIn >
-    quote_tokens_limit
+    user_market_state.netQuoteTokensIn
+      .add(new BN(balance_required))
+      .gt(quote_tokens_limit)
   )
-    throw Error("Permissioned quote token limit exceeded")
+    throw Error(
+      `This order would lead to the maximum number of tokens for this market being exceeded. Please adjust your order to remain within market limits. Tokens required for this order ${balance_required}; Remaining tokens until limit reached: ${
+        quote_tokens_limit - user_market_state.netQuoteTokensIn
+      }`
+    )
 }
-
-///////
-// Cancel order
 
 export function checkCorrectUmaMarketMatch(
   user_market_state: UserMarketState,
@@ -208,7 +236,9 @@ export function checkCancelOrderMarketStatus(market_status: MarketStatus) {
   ]
 
   if (invalid_statuses.includes(market_status))
-    throw Error("Market status is invalid for operation")
+    throw Error(
+      `The current market status does not permit this action. Market status ${market_status}`
+    )
 }
 
 export function checkOrderExists(
@@ -219,7 +249,7 @@ export function checkOrderExists(
     if (o.orderId - order_id === 0) return
   }
 
-  throw Error("The specified order has not been found.")
+  throw Error(`'No order at order_id ${order_id} was found for this market.`)
 }
 
 //TODO - Calculate min across free outcome positions
@@ -235,5 +265,5 @@ export function checkOutcomeHasOrders(
     if (o.outcomeId == outcome_id) return
   }
 
-  throw Error("The specified order has not been found.")
+  throw Error(`No open orders found for outcome ${outcome_id} in this market.`)
 }

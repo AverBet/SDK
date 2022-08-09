@@ -26,12 +26,15 @@ import {
 } from "./types"
 import {
   getBestDiscountToken,
-  roundPriceToNearestTickSize,
   signAndSendTransactionInstructions,
 } from "./utils"
-import { canCancelOrderInMarket, isMarketTradable, Market } from "./market"
+import { Market } from "./market"
 import BN from "bn.js"
-import { AVER_PROGRAM_ID, AVER_HOST_ACCOUNT } from "./ids"
+import {
+  AVER_PROGRAM_ID,
+  AVER_HOST_ACCOUNT,
+  CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE,
+} from "./ids"
 import { UserHostLifetime } from "./user-host-lifetime"
 import { chunk } from "lodash"
 import {
@@ -43,51 +46,93 @@ import {
   checkIsOrderValid,
   checkLimitPriceError,
   checkOrderExists,
+  checkUhlSelfExcluded,
   checkOutcomeHasOrders,
   checkOutcomeOutsideSpace,
-  checkOutcomePositionAmountError,
-  checkPriceError,
   checkQuoteAndBaseSizeTooSmall,
   checkStakeNoop,
-  checkUhlSelfExcluded,
   checkUserMarketFull,
   checkUserPermissionAndQuoteTokenLimitExceeded,
 } from "./checks"
 export class UserMarket {
+  /**
+   * Contains data on a user's orders on a particular market (for a particular host)
+   */
+
+  /**
+   * AverClient object
+   * @private
+   */
   private _userMarketState: UserMarketState
 
+  /**
+   * UserMarket public key
+   * @private
+   */
   private _pubkey: PublicKey
 
+  /**
+   * Corresponding Market object
+   * @private
+   */
   private _averClient: AverClient
 
+  /**
+   * UserMarketState object
+   * @private
+   */
   private _market: Market
 
+  /**
+   * UserBalanceState object
+   * @private
+   */
   private _userBalanceState: UserBalanceState
 
+  /**
+   * UserHostLifetime object
+   * @private
+   */
+  private _userHostLifetime: UserHostLifetime
+
+  /**
+   * Initialise an UserMarket object. Do not use this function; use load() instead
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {PublicKey} pubkey - UserMarket public key
+   * @param {UserMarketState} userMarketState - UserMarketState object
+   * @param {Market} market - Market object
+   * @param {UserBalanceState} userBalanceState - UserBalanceState object
+   * @param {UserHostLifetime} userHostLifetime - UserHostLifetime object
+   */
   private constructor(
     averClient: AverClient,
     pubkey: PublicKey,
     userMarketState: UserMarketState,
     market: Market,
-    userBalanceState: UserBalanceState
+    userBalanceState: UserBalanceState,
+    userHostLifetime: UserHostLifetime
   ) {
     this._userMarketState = userMarketState
     this._pubkey = pubkey
     this._averClient = averClient
     this._market = market
     this._userBalanceState = userBalanceState
+    this._userHostLifetime = userHostLifetime
   }
 
   /**
-   * Load the User Market object
+   * Initialises an UserMarket object from Market, Host and Owner public keys
    *
-   * @param averClient
-   * @param market
-   * @param owner
-   * @param host
-   * @param programId
+   * To refresh data on an already loaded UserMarket use refresh()
    *
-   * @returns {Promise<UserMarket>}
+   * @param {AverClient} averClient - AverClient object
+   * @param {Market} market - Corresponding Market object
+   * @param {PublicKey} owner - Owner of UserMarket account
+   * @param {PublicKey} host - Host account public key. Defaults to AVER_HOST_ACCOUNT.
+   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   *
+   * @returns {Promise<UserMarket>} - UserMarket object
    */
   static async load(
     averClient: AverClient,
@@ -104,26 +149,33 @@ export class UserMarket {
       host,
       programId
     )
-    return UserMarket.loadByUma(averClient, uma, market)
+    const uhl = UserHostLifetime.derivePubkeyAndBump(umaOwner, host, programId)
+    return UserMarket.loadByUma(averClient, uma, market, uhl)
   }
 
   /**
-   * Load the User Market object when the Public Key is known
+   * Initialises an UserMarket object from UserMarket account public key
    *
-   * @param averClient
-   * @param pubkey
-   * @param market
+   * To refresh data on an already loaded UserMarket use refresh()
    *
-   * @returns {Promise<UserMarket>}
+   * @param {AverClient} averClient - AverClient object
+   * @param {PublicKey} pubkey - UserMarket account public key
+   * @param {Market} market - AverMarket object or AverMarket public key
+   * @param {PublicKey} uhl - UserHostLifetime account
+   *
+   * @returns {Promise<UserMarket>} - UserMarket object
    */
   static async loadByUma(
     averClient: AverClient,
     pubkey: PublicKey,
-    market: Market
+    market: Market,
+    uhl: PublicKey
   ) {
     const program = averClient.program
 
     const userMarketResult = await program.account["userMarket"].fetch(pubkey)
+
+    const uhlAccount = await UserHostLifetime.load(averClient, uhl)
 
     const userMarketState = UserMarket.parseUserMarketState(userMarketResult)
 
@@ -148,57 +200,78 @@ export class UserMarket {
       pubkey,
       userMarketState,
       market,
-      userBalanceState
+      userBalanceState,
+      uhlAccount
     )
   }
 
   /**
-   * Load Multiple User Markets
+   * Initialises multiple UserMarket objects from Market, Host and Owner public keys
    *
-   * @param averClient
-   * @param markets
-   * @param owner
-   * @param host
-   * @param programId
-   * @returns
+   * This method is more highly optimized and faster than using load() multiple times.
+   *
+   * To refresh data on already loaded UserMarkets use refreshMultipleUserMarkets()
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {Market[]} markets - List of corresponding AverMarket objects (in correct order)
+   * @param {PublicKey[]} owners - List of owners of UserMarket account
+   * @param {PublicKey} host - Host account public key. Defaults to AVER_HOST_ACCOUNT.
+   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   * @returns {Promise<(UserMarket | undefined)[]>} List of UserMarket objects
    */
   static async loadMultiple(
     averClient: AverClient,
     markets: Market[],
-    owner?: PublicKey,
+    owners?: PublicKey[],
     host: PublicKey = AVER_HOST_ACCOUNT,
     programId: PublicKey = AVER_PROGRAM_ID
   ) {
-    const umaOwner = owner || averClient.owner
+    const umaOwners = owners || Array(markets.length).fill(averClient.owner)
 
     const umasAndBumps = await Promise.all(
-      markets.map((m) =>
-        UserMarket.derivePubkeyAndBump(umaOwner, m.pubkey, host, programId)
+      markets.map((m, i) =>
+        UserMarket.derivePubkeyAndBump(umaOwners[i], m.pubkey, host, programId)
       )
     )
     const umasPubkeys = umasAndBumps.map((u) => u[0])
+    const uhlPubkeysAndBumps = await Promise.all(
+      umaOwners?.map((o) =>
+        UserHostLifetime.derivePubkeyAndBump(o, host, programId)
+      )
+    )
+    const uhlPubkeys = uhlPubkeysAndBumps.map((u) => u[0])
 
-    return UserMarket.loadMultipleByUma(averClient, umasPubkeys, markets)
+    return UserMarket.loadMultipleByUma(
+      averClient,
+      umasPubkeys,
+      markets,
+      uhlPubkeys
+    )
   }
 
   /**
-   * Load Multiple User Markets when Public Keys are known
+   * Initialises an multiple UserMarket objects from a list of UserMarket account public keys
    *
-   * @param averClient
-   * @param pubkeys
-   * @param markets
-   * @returns
+   * To refresh data on an already loaded UserMarket use src.refresh.refresh_user_markets()
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {PublicKey[]} pubkeys - List of UserMarket account public keys
+   * @param {Market[]} markets - List of AverMarket objects
+   * @param {PublicKey[]} uhls - List of UserHostLifetime  account public keys
+   * @returns {Promise<(UserMarket | undefined)[]>} List of UserMarket objects
    */
   static async loadMultipleByUma(
     averClient: AverClient,
     pubkeys: PublicKey[],
-    markets: Market[]
+    markets: Market[],
+    uhls: PublicKey[]
   ) {
     const program = averClient.program
 
     const userMarketResult = await program.account["userMarket"].fetchMultiple(
       pubkeys
     )
+    const uhlAccounts = await UserHostLifetime.loadMultiple(averClient, uhls)
     const userMarketStates = userMarketResult.map((umr) =>
       umr ? UserMarket.parseUserMarketState(umr) : null
     )
@@ -232,7 +305,8 @@ export class UserMarket {
             pubkeys[i],
             ums,
             markets[i],
-            userBalances[i]
+            userBalances[i],
+            uhlAccounts[i]
           )
         : undefined
     )
@@ -245,16 +319,18 @@ export class UserMarket {
   }
 
   /**
-   * Format the instruction to create a User Market Account
+   * Creates instruction for UserMarket account creation
    *
-   * @param averClient
-   * @param market
-   * @param owner
-   * @param host
-   * @param numberOfOrders
-   * @param programId
+   * Returns TransactionInstruction object only. Does not send transaction.
    *
-   * @returns {Promise<TransactionInstruction>}
+   * @param {AverClient} averClient - AverClient object
+   * @param {Market} market - Corresponding Market object
+   * @param {PublicKey} owner - Owner of UserMarket account
+   * @param {PublicKey} host - Host account public key. Defaults to AVER_HOST_ACCOUNT.
+   * @param {number} numberOfOrders - Max no. of open orders on UMA. Defaults to 5*number of market outcomes.
+   * @param {PublicKey} programId -  Program public key. Defaults to AVER_PROGRAM_ID.
+   *
+   * @returns {Promise<TransactionInstruction>} - TransactionInstruction object
    */
   static async makeCreateUserMarketAccountInstruction(
     averClient: AverClient,
@@ -319,22 +395,24 @@ export class UserMarket {
   }
 
   /**
-   * Create a User Market Account
+   * Creates UserMarket account
    *
-   * @param averClient
-   * @param market
-   * @param owner
-   * @param sendOptions
-   * @param manualMaxRetry
-   * @param host
-   * @param numberOfOrders
-   * @param programId
-   * @returns
+   * Sends instructions on chain
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {Market} market - Corresponding Market object
+   * @param {Keypair} owner - Owner of UserMarket account. Defaults to AverClient wallet
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction. Defaults to None.
+   * @param {number} manualMaxRetry - No. of times to retry in case of failure
+   * @param {PublicKey} host - Host account public key. Defaults to AVER_HOST_ACCOUNT.
+   * @param {number} numberOfOrders - Max no. of open orders on UMA. Defaults to 5*number of market outcomes.
+   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   * @returns {Promise<String>} Transaction signature
    */
   static async createUserMarketAccount(
     averClient: AverClient,
     market: Market,
-    owner: Keypair,
+    owner: Keypair = averClient.keypair,
     sendOptions?: SendOptions,
     manualMaxRetry?: number,
     host: PublicKey = AVER_HOST_ACCOUNT,
@@ -362,23 +440,23 @@ export class UserMarket {
   }
 
   /**
-   * Get a User Market Account, or create one if not present
+   * Attempts to load UserMarket object or creates one if not one is not found
    *
-   * @param averClient
-   * @param owner
-   * @param market
-   * @param sendOptions
-   * @param quoteTokenMint
-   * @param host
-   * @param numberOfOrders
-   * @param referrer
-   * @param programId
+   * @param {AverClient} averClient - AverClient object
+   * @param {Keypair} owner - Owner of UserMarket account. Defaults to AverClient wallet
+   * @param {Market} market - Corresponding AverMarket object
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction
+   * @param {PublicKey} quoteTokenMint - ATA token mint public key. Defaults to USDC token according to Aver Client.
+   * @param {PublicKey} host - Host account public key. Defaults to AVER_HOST_ACCOUNT.
+   * @param {number} numberOfOrders - Max no. of open orders on UMA. Defaults to 5*number of market outcomes.
+   * @param {PublicKey} referrer - Referrer account public key. Defaults to SYS_PROGRAM_ID.
+   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
    *
-   * @returns {Promise<UserMarket>}
+   * @returns {Promise<UserMarket>} - UserMarket account object
    */
   static async getOrCreateUserMarketAccount(
     averClient: AverClient,
-    owner: Keypair,
+    owner: Keypair = averClient.keypair,
     market: Market,
     sendOptions?: SendOptions,
     quoteTokenMint: PublicKey = averClient.quoteTokenMint,
@@ -413,16 +491,25 @@ export class UserMarket {
         lamportBalance: lamportBalance,
         tokenBalance: parseInt(tokenBalance.amount),
       }
+      const uhlPubkey = (
+        await UserHostLifetime.derivePubkeyAndBump(
+          owner.publicKey,
+          host,
+          programId
+        )
+      )[0]
+      const uhlAccount = await UserHostLifetime.load(averClient, uhlPubkey)
       return new UserMarket(
         averClient,
         userMarket,
         userMarketState,
         market,
-        userBalanceState
+        userBalanceState,
+        uhlAccount
       )
     }
 
-    await UserHostLifetime.getOrCreateUserHostLifetime(
+    const uhl = await UserHostLifetime.getOrCreateUserHostLifetime(
       averClient,
       owner,
       sendOptions,
@@ -451,19 +538,20 @@ export class UserMarket {
     const userMarketAccount = await UserMarket.loadByUma(
       averClient,
       userMarket,
-      market
+      market,
+      uhl.pubkey
     )
 
     return userMarketAccount
   }
 
   /**
-   * Desearealise multiple User Market Stores Data
+   * Parses onchain data for multiple UserMarketState objects
    *
-   * @param averClient
-   * @param userMarketStoresData
+   * @param {AverClient} averClient - AverClient object
+   * @param {AccountInfo<Buffer | null>[]} userMarketStoresData - Raw bytes coming from onchain
    *
-   * @returns {(UserMarketState | null)[]}
+   * @returns {(UserMarketState | null)[]} - UserMarketState objects
    */
   static deserializeMultipleUserMarketStoreData(
     averClient: AverClient,
@@ -480,12 +568,16 @@ export class UserMarket {
   }
 
   /**
-   * Refresh Multiple User Markets
+   * Refresh all data for multiple user markets quickly
    *
-   * @param averClient
-   * @param userMarkets
+   * This function optimizes the calls to the Solana network batching them efficiently so that many can be reloaded in the fewest calls.
    *
-   * @returns {Promise<(UserMarket | null)[]>}
+   * Also refreshes the underlying AverMarket objects
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {UserMarket[]} userMarkets - List of UserMarket objects
+   *
+   * @returns {Promise<(UserMarket | null)[]>} - List of refreshed UserMarket objects
    */
   static async refreshMultipleUserMarkets(
     averClient: AverClient,
@@ -507,7 +599,8 @@ export class UserMarket {
         ordAcc?.flatMap((acc) => [acc.bids, acc.asks])
       ),
       userMarkets.map((u) => u.pubkey),
-      userMarkets.map((u) => u.user)
+      userMarkets.map((u) => u.user),
+      userMarkets.map((u) => u._userHostLifetime.pubkey)
     )
 
     const newMarkets = Market.getMarketsFromAccountStates(
@@ -525,20 +618,21 @@ export class UserMarket {
             userMarkets[i].pubkey,
             userMarketState,
             newMarkets[i],
-            multipleAccountStates.userBalanceStates[i]
+            multipleAccountStates.userBalanceStates[i],
+            multipleAccountStates.userHostLifetimes[i]
           )
         : undefined
     )
   }
 
   /**
-   * Derive the User Market Pubkey based on the Owner, Market, Host and program
+   * Derives PDA (Program Derived Account) for UserMarket public key given a user, host and market
    *
-   * @param owner
-   * @param market
-   * @param host
-   * @param programId
-   * @returns
+   * @param {PublicKey} owner - Owner of UserMarket account
+   * @param {PublicKey} market - Corresponding Market account public key
+   * @param {PublicKey} host - Host public key
+   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   * @returns {Promise<[PublicKey, number]>} UserMarket Pubkey and bump
    */
   static async derivePubkeyAndBump(
     owner: PublicKey,
@@ -610,7 +704,7 @@ export class UserMarket {
   }
 
   get userHostLifetime() {
-    return this._userMarketState.userHostLifetime
+    return this._userHostLifetime
   }
 
   get lamportBalance() {
@@ -632,7 +726,11 @@ export class UserMarket {
   }
 
   /**
-   * Refresh the User Market object
+   * Refresh all data for a user markets quickly
+   *
+   * This function optimizes the calls to the Solana network batching them efficiently so that many can be reloaded in the fewest calls.
+   *
+   * Also refreshes the underlying AverMarket object
    */
   async refresh() {
     const refreshedUserMarket = (
@@ -642,21 +740,25 @@ export class UserMarket {
     )[0]
     this._market = refreshedUserMarket._market
     this._userMarketState = refreshedUserMarket._userMarketState
+    this._userBalanceState = refreshedUserMarket._userBalanceState
+    this._userHostLifetime = refreshedUserMarket._userHostLifetime
   }
 
   /**
-   * Format the instruction to place an order
+   * Creates instruction to place order.
    *
-   * @param outcomeIndex
-   * @param side
-   * @param limitPrice
-   * @param size
-   * @param sizeFormat
-   * @param orderType
-   * @param selfTradeBehavior
-   * @param averPreFlightCheck
+   * Returns TransactionInstruction object only. Does not send transaction.
    *
-   * @returns {Promise<TransactionInstruction>}
+   * @param {number} outcomeIndex - ID of outcome
+   * @param {Side} side - Side object (bid or ask)
+   * @param {number} limitPrice - Limit price - in probability format i.e. in the range (0, 1). If you are using Decimal or other odds formats you will need to convert these prior to passing as an argument
+   * @param {number} size - Size - in the format specified in size_format. This value is in number of 'tokens' - i.e. 20.45 => 20.45 USDC, the SDK handles the conversion to u64 token units (e.g. to 20,450,000 as USDC is a 6 decimal place token)
+   * @param {SizeFormat} sizeFormat - SizeFormat object (Stake or Payout)
+   * @param {OrderType} orderType - OrderType object. Defaults to OrderType.LIMIT.
+   * @param {SelfTradeBehavior} selfTradeBehavior - Behavior when a user's trade is matched with themselves. Defaults to SelfTradeBehavior.CANCEL_PROVIDE.
+   * @param {boolean} averPreFlightCheck - Clientside check if order will success or fail. Defaults to False.
+   *
+   * @returns {Promise<TransactionInstruction>} TransactionInstruction object
    */
   async makePlaceOrderInstruction(
     outcomeIndex: number,
@@ -672,7 +774,7 @@ export class UserMarket {
       checkSufficientLamportBalance(this._userBalanceState)
       checkCorrectUmaMarketMatch(this._userMarketState, this._market)
       checkMarketActivePreEvent(this._market.marketStatus)
-      //checkUHLSelfExcluded() -Requires loading UHL
+      checkUhlSelfExcluded(this.userHostLifetime)
       checkUserMarketFull(this._userMarketState)
       checkLimitPriceError(limitPrice, this._market)
       checkOutcomeOutsideSpace(outcomeIndex, this._market)
@@ -749,7 +851,7 @@ export class UserMarket {
       {
         accounts: {
           user: this.user,
-          userHostLifetime: this.userHostLifetime,
+          userHostLifetime: this.userHostLifetime.pubkey,
           userMarket: this.pubkey,
           userQuoteTokenAta: userQuoteTokenAta,
           market: this.market.pubkey,
@@ -766,126 +868,128 @@ export class UserMarket {
     )
   }
 
-  // need a static method to use for first place order
+  //Why are there 2?
+  // /**
+  //  *
+  //  * @param outcomeIndex
+  //  * @param side
+  //  * @param limitPrice
+  //  * @param size
+  //  * @param sizeFormat
+  //  * @param market
+  //  * @param user
+  //  * @param averClient
+  //  * @param userHostLifetime
+  //  * @param umaPubkey
+  //  * @param orderType
+  //  * @param selfTradeBehavior
+  //  * @returns
+  //  */
+  // static async makePlaceOrderInstruction(
+  //   outcomeIndex: number,
+  //   side: Side,
+  //   limitPrice: number,
+  //   size: number,
+  //   sizeFormat: SizeFormat,
+  //   market: Market,
+  //   user: PublicKey,
+  //   averClient: AverClient,
+  //   userHostLifetime: PublicKey,
+  //   umaPubkey: PublicKey,
+  //   orderType: OrderType = OrderType.Limit,
+  //   selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide
+  // ) {
+  //   const sizeU64 = new BN(Math.floor(size * Math.pow(10, market.decimals)))
+  //   const limitPriceU64 = new BN(
+  //     Math.ceil(limitPrice * Math.pow(10, market.decimals))
+  //   )
+  //   // consider when binary markets where there is only one order book
+  //   const orderbookAccountIndex =
+  //     market.numberOfOutcomes == 2 && outcomeIndex == 1 ? 0 : outcomeIndex
+  //   // @ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
+  //   const orderbookAccount = market.orderbookAccounts[orderbookAccountIndex]
+
+  //   const userQuoteTokenAta = await getAssociatedTokenAddress(
+  //     market.quoteTokenMint,
+  //     user
+  //   )
+
+  //   console.log("Placing the order")
+  //   console.log(
+  //     "user:",
+  //     user.toString(),
+  //     "userHostLifetime:",
+  //     userHostLifetime.toString(),
+  //     "userMarket:",
+  //     umaPubkey.toString(),
+  //     "userQuoteTokenAta:",
+  //     userQuoteTokenAta.toString(),
+  //     "market:",
+  //     market.pubkey.toString(),
+  //     "marketStore:",
+  //     market.marketStore.toString(),
+  //     "quoteVault:",
+  //     market.quoteVault.toString(),
+  //     "orderbook:",
+  //     orderbookAccount.orderbook.toString(),
+  //     "bids:",
+  //     orderbookAccount.bids.toString(),
+  //     "asks:",
+  //     orderbookAccount.asks.toString(),
+  //     "eventQueue:",
+  //     orderbookAccount.eventQueue.toString()
+  //   )
+  //   return averClient.program.instruction["placeOrder"](
+  //     {
+  //       size: sizeU64,
+  //       sizeFormat,
+  //       limitPrice: limitPriceU64,
+  //       side: side,
+  //       orderType: orderType,
+  //       selfTradeBehaviour: selfTradeBehavior,
+  //       outcomeId: outcomeIndex,
+  //     },
+  //     {
+  //       accounts: {
+  //         user: user,
+  //         userHostLifetime: userHostLifetime,
+  //         userMarket: umaPubkey,
+  //         userQuoteTokenAta: userQuoteTokenAta,
+  //         market: market.pubkey,
+  //         marketStore: market.marketStore,
+  //         quoteVault: market.quoteVault,
+  //         orderbook: orderbookAccount.orderbook,
+  //         bids: orderbookAccount.bids,
+  //         asks: orderbookAccount.asks,
+  //         eventQueue: orderbookAccount.eventQueue,
+  //         splTokenProgram: TOKEN_PROGRAM_ID,
+  //         systemProgram: SystemProgram.programId,
+  //       },
+  //     }
+  //   )
+  // }
+
   /**
+   * Places a new order
    *
-   * @param outcomeIndex
-   * @param side
-   * @param limitPrice
-   * @param size
-   * @param sizeFormat
-   * @param market
-   * @param user
-   * @param averClient
-   * @param userHostLifetime
-   * @param umaPubkey
-   * @param orderType
-   * @param selfTradeBehavior
-   * @returns
-   */
-  static async makePlaceOrderInstruction(
-    outcomeIndex: number,
-    side: Side,
-    limitPrice: number,
-    size: number,
-    sizeFormat: SizeFormat,
-    market: Market,
-    user: PublicKey,
-    averClient: AverClient,
-    userHostLifetime: PublicKey,
-    umaPubkey: PublicKey,
-    orderType: OrderType = OrderType.Limit,
-    selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide
-  ) {
-    const sizeU64 = new BN(Math.floor(size * Math.pow(10, market.decimals)))
-    const limitPriceU64 = new BN(
-      Math.ceil(limitPrice * Math.pow(10, market.decimals))
-    )
-    // consider when binary markets where there is only one order book
-    const orderbookAccountIndex =
-      market.numberOfOutcomes == 2 && outcomeIndex == 1 ? 0 : outcomeIndex
-    // @ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
-    const orderbookAccount = market.orderbookAccounts[orderbookAccountIndex]
-
-    const userQuoteTokenAta = await getAssociatedTokenAddress(
-      market.quoteTokenMint,
-      user
-    )
-
-    console.log("Placing the order")
-    console.log(
-      "user:",
-      user.toString(),
-      "userHostLifetime:",
-      userHostLifetime.toString(),
-      "userMarket:",
-      umaPubkey.toString(),
-      "userQuoteTokenAta:",
-      userQuoteTokenAta.toString(),
-      "market:",
-      market.pubkey.toString(),
-      "marketStore:",
-      market.marketStore.toString(),
-      "quoteVault:",
-      market.quoteVault.toString(),
-      "orderbook:",
-      orderbookAccount.orderbook.toString(),
-      "bids:",
-      orderbookAccount.bids.toString(),
-      "asks:",
-      orderbookAccount.asks.toString(),
-      "eventQueue:",
-      orderbookAccount.eventQueue.toString()
-    )
-    return averClient.program.instruction["placeOrder"](
-      {
-        size: sizeU64,
-        sizeFormat,
-        limitPrice: limitPriceU64,
-        side: side,
-        orderType: orderType,
-        selfTradeBehaviour: selfTradeBehavior,
-        outcomeId: outcomeIndex,
-      },
-      {
-        accounts: {
-          user: user,
-          userHostLifetime: userHostLifetime,
-          userMarket: umaPubkey,
-          userQuoteTokenAta: userQuoteTokenAta,
-          market: market.pubkey,
-          marketStore: market.marketStore,
-          quoteVault: market.quoteVault,
-          orderbook: orderbookAccount.orderbook,
-          bids: orderbookAccount.bids,
-          asks: orderbookAccount.asks,
-          eventQueue: orderbookAccount.eventQueue,
-          splTokenProgram: TOKEN_PROGRAM_ID,
-          systemProgram: SystemProgram.programId,
-        },
-      }
-    )
-  }
-
-  /**
-   * Place an order
+   * Sends instructions on chain
    *
-   * @param owner
-   * @param outcomeIndex
-   * @param side
-   * @param limitPrice
-   * @param size
-   * @param sizeFormat
-   * @param sendOptions
-   * @param manualMaxRetry
-   * @param orderType
-   * @param selfTradeBehavior
-   * @param averPreFlightCheck
+   * @param {Keypair} owner - Owner of UserMarket account. Pays transaction fees.
+   * @param {number} outcomeIndex - Index of the outcome intended to be traded
+   * @param {Side} side - Side object (bid/back/buy or ask/lay/sell)
+   * @param {number} limitPrice -  Limit price - in probability format i.e. in the range (0, 1). If you are using Decimal or other odds formats you will need to convert these prior to passing as an argument
+   * @param {number} size - Size - in the format specified in size_format. This value is in number of 'tokens' - i.e. 20.45 => 20.45 USDC, the SDK handles the conversion to u64 token units (e.g. to 20,450,000 as USDC is a 6 decimal place token)
+   * @param {SizeFormat} sizeFormat - SizeFormat object (Stake or Payout formats supported)
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction
+   * @param {number} manualMaxRetry - No. of times to retry in case of failure
+   * @param {OrderType} orderType - OrderType object. Defaults to OrderType.LIMIT. Other options include OrderType.IOC, OrderType.KILL_OR_FILL, OrderType.POST_ONLY.
+   * @param {SelfTradeBehavior} selfTradeBehavior - Behavior when a user's trade is matched with themselves. Defaults to SelfTradeBehavior.CANCEL_PROVIDE. Other options include SelfTradeBehavior.DECREMENT_TAKE and SelfTradeBehavior.ABORT_TRANSACTION
+   * @param {boolean} averPreFlightCheck - Clientside check if order will success or fail. Defaults to True.
    *
-   * @returns {Promise<string>}
+   * @returns {Promise<string>} - Transaction signature
    */
   async placeOrder(
-    owner: Keypair,
+    owner: Keypair = this._averClient.keypair,
     outcomeIndex: number,
     side: Side,
     limitPrice: number,
@@ -919,13 +1023,15 @@ export class UserMarket {
   }
 
   /**
-   * Format the instruction to cancel an order
+   * Creates instruction for to cancel order.
    *
-   * @param orderId
-   * @param outcomeIndex
-   * @param averPreFlightCheck
+   * Returns TransactionInstruction object only. Does not send transaction.
    *
-   * @returns {Promise<TransactionInstruction>}
+   * @param {BN} orderId - ID of order to cancel
+   * @param {number} outcomeIndex - ID of outcome
+   * @param {boolean} averPreFlightCheck - Clientside check if order will success or fail. Defaults to False.
+   *
+   * @returns {Promise<TransactionInstruction>} TransactionInstruction object
    */
   makeCancelOrderInstruction(
     orderId: BN,
@@ -935,7 +1041,7 @@ export class UserMarket {
     if (averPreFlightCheck) {
       checkSufficientLamportBalance(this._userBalanceState)
       checkCancelOrderMarketStatus(this._market.marketStatus)
-      checkOrderExists(this._userMarketState, order)
+      checkOrderExists(this._userMarketState, orderId)
     }
 
     // account for binary markets where there is only one order book
@@ -963,19 +1069,21 @@ export class UserMarket {
   }
 
   /**
-   * Cancel an order
+   * Cancels order
    *
-   * @param feePayer
-   * @param orderId
-   * @param outcomeIndex
-   * @param sendOptions
-   * @param manualMaxRetry
-   * @param averPreFlightCheck
+   * Sends instructions on chain
+   *
+   * @param {Keypair} feePayer - Keypair to pay fee for transaction. Defaults to AverClient wallet
+   * @param {BN} orderId - ID of order to cancel
+   * @param {number} outcomeIndex - ID of outcome
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction
+   * @param {number} manualMaxRetry - No. of times to retry in case of failure
+   * @param {boolean} averPreFlightCheck - Clientside check if order will success or fail. Defaults to True.
    *
    * @returns {Promise<string>}
    */
   cancelOrder(
-    feePayer: Keypair,
+    feePayer: Keypair = this._averClient.keypair,
     orderId: BN,
     outcomeIndex: number,
     sendOptions?: SendOptions,
@@ -999,12 +1107,16 @@ export class UserMarket {
   }
 
   /**
-   * Format instruction to cancel all orders on given outcomes
+   * Creates instruction for to cancelling all orders
    *
-   * @param outcomeIdsToCancel
-   * @param averPreFlightCheck
+   * Cancels all orders on particular outcome_ids (not by order_id)
    *
-   * @returns {Promise<TransactionInstruction>}
+   * Returns TransactionInstruction object only. Does not send transaction.
+   *
+   * @param {number[]} outcomeIdsToCancel - List of outcome ids to cancel orders on
+   * @param {boolean} averPreFlightCheck - Clientside check if order will success or fail. Defaults to False.
+   *
+   * @returns {Promise<TransactionInstruction>} TransactionInstruction ojbect
    */
   makeCancelAllOrdersInstructions(
     outcomeIdsToCancel: number[],
@@ -1031,7 +1143,7 @@ export class UserMarket {
           } as AccountMeta)
       )
 
-    const chunkSize = 5
+    const chunkSize = CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
     const chunkedOutcomeIds = chunk(outcomeIdsToCancel, chunkSize)
     const chunkedRemainingAccounts = chunk(remainingAccounts, 4 * chunkSize)
 
@@ -1049,18 +1161,20 @@ export class UserMarket {
   }
 
   /**
-   * Cancel all order on given outcomes
+   * Cancels all orders on particular outcome_ids (not by order_id)
    *
-   * @param feePayer
-   * @param outcomeIdsToCancel
-   * @param sendOptions
-   * @param manualMaxRetry
-   * @param averPreFlightCheck
+   * Sends instructions on chain
    *
-   * @returns {Promise<string>}
+   * @param {Keypair} feePayer - Keypair to pay fee for transaction. Defaults to AverClient wallet
+   * @param {number[]} outcomeIdsToCancel - List of outcome ids to cancel orders on
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction. Defaults to None.
+   * @param {number} manualMaxRetry - No. of times to retry in case of failure
+   * @param {boolean} averPreFlightCheck - Clientside check if order will success or fail. Defaults to True.
+   *
+   * @returns {Promise<string>} - Transaction signature
    */
   cancelAllOrders(
-    feePayer: Keypair,
+    feePayer: Keypair = this._averClient.keypair,
     outcomeIdsToCancel: number[],
     sendOptions?: SendOptions,
     manualMaxRetry?: number,
@@ -1085,130 +1199,76 @@ export class UserMarket {
     )
   }
 
-  /**
-   * Format instruction to deposit tokens
-   *
-   * @param amount
-   *
-   * @returns {Promise<TransactionInstruction>}
-   */
-  async makeDepositTokensInstruction(amount: BN) {
-    const userQuoteTokenAta = await getAssociatedTokenAddress(
-      this.market.quoteTokenMint,
-      this.user
-    )
+  // /**
+  //  * Format instruction to withdraw idle funds
+  //  *
+  //  * @param amount
+  //  *
+  //  * @returns {Promise<TransactionInstruction>}
+  //  */
+  // async makeWithdrawIdleFundsInstruction(amount?: BN) {
+  //   const userQuoteTokenAta = await getAssociatedTokenAddress(
+  //     this.market.quoteTokenMint,
+  //     this.user
+  //   )
+  //   const amountToWithdraw = new BN(
+  //     amount || this.calculateFundsAvailableToWithdraw()
+  //   )
 
-    return this._averClient.program.instruction["depositTokens"](amount, {
-      accounts: {
-        user: this.user,
-        userMarket: this.pubkey,
-        userQuoteTokenAta,
-        market: this.market.pubkey,
-        quoteVault: this.market.quoteVault,
-        splTokenProgram: TOKEN_PROGRAM_ID,
-      },
-    })
-  }
-
-  /**
-   * Deposit tokens
-   *
-   * @param owner
-   * @param amount
-   * @param sendOptions
-   * @param manualMaxRetry
-   *
-   * @returns {Promise<string>}
-   */
-  async depositTokens(
-    owner: Keypair,
-    amount: BN,
-    sendOptions?: SendOptions,
-    manualMaxRetry?: number
-  ) {
-    if (!owner.publicKey.equals(this.user))
-      throw new Error("Owner must be same as user market owner")
-
-    const ix = await this.makeDepositTokensInstruction(amount)
-
-    return signAndSendTransactionInstructions(
-      this._averClient,
-      [],
-      owner,
-      [ix],
-      sendOptions,
-      manualMaxRetry
-    )
-  }
+  //   return this._averClient.program.instruction["withdrawTokens"](
+  //     amountToWithdraw,
+  //     {
+  //       accounts: {
+  //         market: this.market.pubkey,
+  //         userMarket: this.pubkey,
+  //         user: this.user,
+  //         userQuoteTokenAta,
+  //         quoteVault: this.market.quoteVault,
+  //         vaultAuthority: this.market.vaultAuthority,
+  //         splTokenProgram: TOKEN_PROGRAM_ID,
+  //       },
+  //     }
+  //   )
+  // }
 
   /**
-   * Format instruction to withdraw idle funds
-   *
-   * @param amount
-   *
-   * @returns {Promise<TransactionInstruction>}
-   */
-  async makeWithdrawIdleFundsInstruction(amount?: BN) {
-    const userQuoteTokenAta = await getAssociatedTokenAddress(
-      this.market.quoteTokenMint,
-      this.user
-    )
-    const amountToWithdraw = new BN(
-      amount || this.calculateFundsAvailableToWithdraw()
-    )
+  //  * Withdraw idle funds from the User Market
+  //  * @param owner
+  //  * @param amount
+  //  * @param sendOptions
+  //  * @param manualMaxRetry
+  //  *
+  //  * @returns {Promise<string>}
+  //  */
+  // async withdrawIdleFunds(
+  //   owner: Keypair = this._averClient.keypair,
+  //   amount?: BN,
+  //   sendOptions?: SendOptions,
+  //   manualMaxRetry?: number
+  // ) {
+  //   if (!owner.publicKey.equals(this.user))
+  //     throw new Error("Owner must be same as user market owner")
 
-    return this._averClient.program.instruction["withdrawTokens"](
-      amountToWithdraw,
-      {
-        accounts: {
-          market: this.market.pubkey,
-          userMarket: this.pubkey,
-          user: this.user,
-          userQuoteTokenAta,
-          quoteVault: this.market.quoteVault,
-          vaultAuthority: this.market.vaultAuthority,
-          splTokenProgram: TOKEN_PROGRAM_ID,
-        },
-      }
-    )
-  }
+  //   const ix = await this.makeWithdrawIdleFundsInstruction(amount)
 
-  /**
-   * Withdraw idle funds from the User Market
-   * @param owner
-   * @param amount
-   * @param sendOptions
-   * @param manualMaxRetry
-   *
-   * @returns {Promise<string>}
-   */
-  async withdrawIdleFunds(
-    owner: Keypair,
-    amount?: BN,
-    sendOptions?: SendOptions,
-    manualMaxRetry?: number
-  ) {
-    if (!owner.publicKey.equals(this.user))
-      throw new Error("Owner must be same as user market owner")
-
-    const ix = await this.makeWithdrawIdleFundsInstruction(amount)
-
-    return signAndSendTransactionInstructions(
-      this._averClient,
-      [],
-      owner,
-      [ix],
-      sendOptions,
-      manualMaxRetry
-    )
-  }
+  //   return signAndSendTransactionInstructions(
+  //     this._averClient,
+  //     [],
+  //     owner,
+  //     [ix],
+  //     sendOptions,
+  //     manualMaxRetry
+  //   )
+  // }
 
   /**
    * Format instruction to neutralise the outcome position
    *
-   * @param outcomeId
+   * Returns TransactionInstruction object only. Does not send transaction.
    *
-   * @returns {Promise<TransactionInstruction>}
+   * @param outcomeId - Outcome ids to neutralize positions on
+   *
+   * @returns {Promise<TransactionInstruction>} TransactionInstruction object
    */
   async makeNeutralizePositionInstruction(outcomeId: number) {
     const quoteTokenAta = await getAssociatedTokenAddress(
@@ -1220,7 +1280,7 @@ export class UserMarket {
       {
         accounts: {
           user: this.user,
-          userHostLifetime: this.userHostLifetime,
+          userHostLifetime: this.userHostLifetime.pubkey,
           userMarket: this.pubkey,
           userQuoteTokenAta: quoteTokenAta,
           market: this.market.pubkey,
@@ -1242,15 +1302,17 @@ export class UserMarket {
   /**
    * Neutralise the outcome position
    *
-   * @param owner
-   * @param outcomeId
-   * @param sendOptions
-   * @param manualMaxRetry
+   * Sends instructions on chain
    *
-   * @returns {Promise<string>}
+   * @param {Keypair} owner - Owner of UserMarket account
+   * @param {number} outcomeId - Outcome ids to neutralize positions on
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction. Defaults to None.
+   * @param {number} manualMaxRetry - No. of times to retry in case of failure
+   *
+   * @returns {Promise<string>} - Transaction signature
    */
   async neutralizePosition(
-    owner: Keypair,
+    owner: Keypair = this._averClient.keypair,
     outcomeId: number,
     sendOptions?: SendOptions,
     manualMaxRetry?: number
@@ -1270,62 +1332,12 @@ export class UserMarket {
     )
   }
 
-  // NOT TESTED
   /**
-   * Format instruction to collect funds from the User Market
+   * Loads UserMarket listener
    *
-   * @returns {Promise<string>}
+   * @param {(userMarket: UserMarket) => void} callback - Callback function
+   * @returns
    */
-  async makeCollectInstruction() {
-    const userQuoteTokenAta = await getAssociatedTokenAddress(
-      this.market.quoteTokenMint,
-      this.user
-    )
-
-    return this._averClient.program.instruction["collect"](true, {
-      accounts: {
-        market: this.market.pubkey,
-        userMarket: this.pubkey,
-        user: this.user,
-        userQuoteTokenAta,
-        quoteVault: this.market.quoteVault,
-        vaultAuthority: this.market.vaultAuthority,
-        splTokenProgram: TOKEN_PROGRAM_ID,
-      },
-    })
-  }
-
-  // NOT TESTED
-  /**
-   * Collect funds from the User Market
-   *
-   * @param owner
-   * @param sendOptions
-   * @param manualMaxRetry
-   *
-   * @returns {Promise<string>}
-   */
-  async collect(
-    owner: Keypair,
-    sendOptions?: SendOptions,
-    manualMaxRetry?: number
-  ) {
-    if (!owner.publicKey.equals(this.user))
-      throw new Error("Owner must be same as user market owner")
-
-    const ix = await this.makeCollectInstruction()
-
-    return signAndSendTransactionInstructions(
-      this._averClient,
-      [],
-      owner,
-      [ix],
-      sendOptions,
-      manualMaxRetry
-    )
-  }
-
-  // NOT TESTED
   async loadUserMarketListener(callback: (userMarket: UserMarket) => void) {
     const ee = this._averClient.program.account["userMarket"].subscribe(
       this.pubkey
@@ -1335,9 +1347,9 @@ export class UserMarket {
   }
 
   /**
-   * Calculate funds available to withdraw from the User Market
+   * Calculates idle funds available to withdraw
    *
-   * @returns {number}
+   * @returns {number} Idle funds
    */
   calculateFundsAvailableToWithdraw() {
     return Math.min(
@@ -1347,23 +1359,24 @@ export class UserMarket {
   }
 
   /**
-   * Calculate exposures to each outcome
+   * Calcualtes exposures for every possible outcome
    *
-   * @returns {BN[]}
+   * The exposure on a particular outcome is the profit/loss if that outcome wins
+   *
+   * @returns {BN[]} List of exposures
    */
   calculateExposures() {
     return this.outcomePositions.map((op) =>
       op.free.add(op.locked).sub(this.netQuoteTokensIn)
-    )
+    ) as BN[]
   }
 
-  // NOT TESTED
   /**
-   * Calculate funds available to collect based on the winning outcome
+   * Calculate funds won if a particular outcome wins
    *
-   * @param winningOutcome
+   * @param {number} winningOutcome - Winning outcome ID
    *
-   * @returns {number}
+   * @returns {number} Tokens won
    */
   calculateFundsAvailableToCollect(winningOutcome: number) {
     return (
@@ -1373,11 +1386,12 @@ export class UserMarket {
   }
 
   /**
-   * Calculates the tokens available to sell on an outcome
-   * @param outcomeIndex
-   * @param price
+   * Calculates tokens available to sell on a particular outcome
    *
-   * @returns {number}
+   * @param {number} outcomeIndex - Outcome ID
+   * @param {number} price - Price - in probability format i.e. in the range (0, 1). If you are using Decimal or other odds formats you will need to convert these prior to passing as an argument
+   *
+   * @returns {number} Token amount
    */
   calculateTokensAvailableToSell(outcomeIndex: number, price: number) {
     return (
@@ -1387,12 +1401,12 @@ export class UserMarket {
   }
 
   /**
-   * Calculates the tokens available to buy on an outcome
+   * Calculates tokens available to buy on a particular outcome
    *
-   * @param outcomeIndex
-   * @param price
+   * @param {number} outcomeIndex - Outcome ID
+   * @param {number} price - Price - in probability format i.e. in the range (0, 1). If you are using Decimal or other odds formats you will need to convert these prior to passing as an argument
    *
-   * @returns {number}
+   * @returns {number} Token amount
    */
   calculateTokensAvailableToBuy(outcomeIndex: number, price) {
     const minFreeTokensExceptOutcomeIndex = Math.min(

@@ -1,4 +1,4 @@
-import { Program, ProgramError } from "@project-serum/anchor"
+import { ProgramError } from "@project-serum/anchor"
 import {
   Keypair,
   Connection,
@@ -17,8 +17,19 @@ import {
   getAverLaunchZeroFeesToken,
 } from "./ids"
 
+/**
+ * Cryptographically signs transaction and sends onchain
+ *
+ * @param {AverClient} client - AverClient object
+ * @param {Keypair[]} signers - List of signing keypairs
+ * @param {Keypair} feePayer - Keypair to pay fee for transaction
+ * @param {TransactionInstruction[]} txInstructions - List of transaction instructions to pack into transaction to be sen
+ * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction. Defaults to None.
+ * @param {number} manualMaxRetry - No. of times to retry in case of failure
+ *
+ * @returns {Promise<String>} Transaction signature
+ */
 export const signAndSendTransactionInstructions = async (
-  // sign and send transaction
   client: AverClient,
   signers: Array<Keypair>,
   feePayer: Keypair,
@@ -65,6 +76,13 @@ export function throwIfNull<T>(
 }
 
 // TODO remove generic return type and fix associated TS errors elsewhere
+/**
+ * Chunks requests to RPC node containing more than 100 pubkeys into blocks of size 100
+ *
+ * @param {Connection} connection - Solana Connection object
+ * @param {PublicKey[]} pubkeys - List of account pubkeys
+ * @returns {Promise<(AccountInfo<Buffer> | null)[]>} Raw onchain account data
+ */
 export const chunkAndFetchMultiple = async (
   connection: Connection,
   pubkeys: PublicKey[]
@@ -80,8 +98,10 @@ export const chunkAndFetchMultiple = async (
 
 /**
  * Returns the tick size interval for the given limit price
- * @param limitPrice 1000 < limitPrice <= 990000 where limit price is in 6dp
- * @returns tick size for the given price
+ *
+ * @param {number} limitPrice 1000 < limitPrice <= 990000 where limit price is in 6dp
+ *
+ * @returns {number} tick size for the given price
  */
 export const calculateTickSizeForPrice = (limitPrice: number) => {
   switch (true) {
@@ -108,6 +128,13 @@ export const calculateTickSizeForPrice = (limitPrice: number) => {
   }
 }
 
+/**
+ * Rounds price to the nearest tick size available
+ *
+ * @param {number} limitPrice - Limit price
+ * @param {boolean} isBinary - True for markets with exactly 2 outcomes
+ * @returns {number} Rounded price
+ */
 export const roundPriceToNearestTickSize = (
   limitPrice: number,
   isBinary?: boolean
@@ -125,6 +152,13 @@ export const roundPriceToNearestTickSize = (
   return finalLimitPrice
 }
 
+/**
+ * Obtains public key of best available discount token
+ *
+ * @param {AverClient} averClient - AverClient object
+ * @param {PublicKey} owner - Owner of token
+ * @returns {Promise<PublicKey>} Public key of discount token
+ */
 export const getBestDiscountToken = async (
   averClient: AverClient,
   owner: PublicKey

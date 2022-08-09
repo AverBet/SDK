@@ -22,53 +22,90 @@ import { Wallet } from "@project-serum/anchor/dist/cjs/provider"
 import { SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js"
 
 export class AverClient {
+  /**
+   * Aver Client Class
+   *
+   * Use AverClient to interact with the Aver Program, Solana network and Aver API
+   */
+
+  /**
+   * Solana Connection Client
+   */
   private _connection: Connection
 
+  /**
+   * AnchorPy Program
+   */
   private _program: Program
 
+  /**
+   * Endpoint is used to make requests to Aver
+   */
   private _averApiEndpoint: string
 
+  /**
+   * Devnet or Mainnet - must correspond to the network provided in the connection object
+   */
   private _solanaNetwork: SolanaNetwork
 
+  /**
+   * The token mint of the default quote token for markets on this network (i.e. USDC)
+   */
   private _quoteTokenMint: PublicKey
 
+  /**
+   * The default payer for transactions on-chain, unless one is specified
+   */
+  private _keypair: Keypair
+
+  /**
+   * Initialises AverClient object. Do not use this function; use AverClient.load() instead
+   *
+   * @param {Program} program - Aver program AnchorPy
+   * @param {string} averApiEndpoint - Endpoint for Aver API (to be removed soon)
+   * @param {SolanaNetwork} solanaNetwork - Solana network
+   * @param {Keypair} keypair - Default keypair to use for paying transaction costs
+   */
   private constructor(
     program: Program,
     averApiEndpoint: string,
-    solanaNetwork: SolanaNetwork
+    solanaNetwork: SolanaNetwork,
+    keypair: Keypair
   ) {
     this._connection = program.provider.connection
     this._program = program
     this._averApiEndpoint = averApiEndpoint
     this._solanaNetwork = solanaNetwork
     this._quoteTokenMint = getQuoteToken(solanaNetwork)
+    this._keypair = keypair
   }
 
   /**
    * Initialises an AverClient object
    *
-   * @param {Connection} connection Solana Client Object
-   * @param {PublicKey | null} owner Public Key to pay transaction costs
-   * @param {string} averApiEndpoint
-   * @param {PublicKey} averProgramId Program public key. Defaults to AVER_PROGRAM_ID.
-   * @returns {AverClient | null} The Aver Client object or null if unsuccesful
+   * @param {Connection} connection - Solana Client Object
+   * @param {SolanaNetwork} solanaNetwork - Solana network
+   * @param {PublicKey | null} owner - Default keypair to pay transaction costs (and rent costs) unless one is otherwise specified for a given transaction.
+   * @param {ConfirmOptions} opts - Default options for sending transactions.
+   * @param {PublicKey} averProgramId - Program public key. Defaults to AVER_PROGRAM_ID.
+   * @returns {AverClient} - The Aver Client object
    */
   static async loadAverClient(
     connection: Connection,
     solanaNetwork: SolanaNetwork,
-    owner: null | Keypair | Wallet,
+    owner: null | Keypair,
     opts?: ConfirmOptions,
     averProgramId?: PublicKey
   ) {
     let wallet: Wallet
+    let keypair: Keypair = new Keypair()
     if (owner == null) {
       // create a dummy wallet
-      wallet = new NodeWallet(new Keypair())
+      wallet = new NodeWallet(keypair)
     } else if (owner instanceof Keypair) {
       // create a node wallet with the keypair
       wallet = new NodeWallet(owner)
-    } else if (owner.publicKey) {
-      wallet = owner
+      keypair = owner
     } else {
       wallet = new NodeWallet(new Keypair())
     }
@@ -89,10 +126,10 @@ export class AverClient {
 
     if (idl) {
       const program = new Program(idl, averProgramId, provider)
-      return new AverClient(program, averApiEndpoint, solanaNetwork)
+      return new AverClient(program, averApiEndpoint, solanaNetwork, keypair)
     }
 
-    return null
+    throw new Error("Client could not be loaded")
   }
 
   get connection() {
@@ -109,6 +146,10 @@ export class AverClient {
 
   get owner() {
     return this._program.provider.wallet.publicKey
+  }
+
+  get keypair() {
+    return this._keypair
   }
 
   get quoteTokenMint() {
@@ -135,11 +176,11 @@ export class AverClient {
   /**
    * Formats the instruction to create an associated token account
    *
-   * @param {PublicKey} mint Associated token account mint
-   * @param {PublicKey} owner Owner of the assocaited token account
-   * @param {PublicKey} payer Fee payer for creating the associated token account
+   * @param {PublicKey} mint - Associated token account mint
+   * @param {PublicKey} owner - Owner of the assocaited token account
+   * @param {PublicKey} payer - Fee payer for creating the associated token account
    *
-   * @returns {Promise<TransactionInstruction>} Instruction to create an associated token account
+   * @returns {Promise<TransactionInstruction>} - Instruction to create an associated token account
    */
   async createTokenAtaInstruction(
     mint: PublicKey = this.quoteTokenMint,
@@ -165,13 +206,13 @@ export class AverClient {
   }
 
   /**
-   * Returns the associated token account if present, or creates one if not
+   * Attempts to load an Associate Token Account (ATA) or creates one if not found.
    *
-   * @param {PublicKey} payer Fee payer for creating the associated token account
-   * @param {PublicKey} mint Associated token account mint
-   * @param {PublicKey} owner Owner of the assocaited token account
+   * @param {PublicKey} payer - Fee payer for creating the associated token account
+   * @param {PublicKey} mint - Associated token account mint
+   * @param {PublicKey} owner - Owner of the assocaited token account
    *
-   * @returns {Promise<Account>} The associated token account
+   * @returns {Promise<Account>} - ATA Account
    */
   async getOrCreateTokenAta(
     payer: Signer,
@@ -187,12 +228,12 @@ export class AverClient {
   }
 
   /**
-   * Requests a lamport airdrop. This is only available on DevNet
+   * Request an airdrop of lamports (SOL). This method is only supported on devnet.
    *
-   * @param {number} amount The number of lamports to airdrop
-   * @param {PublicKey} owner Owner of the account to be airdropeed
+   * @param {number} amount - Lamports to airdrop. Note 1 lamport = 10^-9 SOL. Max of 1 SOL (10^9 lamports) applies.
+   * @param {PublicKey} owner - Public key of account to be airdropped
    *
-   * @returns {Promise<string>}
+   * @returns {Promise<string>} - RPC Response Signature
    */
   async requestLamportAirdrop(
     amount: number = LAMPORTS_PER_SOL,
@@ -235,23 +276,29 @@ export class AverClient {
   }
 
   /**
-   * Requests the associated token account balance
+   * Fetches the balance for an Associated Token Account (ATA).
    *
-   * @param {PublicKey} ata Associated token account
+   * Note: the value returned is the integer representation of the balance, where a unit is the smallest possible increment of the token.
+   * For example, USDC is a 6 decimal place token, so a value of 1,000,000 here = 1 USDC.
    *
-   * @returns {Promise<RpcResponseAndContext<TokenAmount>>}
+   * @param {PublicKey} ata - ATA public key
+   *
+   * @returns {Promise<RpcResponseAndContext<TokenAmount>>} - Token balance
    */
   async requestAtaBalance(ata: PublicKey) {
     return await this.connection.getTokenAccountBalance(ata)
   }
 
   /**
-   * Requests the token balance
+   * Fetches a wallet's token balance, given the wallet's owner and the token mint's public key.
    *
-   * @param {PublicKey} mint Token mint
-   * @param {PublicKey} owner Wallet owner
+   * Note: the value returned is the integer representation of the balance, where a unit is the smallest possible increment of the token.
+   * For example, USDC is a 6 decimal place token, so a value of 1,000,000 here = 1 USDC.
    *
-   * @returns {Promise<RpcResponseAndContext<TokenAmount>>}
+   * @param {PublicKey} mint The public key of the token mint
+   * @param {PublicKey} owner The public key of the wallet
+   *
+   * @returns {Promise<RpcResponseAndContext<TokenAmount>>} - Token balance
    */
   async requestTokenBalance(
     mint: PublicKey = this.quoteTokenMint,
@@ -262,16 +309,24 @@ export class AverClient {
   }
 
   /**
-   * Requests the lamport balance
+   * Fetches Lamport (SOL) balance for a given wallet
    *
-   * @param {PublicKey} owner The wallet owner
+   * Note: the value returned is the integer representation of the balance, where a unit is one lamport (=10^-9 SOL)
+   * For example, a value of 1,000,000,000 (lamports) = 1 SOL.
    *
-   * @returns {Promise<number>}
+   * @param {PublicKey} owner - The wallet owner
+   *
+   * @returns {Promise<number>} - Lamport balanace
    */
   async requestLamportBalance(owner: PublicKey) {
     return this.connection.getBalance(owner)
   }
 
+  /**
+   * Loads current solana system datetime
+   *
+   * @returns {Promise<number | null>} - Current Solana Clock time
+   */
   async getSystemClockDatetime() {
     const slot = await this.connection.getSlot()
     const time = await this.connection.getBlockTime(slot)

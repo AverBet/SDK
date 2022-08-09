@@ -1,8 +1,8 @@
-import { Slab, Price, Side } from "@bonfida/aaob"
+import { Slab, Price, Side, LeafNode } from "@bonfida/aaob"
+import { BN } from "@project-serum/anchor"
 import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
-import BN from "bn.js"
 import { AVER_PROGRAM_ID, CALLBACK_INFO_LEN } from "./ids"
-import { PriceAndSide } from "./types"
+import { PriceAndSide, SlabOrder } from "./types"
 import { chunkAndFetchMultiple, throwIfNull } from "./utils"
 
 /**
@@ -39,18 +39,22 @@ export class Orderbook {
    */
   private _slabBidsPubkey: PublicKey
 
+  /**
+   * @private
+   * Whether the bids and asks should be interpretted as inverted when parsing the data. (Used in the case of the second outcome in a two-outcome market.)
+   */
   private _isInverted: boolean
 
   /**
-   * Orderbook constructor. This can be used if the slab bids and asks are already known, otherwise use the load method.
+   * Initialise an Orderbook object. Do not use this function; use Orderbook.load() instead
    *
-   * @param pubkey
-   * @param slabBids
-   * @param slabAsks
-   * @param slabBidsPubkey
-   * @param slabAsksPubkey
-   * @param decimals
-   * @param isInverted
+   * @param {PublicKey} pubkey - Orderbook public key
+   * @param {Slab} slabBids - Slab object for bids
+   * @param {Slab} slabAsks - Slab object for asks
+   * @param {PublicKey} slabBidsPubkey - Slab bids public key
+   * @param {PublicKey} slabAsksPubkey - Slab asks public key
+   * @param {number} decimals - Decimal precision for orderbook
+   * @param {boolean} isInverted - Whether the bids and asks have been switched with each other. Defaults to False.
    */
   constructor(
     pubkey: PublicKey,
@@ -99,10 +103,11 @@ export class Orderbook {
   }
 
   /**
-   * Function to invert the orderbook, this switches around the bids and asks
+   * Returns a version of the orderbook which has been parsed with bids and asks switched and
+   * prices inverted. (Used for the second outcome in a two-outcome market)
    *
-   * @param orderbook
-   * @returns
+   * @param {Orderbook} orderbook - Orderbook object
+   * @returns {Orderbook} Orderbook
    */
   static invert(orderbook: Orderbook) {
     // switch bids and asks around to invert
@@ -118,10 +123,11 @@ export class Orderbook {
   }
 
   /**
+   * Loads onchain data for a Slab (contains orders for a particular side of the orderbook)
    *
-   * @param connection The solana connection object to the RPC node
-   * @param slabAddress The address of the Slab
-   * @returns A deserialized Slab object
+   * @param connection -  Solana Connection object
+   * @param slabAddress - Slab public key
+   * @returns {Slab} A deserialized Slab object
    */
   static async loadSlab(connection: Connection, slabAddress: PublicKey) {
     const { data } = throwIfNull(await connection.getAccountInfo(slabAddress))
@@ -130,10 +136,11 @@ export class Orderbook {
   }
 
   /**
+   * Loads onchain data for multiple Slabs (contains orders for a particular side of the orderbook)
    *
-   * @param connection The solana connection object to the RPC node
-   * @param slabAddress The address of the Slab
-   * @returns Multiple deserialized Slab object
+   * @param {Connection} connection - The solana connection object to the RPC node
+   * @param {PublicKey[]} slabAddress - The address of the Slab
+   * @returns {Slab[]} Multiple deserialized Slab object
    */
   static async loadMultipleSlabs(
     connection: Connection,
@@ -148,6 +155,12 @@ export class Orderbook {
     }
   }
 
+  /**
+   * Parses onchain data for multiple Slabs (contains orders for a particular side of the orderbook)
+   *
+   * @param {AccountInfo<Buffer | null>[]} slabsData
+   * @returns {Slab[]} - Multiple deserialized Slab object
+   */
   static deserializeMultipleSlabData(slabsData: AccountInfo<Buffer | null>[]) {
     return slabsData.map((d) =>
       !!d?.data ? Slab.deserialize(d.data, new BN(CALLBACK_INFO_LEN)) : null
@@ -155,14 +168,16 @@ export class Orderbook {
   }
 
   /**
-   * Load the Orderbook
+   * Initialise an Orderbook object
    *
-   * @param connection
-   * @param orderbook
-   * @param bids
-   * @param asks
-   * @param decimals
-   * @param isInverted
+   * Parameters are found in MarketStoreStates' --> OrderbookAccounts
+   *
+   * @param {Connection} connection - Solana Connection object
+   * @param {Orderbook} orderbook - Orderbook public key
+   * @param {PublicKey} bids - Slab bids public key
+   * @param {PublicKey} asks - Slab asks public key
+   * @param {number} decimals - Decimal precision for orderbook
+   * @param {boolean} isInverted - Whether the bids and asks have been switched with each other. Defaults to False.
    *
    * @returns {Promise<Orderbook>} The Orderbook object
    */
@@ -187,6 +202,13 @@ export class Orderbook {
     )
   }
 
+  /**
+   * Converts price to correct order of magnitude based on decimal precision
+   *
+   * @param {Price} p - Unconverted Price object
+   * @param {number} decimals - Decimal precision for orderbook
+   * @returns {Price} Price object
+   */
   static convertPrice(p: Price, decimals: number) {
     const exp = Math.pow(10, decimals)
     return {
@@ -195,6 +217,12 @@ export class Orderbook {
     }
   }
 
+  /**
+   * Converts price to correct order of magnitude based on decimal precision
+   *
+   * @param {Price} p - Unconverted Price object
+   * @returns {Price} Price object
+   */
   private convertPrice(p: Price) {
     const exp = Math.pow(10, this.decimals)
     return {
@@ -204,14 +232,17 @@ export class Orderbook {
   }
 
   /**
+   * Get Level 2 market information for a particular slab
    *
-   * @param slab
-   * @param depth
-   * @param increasing
-   * @param decimals
-   * @param uiAmount
-   * @param isInverted
-   * @returns
+   * This contains information on orders on the slab aggregated by price tick.
+   *
+   * @param {Slab} slab - Slab object
+   * @param {number} depth - Number of orders to return
+   * @param {boolean} increasing - Sort orders increasing
+   * @param {number} decimals - Decimal precision for orderbook
+   * @param {boolean} uiAmount - Converts prices based on decimal precision if true. Defaults to False.
+   * @param {boolean} isInverted - Whether the bids and asks have been switched with each other. Defaults to False.
+   * @returns {Price[]} - Price object lists
    */
   static getL2ForSlab(
     slab: Slab,
@@ -233,13 +264,49 @@ export class Orderbook {
   }
 
   /**
-   * Derive the Orderbook pubkey based off the Market, OutcomeId and program
+   * Get Level 3 market information for a particular slab
    *
-   * @param market
-   * @param outcomeId
-   * @param programId
+   * See https://www.thebalance.com/order-book-level-2-market-data-and-depth-of-market-1031118 for more information
    *
-   * @returns {Promise<[PublicKey, number]>} The Orderbook pubkey
+   * @param {Slab} slab - Slab object
+   * @param {boolean} increasing - Sort orders increasing
+   * @param {boolean} decimals - Decimal precision for orderbook
+   * @param {boolean} isInverted - Whether the bids and asks have been switched with each other. Defaults to False.
+   * @returns {SlabOrder[]} Slab Order list
+   */
+  static getL3ForSlab(
+    slab: Slab,
+    decimals: number,
+    increasing: boolean,
+    isInverted?: boolean
+  ) {
+    let orders: SlabOrder[] = []
+    for (let node of slab.items(!increasing)) {
+      node.getPrice()
+      orders.push({
+        id: node.key,
+        price: isInverted
+          ? 1 - node.getPrice() / 2 ** 32
+          : node.getPrice() / 2 ** 32,
+        base_quantity: node.baseQuantity,
+        base_quantity_ui: node.baseQuantity * 10 ** -decimals,
+        // user_market: new PublicKey(node.callBackInfoPt[0 - 32]), //TODO - CHECK THIS
+        // fee_tier: node.callBackInfoPt,
+      } as SlabOrder)
+    }
+    return orders
+  }
+
+  /**
+   * Derives PDA (Program Derived Account) for Orderbook public key.
+   *
+   * MarketStore account addresses are derived deterministically using the market's pubkey.
+   *
+   * @param {PublicKey} market - Market public key
+   * @param {number} outcomeId - Outcome ID of orderbook
+   * @param {PublicKey} programId - Program ID. Defaults to AverProgramId
+   *
+   * @returns {Promise<[PublicKey, number]>} The Orderbook pubkey and bump
    */
   static async deriveOrderbookPubkeyAndBump(
     market: PublicKey,
@@ -257,11 +324,14 @@ export class Orderbook {
   }
 
   /**
+   * Derives PDA (Program Derived Account) for Event Queue public key.
    *
-   * @param market
-   * @param outcomeId
-   * @param programId
-   * @returns
+   * MarketStore account addresses are derived deterministically using the market's pubkey.
+   *
+   * @param {PublicKey} market - Market public key
+   * @param {number} outcomeId - Outcome ID of orderbook
+   * @param {PublicKey} programId - Program ID. Defaults to AverProgramId
+   * @returns {Promise<[PublicKey, number]>} The Event Queue pubkey and bump
    */
   static async deriveEventQueuePubkeyAndBump(
     market: PublicKey,
@@ -279,11 +349,14 @@ export class Orderbook {
   }
 
   /**
+   * Derives PDA (Program Derived Account) for Bids public key.
    *
-   * @param market
-   * @param outcomeId
-   * @param programId
-   * @returns
+   * MarketStore account addresses are derived deterministically using the market's pubkey.
+   *
+   * @param {PublicKey} market - Market public key
+   * @param {number} outcomeId - Outcome ID of orderbook
+   * @param {PublicKey} programId - Program ID. Defaults to AverProgramId
+   * @returns {Promise<[PublicKey, number]>} The Bids pubkey and bump
    */
   static async deriveBidsPubkeyAndBump(
     market: PublicKey,
@@ -297,11 +370,14 @@ export class Orderbook {
   }
 
   /**
+   * Derives PDA (Program Derived Account) for Asks public key.
    *
-   * @param market
-   * @param outcomeId
-   * @param programId
-   * @returns
+   * MarketStore account addresses are derived deterministically using the market's pubkey.
+   *
+   * @param {PublicKey} market - Market public key
+   * @param {number} outcomeId - Outcome ID of orderbook
+   * @param {PublicKey} programId - Program ID. Defaults to AverProgramId
+   * @returns {Promise<[PublicKey, number]>} The Asks pubkey and bump
    */
   static async deriveAsksPubkeyAndBump(
     market: PublicKey,
@@ -315,10 +391,15 @@ export class Orderbook {
   }
 
   /**
+   * Inverts prices
    *
-   * @param price
-   * @param uiAmount
-   * @returns
+   * This is used when inverting the second outcome in a two-outcome market.
+   * When switching prices between bids and asks, the price is `1-p`.
+   * Example, a BUY on A at a (probability) price of 0.4 is equivelant to a SELL on B at a price of 0.6 (1-0.4) and vice versa.
+   *
+   * @param {Price} price - Price object
+   * @param uiAmount - Converts prices based on decimal precision if true. Defaults to False.
+   * @returns {Price} - Inverted Price object
    */
   private static invertPrice(price: Price, uiAmount?: boolean): Price {
     return {
@@ -327,12 +408,14 @@ export class Orderbook {
     }
   }
 
-  // NOT TESTED
   /**
+   * Gets level 2 market information for bids
    *
-   * @param depth
-   * @param uiAmount
-   * @returns
+   * See https://www.thebalance.com/order-book-level-2-market-data-and-depth-of-market-1031118 for more information
+   *
+   * @param {number} depth - Number of orders to return
+   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
+   * @returns {Price[]} - Price object lists
    */
   getBidsL2(depth: number, uiAmount?: boolean) {
     const isIncreasing = this._isInverted ? true : false
@@ -346,12 +429,14 @@ export class Orderbook {
     )
   }
 
-  // NOT TESTED
   /**
+   * Gets level 2 market information for asks
    *
-   * @param depth
-   * @param uiAmount
-   * @returns
+   * See https://www.thebalance.com/order-book-level-2-market-data-and-depth-of-market-1031118 for more information
+   *
+   * @param {number} depth - Number of orders to return
+   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
+   * @returns {Price[]} - Price object lists
    */
   getAsksL2(depth: number, uiAmount?: boolean) {
     const isIncreasing = this._isInverted ? false : true
@@ -365,33 +450,71 @@ export class Orderbook {
     )
   }
 
-  // NOT TESTED
   /**
+   * Gets level 3 market information for bids
    *
-   * @param uiAmount
-   * @returns
+   * See https://www.thebalance.com/order-book-level-2-market-data-and-depth-of-market-1031118 for more information
+   *
+   * @param {number} depth - Number of orders to return
+   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
+   * @returns {SlabOrder[]} - SlabOrder object lists
+   */
+  getBidsL3(depth: number, uiAmount?: boolean) {
+    const isIncreasing = this._isInverted ? true : false
+    return Orderbook.getL3ForSlab(
+      this._slabBids,
+      this.decimals,
+      isIncreasing,
+      this._isInverted
+    )
+  }
+
+  /**
+   * Gets level 3 market information for asks
+   *
+   * See https://www.thebalance.com/order-book-level-2-market-data-and-depth-of-market-1031118 for more information
+   *
+   * @param {number} depth - Number of orders to return
+   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
+   * @returns {SlabOrder[]} - SlabOrder object lists
+   */
+  getAsksL3(depth: number, uiAmount?: boolean) {
+    const isIncreasing = this._isInverted ? false : true
+    return Orderbook.getL3ForSlab(
+      this._slabAsks,
+      this.decimals,
+      isIncreasing,
+      this._isInverted
+    )
+  }
+
+  /**
+   * Gets the best bid price
+   *
+   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
+   * @returns {Price | undefined} - Price object
    */
   getBestBidPrice(uiAmount?): Price | undefined {
     const bids = this.getBidsL2(1, uiAmount)
     return bids.length ? bids[0] : undefined
   }
 
-  // NOT TESTED
   /**
+   * Gets the best ask price
    *
-   * @param uiAmount
-   * @returns
+   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
+   * @returns {Price | undefined} - Price object
    */
   getBestAskPrice(uiAmount?): Price | undefined {
     const asks = this.getAsksL2(1, uiAmount)
     return asks.length ? asks[0] : undefined
   }
 
-  // NOT TESTED
   /**
+   * Gets bid Price object by orderId
    *
-   * @param orderId
-   * @returns
+   * @param {BN} orderId - Order ID
+   * @returns {Price | undefined} - Price object
    */
   getBidPriceByOrderId(orderId: BN): Price | undefined {
     const bid = this.slabBids.getNodeByKey(orderId)
@@ -405,11 +528,11 @@ export class Orderbook {
     return this._isInverted ? Orderbook.invertPrice(bidPrice) : bidPrice
   }
 
-  // NOT TESTED
   /**
+   * Gets ask Price object by orderId
    *
-   * @param orderId
-   * @returns
+   * @param {BN} orderId - Order ID
+   * @returns {Price | undefined} - Price object
    */
   getAskPriceByOrderId(orderId: BN): Price | undefined {
     const ask = this.slabAsks.getNodeByKey(orderId)
@@ -434,6 +557,12 @@ export class Orderbook {
   //   return undefined
   // }
 
+  /**
+   * Gets Price object by orderId
+   *
+   * @param {BN} orderId - Order ID
+   * @returns {PriceAndSide | undefined} - PriceAndSide object
+   */
   getPriceByOrderId(orderId: BN): PriceAndSide | undefined {
     for (const node of this._slabBids.items()) {
       if (orderId.eq(node.key)) {
@@ -476,12 +605,12 @@ export class Orderbook {
     return undefined
   }
 
-  // NOT TESTED
   /**
+   * Loads Orderbook Listener
    *
-   * @param connection
-   * @param callback
-   * @returns
+   * @param {Connection} connection - Solana Connection object
+   * @param {(slab: Orderbook) => void} callback
+   * @returns {number[]}
    */
   loadOrderbookListener(
     connection: Connection,
@@ -510,28 +639,40 @@ export class Orderbook {
     return [bidsListener, asksListener]
   }
 
-  // NOT TESTED
   /**
+   * Gets estimate of average fill price (probability format) given a base/payout quantity
    *
-   * @param baseQty
-   * @param side
-   * @param uiAmount
+   * @param {boolean} baseQty - Base quantity
+   * @param {Side} side - Side object (bid or ask)
+   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
+   * @returns Average price, worst price and filled
    */
   estimateAvgFillForBaseQty(baseQty: number, side: Side, uiAmount?: boolean) {
-    this.estimateFillForQty(baseQty, side, false, uiAmount)
+    return this.estimateFillForQty(baseQty, side, false, uiAmount)
   }
 
-  // NOT TESTED
   /**
+   * Gets estimate of average fill price (probability format) given a stake/quote quantity
    *
-   * @param quoteQty
-   * @param side
-   * @param uiAmount
+   * @param {boolean} baseQty - Base quantity
+   * @param {Side} side - Side object (bid or ask)
+   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
+   * @returns Average price, worst price and filled
    */
   estimateAvgFillForQuoteQty(quoteQty: number, side: Side, uiAmount?: boolean) {
-    this.estimateFillForQty(quoteQty, side, true, uiAmount)
+    return this.estimateFillForQty(quoteQty, side, true, uiAmount)
   }
 
+  /**
+   * Gets estimate of average fill price (probability format) given a base/payout quantity
+   *
+   * @private
+   * @param {boolean} baseQty - Base quantity
+   * @param {Side} side - Side object (bid or ask)
+   * @param {boolean} quote - Whether this is stake/quote (or base/payout)
+   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
+   * @returns Average price, worst price and filled
+   */
   private estimateFillForQty(
     qty: number,
     side: Side,
@@ -571,6 +712,15 @@ export class Orderbook {
     }
   }
 
+  /**
+   * Load slab listener
+   *
+   * @param connection - Solana Connection object
+   * @param {Side} side - Side object (bid or ask)
+   * @param {(slab: Slab) => void} callback - Callback function
+   * @param {(error: any) => void} errorCallback
+   * @returns {number}
+   */
   private loadSlabListener(
     connection: Connection,
     side: Side,
@@ -595,10 +745,11 @@ export class Orderbook {
 }
 
 /**
+ * Calculates weighted average
  *
- * @param nums
- * @param weights
- * @returns
+ * @param {number[]} nums - List of values
+ * @param {number[]} weights - List of weights
+ * @returns {number} Weighted average
  */
 const weightedAverage = (nums, weights) => {
   const [sum, weightSum] = weights.reduce(
