@@ -547,6 +547,7 @@ class UserMarket():
                     "event_queue": orderbook_account.event_queue,
                     "spl_token_program": TOKEN_PROGRAM_ID,
                     "system_program": SYS_PROGRAM_ID,
+                    "vault_authority": self.market.market_state.vault_authority
                },)
         )
 
@@ -614,7 +615,7 @@ class UserMarket():
             send_options
         )
 
-    def make_cancel_order_instruction(
+    async def make_cancel_order_instruction(
             self,
             order_id: int,
             outcome_id: int,
@@ -646,6 +647,12 @@ class UserMarket():
             check_sufficient_lamport_balance(self.user_balance_state)
             check_cancel_order_market_status(self.market.market_state.market_status)
             check_order_exists(self.user_market_state, order_id)
+
+        user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
+            self.user_market_state.user,
+            self.market.aver_client.owner,
+            self.market.market_state.quote_token_mint
+        )
       
         is_binary_market_second_outcome = self.market.market_state.number_of_outcomes == 2 and outcome_id == 1
         orderbook_account_index = outcome_id if not is_binary_market_second_outcome else 0
@@ -663,6 +670,10 @@ class UserMarket():
                 "user_market": self.pubkey,
                 "user": self.user_market_state.user,
                 "market_store": self.market.market_state.market_store,
+                "user_quote_token_ata": user_quote_token_ata,
+                "quote_vault": self.market.market_state.quote_vault,
+                "vault_authority": self.market.market_state.vault_authority,
+                "spl_token_program": TOKEN_PROGRAM_ID,
             })
         )
     
@@ -693,7 +704,7 @@ class UserMarket():
         if(fee_payer is None):
             fee_payer = self.aver_client.owner
 
-        ix = self.make_cancel_order_instruction(
+        ix = await self.make_cancel_order_instruction(
             order_id,
             outcome_id,
             active_pre_flight_check
@@ -707,7 +718,7 @@ class UserMarket():
             send_options
         )
 
-    def make_cancel_all_orders_instruction(
+    async def make_cancel_all_orders_instruction(
         self, 
         outcome_ids_to_cancel: list[int],
         active_pre_flight_check: bool = False,
@@ -739,6 +750,12 @@ class UserMarket():
             check_cancel_order_market_status(self.market.market_state.market_status)
             for outcome_id in outcome_ids_to_cancel:
                 check_outcome_has_orders(outcome_id, self.user_market_state)
+
+        user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
+            self.user_market_state.user,
+            self.market.aver_client.owner,
+            self.market.market_state.quote_token_mint
+        )
 
         remaining_accounts: list[AccountMeta] = []
         for i, accounts in enumerate(self.market.market_store_state.orderbook_accounts):
@@ -781,6 +798,10 @@ class UserMarket():
                                 "market": self.market.market_pubkey,
                                 "user": self.user_market_state.user,
                                 "market_store": self.market.market_state.market_store,
+                                "user_quote_token_ata": user_quote_token_ata,
+                                "quote_vault": self.market.market_state.quote_vault,
+                                "vault_authority": self.market.market_state.vault_authority,
+                                "spl_token_program": TOKEN_PROGRAM_ID,
                             },
                         remaining_accounts = chunked_remaining_accounts[i],
                         )
@@ -813,7 +834,7 @@ class UserMarket():
         if(fee_payer is None):
             fee_payer = self.aver_client.owner
         
-        ixs = self.make_cancel_all_orders_instruction(outcome_ids_to_cancel, active_pre_flight_check)
+        ixs = await self.make_cancel_all_orders_instruction(outcome_ids_to_cancel, active_pre_flight_check)
 
         sigs = await gather(
             *[sign_and_send_transaction_instructions(
@@ -897,6 +918,83 @@ class UserMarket():
             send_options
         )
 
+    async def make_neutralize_positions_instruction(
+        self,
+        outcome_id: int
+    ):
+        """
+        Format instruction to neutralise the outcome position
+   
+        Returns TransactionInstruction object only. Does not send transaction.
+
+        Args:
+            outcome_id (int): Outcome ids to neutralize positions on
+
+        Returns:
+            TransactionInstruction: TransactionInstruction object
+        """
+        user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
+            self.user_market_state.user,
+            self.market.aver_client.owner,
+            self.market.market_state.quote_token_mint
+        )
+
+        return self.aver_client.program.instruction['neutralize_outcome_position'](
+            outcome_id,
+            ctx=Context(
+                accounts={
+                    "market": self.market.market_pubkey,
+                    "user_market": self.pubkey,
+                    "user": self.user_market_state.user,
+                    "user_host_lifetime": self.user_host_lifetime.pubkey,
+                    "user_quote_token_ata": user_quote_token_ata,
+                    "quote_vault": self.market.market_state.quote_vault,
+                    "market_store": self.market.market_state.market_store,
+                    "orderbook": self.market.market_store_state.orderbook_accounts[outcome_id].orderbook,
+                    "bids": self.market.market_store_state.orderbook_accounts[outcome_id].bids,
+                    "asks": self.market.market_store_state.orderbook_accounts[outcome_id].asks,
+                    "event_queue": self.market.market_store_state.orderbook_accounts[outcome_id].event_queue,
+                    "system_program": SYS_PROGRAM_ID,
+                    "spl_token_program": TOKEN_PROGRAM_ID,
+                    "vault_authority": self.market.market_state.vault_authority,
+                },
+            )
+        )
+
+    async def neutralize_positions(
+        self,
+        owner: Keypair,
+        outcome_id: int,
+        send_options: TxOpts = None
+    ):
+        """
+        Neutralise the outcome position
+    
+        Sends instructions on chain
+
+        Args:
+            owner (Keypair): Owner of UserMarket account
+            outcome_id (int): Outcome ids to neutralize positions on
+            send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+
+        Raises:
+            Exception: Owner must be same as UMA owner
+
+        Returns:
+            RPCResponse: Response
+        """
+        ix = self.make_neutralize_positions_instruction(outcome_id)
+
+        if(not owner.public_key == self.user_market_state.user):
+            raise Exception('Owner must be same as UMA owner')
+
+        return await sign_and_send_transaction_instructions(
+            self.aver_client,
+            [],
+            owner,
+            [ix],
+            send_options
+        )
 
     def calculate_funds_available_to_withdraw(self):
         """

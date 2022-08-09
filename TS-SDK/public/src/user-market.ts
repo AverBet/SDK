@@ -863,6 +863,7 @@ export class UserMarket {
           eventQueue: orderbookAccount.eventQueue,
           splTokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
+          vaultAuthority: this.market.vaultAuthority,
         },
       }
     )
@@ -1033,7 +1034,7 @@ export class UserMarket {
    *
    * @returns {Promise<TransactionInstruction>} TransactionInstruction object
    */
-  makeCancelOrderInstruction(
+  async makeCancelOrderInstruction(
     orderId: BN,
     outcomeIndex: number,
     averPreFlightCheck: boolean = false
@@ -1043,6 +1044,11 @@ export class UserMarket {
       checkCancelOrderMarketStatus(this._market.marketStatus)
       checkOrderExists(this._userMarketState, orderId)
     }
+
+    const quoteTokenAta = await getAssociatedTokenAddress(
+      this.market.quoteTokenMint,
+      this.user
+    )
 
     // account for binary markets where there is only one order book
     outcomeIndex =
@@ -1063,6 +1069,10 @@ export class UserMarket {
           userMarket: this.pubkey,
           user: this.user,
           marketStore: this.market.marketStore,
+          userQuoteTokenAta: quoteTokenAta,
+          quoteVault: this.market.quoteVault,
+          vaultAuthority: this.market.vaultAuthority,
+          splTokenProgram: TOKEN_PROGRAM_ID,
         },
       }
     )
@@ -1090,7 +1100,7 @@ export class UserMarket {
     manualMaxRetry?: number,
     averPreFlightCheck: boolean = true
   ) {
-    const ix = this.makeCancelOrderInstruction(
+    const ix = await this.makeCancelOrderInstruction(
       orderId,
       outcomeIndex,
       averPreFlightCheck
@@ -1118,7 +1128,7 @@ export class UserMarket {
    *
    * @returns {Promise<TransactionInstruction>} TransactionInstruction ojbect
    */
-  makeCancelAllOrdersInstructions(
+  async makeCancelAllOrdersInstructions(
     outcomeIdsToCancel: number[],
     averPreFlightCheck: boolean = false
   ) {
@@ -1129,6 +1139,11 @@ export class UserMarket {
         checkOutcomeHasOrders(o, this._userMarketState)
       })
     }
+
+    const quoteTokenAta = await getAssociatedTokenAddress(
+      this.market.quoteTokenMint,
+      this.user
+    )
 
     // @ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
     const remainingAccounts: AccountMeta[] = this.market.orderbookAccounts
@@ -1154,6 +1169,10 @@ export class UserMarket {
           userMarket: this.pubkey,
           user: this.user,
           marketStore: this.market.marketStore,
+          userQuoteTokenAta: quoteTokenAta,
+          quoteVault: this.market.quoteVault,
+          vaultAuthority: this.market.vaultAuthority,
+          splTokenProgram: TOKEN_PROGRAM_ID,
         },
         remainingAccounts: chunkedRemainingAccounts[i],
       })
@@ -1180,7 +1199,7 @@ export class UserMarket {
     manualMaxRetry?: number,
     averPreFlightCheck: boolean = true
   ) {
-    const ixs = this.makeCancelAllOrdersInstructions(
+    const ixs = await this.makeCancelAllOrdersInstructions(
       outcomeIdsToCancel,
       averPreFlightCheck
     )
@@ -1294,6 +1313,7 @@ export class UserMarket {
             .eventQueue as PublicKey,
           splTokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
+          vaultAuthority: this.market.vaultAuthority,
         },
       }
     )
