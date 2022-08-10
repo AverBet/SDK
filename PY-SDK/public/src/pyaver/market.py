@@ -3,13 +3,13 @@ from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .event_queue import load_all_event_queues, prepare_user_accounts_list
 from .aver_client import AverClient
 from solana.publickey import PublicKey
+from spl.token.instructions import get_associated_token_address
 from solana.keypair import Keypair
 from .enums import Fill, MarketStatus
 from .constants import AVER_MARKET_AUTHORITY, AVER_PROGRAM_ID
 from .utils import load_multiple_bytes_data, sign_and_send_transaction_instructions, parse_market_store, parse_market_state
 from .data_classes import MarketState, MarketStoreState, OrderbookAccountsState
 from .orderbook import Orderbook
-from solana.transaction import AccountMeta
 from .slab import Slab
 from anchorpy import Context
 from spl.token.instructions import get_associated_token_address
@@ -595,54 +595,6 @@ class AverMarket():
 
         return sig
 
-    async def consume_events(
-        self,
-        outcome_idx: int,
-        user_accounts: list[PublicKey],
-        max_iterations: int = None,
-        reward_target: PublicKey = None,
-        payer: Keypair = None,
-    ):
-        """
-        Consume events
 
-        Sends instructions on chain
-
-        Args:
-            outcome_idx (int): index of the outcome
-            user_accounts (list[PublicKey]): List of User Account public keys
-            max_iterations (int, optional): Depth of events to iterate through. Defaults to MAX_ITERATIONS_FOR_CONSUME_EVENTS.
-            reward_target (PublicKey, optional): Target for reward. Defaults to AverClient wallet.
-            payer (Keypair, optional): Fee payer. Defaults to AverClient wallet.
-
-        Returns:
-            Transaction Signature: TransactionSignature object
-        """
-        if reward_target == None:
-            reward_target = self.aver_client.owner.public_key
-        if payer == None:
-            payer = self.aver_client.owner
-        if max_iterations > MAX_ITERATIONS_FOR_CONSUME_EVENTS or max_iterations == None:
-            max_iterations = MAX_ITERATIONS_FOR_CONSUME_EVENTS
-        
-        user_accounts_unsorted = [AccountMeta(
-                pk, False, True) for pk in user_accounts]
-                
-        remaining_accounts = sorted(user_accounts_unsorted, key=lambda account: bytes(account.pubkey))
-
-        return await self.aver_client.program.rpc["consume_events"](
-                max_iterations,
-                outcome_idx,
-                ctx=Context(
-                    accounts={
-                        "market": self.market_pubkey,
-                        "market_store": self.market_state.market_store,
-                        "orderbook": self.market_store_state.orderbook_accounts[outcome_idx].orderbook,
-                        "event_queue": self.market_store_state.orderbook_accounts[outcome_idx].event_queue,
-                        "reward_target": reward_target,
-                    },
-                    remaining_accounts=remaining_accounts,
-                ),
-            )
 
 

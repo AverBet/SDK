@@ -1,6 +1,10 @@
 import base64
 import datetime
+import json
+import os
+import re
 from anchorpy import Provider, Wallet, Program
+import numpy as np
 from solana.rpc import types
 from solana.rpc.async_api import AsyncClient
 from solana.publickey import PublicKey
@@ -124,9 +128,59 @@ class AverClient():
         idl = await Program.fetch_idl(program_id,provider)
         if(idl):
             program = Program(idl, program_id, provider)
+            check_idl_has_same_instructions_as_sdk(program)
             return program
         else:
             raise Exception('Program IDL not loaded')
+
+    ####
+## IDL Checks
+
+def check_idl_has_same_instructions_as_sdk(program: Program):
+    """
+    Checks the idl json file's instructions against the instructions in the program
+
+    Warns the user incase their SDK version may be out of date
+
+    Args:
+        program (Program): AnchorPy Program
+    """
+    def camel_to_snake(name: str):
+        """
+        Converts from CamelCase to snake_case
+
+        Args:
+            name (str): Camel case name
+
+        Returns:
+            name: Snake case name
+        """
+        name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+
+
+
+    file_path = os.path.join(os.path.dirname(__file__), './idl.json')
+    file_idl = json.load(open(file_path))
+    file_instructions = file_idl['instructions']
+    for i in program.idl.instructions:
+        file_instruction = next((x for x in file_instructions if camel_to_snake(x['name']) == i.name), None)
+        if(file_instruction is None):
+            print('-'*10)
+            print(f'INSTRUCTION {i.name} IS IN THE IDL BUT IS NOT EXPECTED')
+            print('THIS MEANS YOUR VERSION OF THE SDK MAY NEEDED TO BE UPDATED')
+            print('-'*10)
+            continue
+
+        file_account_names = [camel_to_snake(f['name']) for f in file_instruction['accounts']]
+        idl_account_names = [a.name for a in i.accounts]
+        if(not np.array_equal(file_account_names, idl_account_names)):
+            print('-'*10)
+            print(f'INSTRUCTION {i.name} ACCOUNTS REQUIRED FROM THE IDL ARE DIFFERENT FROM EXPECTED')
+            print('THIS MEANS YOUR VERSION OF THE SDK MAY NEEDED TO BE UPDATED')
+            print('-'*10)
+
+
 
 
     async def close(self):

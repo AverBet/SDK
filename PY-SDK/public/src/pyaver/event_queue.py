@@ -1,6 +1,10 @@
+from anchorpy import Context
+from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .utils import load_multiple_bytes_data
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
+from solana.transaction import AccountMeta
+from solana.keypair import Keypair
 from typing import List, Tuple, Union, Container
 from .enums import Fill, Out, Side
 from solana.rpc.async_api import AsyncClient
@@ -78,4 +82,64 @@ def prepare_user_accounts_list(user_account: List[PublicKey]) -> List[PublicKey]
     sorted_list = sorted(deduped_list)
     pubkey_list = [PublicKey(stpk) for stpk in sorted_list]
     return pubkey_list
+
+async def consume_events(
+        market,
+        outcome_idx: int,
+        user_accounts: list[PublicKey],
+        max_iterations: int = None,
+        reward_target: PublicKey = None,
+        payer: Keypair = None,
+        quote_token: PublicKey = None
+    ):
+        """
+        Consume events
+
+        Sends instructions on chain
+
+        Args:
+            outcome_idx (int): index of the outcome
+            user_accounts (list[PublicKey]): List of User Account public keys
+            max_iterations (int, optional): Depth of events to iterate through. Defaults to MAX_ITERATIONS_FOR_CONSUME_EVENTS.
+            reward_target (PublicKey, optional): Target for reward. Defaults to AverClient wallet.
+            payer (Keypair, optional): Fee payer. Defaults to AverClient wallet.
+            quote_tone (PublicKey, optional): Quote Token. Defaults to AverClient quote token
+
+        Returns:
+            Transaction Signature: TransactionSignature object
+        """
+        if reward_target == None:
+            reward_target = market.aver_client.owner.public_key
+        if payer == None:
+            payer = market.aver_client.owner
+        if max_iterations > MAX_ITERATIONS_FOR_CONSUME_EVENTS or max_iterations == None:
+            max_iterations = MAX_ITERATIONS_FOR_CONSUME_EVENTS
+        if quote_token == None:
+            quote_token = market.aver_client.quote_token
+        
+        user_accounts_unsorted = [AccountMeta(
+                pk, False, True) for pk in user_accounts]
+                
+        sorted_user_accounts = sorted(user_accounts_unsorted, key=lambda account: bytes(account.pubkey))
+        #sorted_loaded_umas = await UserMarket.load_multiple_by_uma(market.aver_client, sorted_user_accounts, [market.market_pubkey]*len(sorted_user_accounts), [])
+        #UserHostLifetime.derive_pubkey_and_bump()
+        #sorted_loaded_umas[0].user_host_lifetime.user_host_lifetime_state.user_quote_token_ata
+        #user_atas =  [get_associated_token_address(u, quote_token) for u in sorted_user_accounts]
+
+        remaining_accounts  = sorted_user_accounts 
+
+        return await market.aver_client.program.rpc["consume_events"](
+                max_iterations,
+                outcome_idx,
+                ctx=Context(
+                    accounts={
+                        "market": market.market_pubkey,
+                        "market_store": market.market_state.market_store,
+                        "orderbook": market.market_store_state.orderbook_accounts[outcome_idx].orderbook,
+                        "event_queue": market.market_store_state.orderbook_accounts[outcome_idx].event_queue,
+                        "reward_target": reward_target,
+                    },
+                    remaining_accounts=remaining_accounts,
+                ),
+            )
 

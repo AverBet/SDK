@@ -387,3 +387,4 @@ def can_cancel_order_in_market(market_status: MarketStatus):
         MarketStatus.HALTED_IN_PLAY,
         MarketStatus.HALTED_PRE_EVENT
     ]
+
