@@ -1,9 +1,13 @@
 from anchorpy import Context
+from data_classes import UserMarketState
+
+from market import AverMarket
 from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .utils import load_multiple_bytes_data
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
 from solana.transaction import AccountMeta
+from spl.token.instructions import get_associated_token_address
 from solana.keypair import Keypair
 from typing import List, Tuple, Union, Container
 from .enums import Fill, Out, Side
@@ -84,7 +88,7 @@ def prepare_user_accounts_list(user_account: List[PublicKey]) -> List[PublicKey]
     return pubkey_list
 
 async def consume_events(
-        market,
+        market: AverMarket,
         outcome_idx: int,
         user_accounts: list[PublicKey],
         max_iterations: int = None,
@@ -121,12 +125,10 @@ async def consume_events(
                 pk, False, True) for pk in user_accounts]
                 
         sorted_user_accounts = sorted(user_accounts_unsorted, key=lambda account: bytes(account.pubkey))
-        #sorted_loaded_umas = await UserMarket.load_multiple_by_uma(market.aver_client, sorted_user_accounts, [market.market_pubkey]*len(sorted_user_accounts), [])
-        #UserHostLifetime.derive_pubkey_and_bump()
-        #sorted_loaded_umas[0].user_host_lifetime.user_host_lifetime_state.user_quote_token_ata
-        #user_atas =  [get_associated_token_address(u, quote_token) for u in sorted_user_accounts]
+        sorted_loaded_umas: list[UserMarketState] = await market.aver_client.program.account['UserMarket'].fetch_multiple(sorted_user_accounts)
+        user_atas =  [get_associated_token_address(u.user, quote_token) for u in sorted_loaded_umas]
 
-        remaining_accounts  = sorted_user_accounts 
+        remaining_accounts  = sorted_user_accounts + user_atas
 
         return await market.aver_client.program.rpc["consume_events"](
                 max_iterations,
