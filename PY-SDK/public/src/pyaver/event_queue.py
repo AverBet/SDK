@@ -1,7 +1,5 @@
 from anchorpy import Context
-from data_classes import UserMarketState
-
-from market import AverMarket
+from .data_classes import UserMarketState
 from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .utils import load_multiple_bytes_data
 from solana.publickey import PublicKey
@@ -88,7 +86,7 @@ def prepare_user_accounts_list(user_account: List[PublicKey]) -> List[PublicKey]
     return pubkey_list
 
 async def consume_events(
-        market: AverMarket,
+        market,
         outcome_idx: int,
         user_accounts: list[PublicKey],
         max_iterations: int = None,
