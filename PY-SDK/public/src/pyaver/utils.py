@@ -1,11 +1,15 @@
+from anchorpy import Program
 from .aver_client import AverClient
 from spl.token.instructions import get_associated_token_address
 from spl.token._layouts import ACCOUNT_LAYOUT
 from spl.token.constants import ACCOUNT_LEN
+from .constants import AVER_VERSION
 from .data_classes import UserBalanceState, MarketStatus
 from solana.publickey import PublicKey
 from .errors import parse_error
+from hashlib import sha256
 from .slab import Slab
+from .enums import AccountTypes
 from solana.keypair import Keypair
 from solana.rpc.types import RPCResponse, TxOpts
 import base64
@@ -213,9 +217,8 @@ def parse_user_market_state(buffer: bytes, aver_client: AverClient):
         Returns:
             UserMarket: UserMarketState object
         """
-        #uma_parsed = USER_MARKET_STATE_LAYOUT.parse(buffer)
-        uma_parsed = aver_client.program.account['UserMarket'].coder.accounts.decode(buffer)
-        return uma_parsed
+        return parse_with_version(aver_client.program, AccountTypes.USER_MARKET, buffer)
+
 
 def parse_market_state(buffer: bytes, aver_client: AverClient):
         """
@@ -228,8 +231,8 @@ def parse_market_state(buffer: bytes, aver_client: AverClient):
             MarketState: MarketState object
         """
         
-        market_account_info = aver_client.program.account['Market'].coder.accounts.decode(buffer)
-        return market_account_info
+        return parse_with_version(aver_client.program, AccountTypes.MARKET, buffer)
+
 
 def parse_market_store(buffer: bytes, aver_client: AverClient):
         """
@@ -242,8 +245,8 @@ def parse_market_store(buffer: bytes, aver_client: AverClient):
         Returns:
             MarketStore: MarketStore object
         """
-        market_store_account_info = aver_client.program.account['MarketStore'].coder.accounts.decode(buffer)
-        return market_store_account_info  
+        return parse_with_version(aver_client.program, AccountTypes.MARKET_STORE, buffer)
+
 
 
 def parse_user_host_lifetime_state(aver_client: AverClient, buffer):
@@ -257,8 +260,7 @@ def parse_user_host_lifetime_state(aver_client: AverClient, buffer):
         Returns:
             UserHostLifetime: UserHostLifetime object
         """
-        user_host_lifetime_info = aver_client.program.account['UserHostLifetime'].coder.accounts.decode(buffer)
-        return user_host_lifetime_info
+        return parse_with_version(aver_client.program, AccountTypes.USER_HOST_LIFETIME, buffer)
 
 async def load_multiple_account_states(
         aver_client: AverClient,
@@ -388,3 +390,40 @@ def can_cancel_order_in_market(market_status: MarketStatus):
         MarketStatus.HALTED_PRE_EVENT
     ]
 
+async def fetch_with_version(conn: AsyncClient, program: Program, account_type: AccountTypes, pubkey: PublicKey):
+    bytes = await load_bytes_data(conn, pubkey)
+    #9th byte contains version
+    return parse_with_version(program, account_type, bytes)
+
+
+async def fetch_multiple_with_version(conn: AsyncClient, program: Program, account_type: AccountTypes, pubkeys: list[PublicKey]):
+    bytes = await load_multiple_bytes_data(conn, pubkeys)
+
+    accounts = []
+    for i, d in enumerate(bytes):
+        accounts.append(parse_with_version(program, account_type, d))
+    
+    return accounts
+
+def parse_with_version(program: Program, account_type: AccountTypes, bytes: bytes):
+    #Version is 9th byte
+    version = bytes[8]
+    
+    #Checks if this is reading the correct version OR if it is not possible to read an old version
+    if(version == AVER_VERSION or program.account.get(f'{account_type.value}V{version}') is None):
+        return program.account[f'{account_type.value}'].coder.accounts.decode(bytes)
+    else:
+        #Reads old version
+        print(f'THE {account_type} BEING READ HAS NOT BEEN UPDATED TO THE LATEST VERSION')
+        print('PLEASE CALL THE UPDATE INSTRUCTION FOR THE CORRESPONDING ACCOUNT TYPE TO RECTIFY')
+        #We need to replace the discriminator on the bytes data to prevent anchor errors
+        account_discriminator = get_account_discriminator(account_type, version)
+        new_bytes = bytearray(bytes)
+        for i, a in enumerate(account_discriminator):
+            new_bytes[i] = a
+        return program.account[f'{account_type.value}V{version}'].coder.accounts.decode(new_bytes)
+
+
+def get_account_discriminator(account_type: AccountTypes, version: int):
+    name = account_type.value if version == AVER_VERSION else f'{account_type.value}V{version}'
+    return sha256(bytes(f'account:{name}', 'utf-8')).digest()[0:8]

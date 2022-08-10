@@ -130,3 +130,9 @@ class Out(NamedTuple):
     delete: bool
     user_market: PublicKey
     fee_tier: int
+
+class AccountTypes(str, Enum):
+    MARKET = 'Market'
+    MARKET_STORE = 'MarketStore'
+    USER_MARKET = 'UserMarket'
+    USER_HOST_LIFETIME = 'UserHostLifetime'

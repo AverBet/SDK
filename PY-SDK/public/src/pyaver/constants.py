@@ -75,6 +75,8 @@ CALLBACK_INFO_LEN = 33
 
 CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE = 5
 
+AVER_VERSION = 1
+
 
 ###### HELPER FUNCTIONS
 def get_aver_api_endpoint(solanaNetwork: SolanaNetwork):
