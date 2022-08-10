@@ -163,3 +163,5 @@ def check_outcome_has_orders(outcome_id: int, user_market_state: UserMarketState
     raise Exception(f'No open orders found for outcome {outcome_id} in this market.')
 
 
+
+

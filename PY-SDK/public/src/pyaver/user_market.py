@@ -16,7 +16,7 @@ from .utils import sign_and_send_transaction_instructions, load_multiple_account
 from solana.rpc.types import TxOpts
 from solana.rpc.commitment import Finalized
 from .data_classes import UserHostLifetimeState, UserMarketState, UserBalanceState
-from .constants import AVER_PROGRAM_ID, AVER_HOST_ACCOUNT, CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
+from .constants import AVER_PROGRAM_ID, AVER_HOST_ACCOUNT, AVER_VERSION, CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
 from .enums import OrderType, SelfTradeBehavior, Side, SizeFormat
 import math
 
@@ -589,6 +589,9 @@ class UserMarket():
         """
         if(not owner.public_key == self.user_market_state.user):
             raise Exception('Owner must be same as user market owner')
+        
+        await self.check_if_uma_latest_version()
+        await self.check_if_uhl_latest_version()
 
         user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
             self.user_market_state.user,
@@ -703,6 +706,9 @@ class UserMarket():
 
         if(fee_payer is None):
             fee_payer = self.aver_client.owner
+        
+        await self.check_if_uma_latest_version()
+        await self.check_if_uhl_latest_version()
 
         ix = await self.make_cancel_order_instruction(
             order_id,
@@ -833,6 +839,9 @@ class UserMarket():
         """
         if(fee_payer is None):
             fee_payer = self.aver_client.owner
+
+        await self.check_if_uma_latest_version()
+        await self.check_if_uhl_latest_version()
         
         ixs = await self.make_cancel_all_orders_instruction(outcome_ids_to_cancel, active_pre_flight_check)
 
@@ -899,6 +908,9 @@ class UserMarket():
         Returns:
             TransactionInstruction: TransactionInstruction object
         """
+        await self.check_if_uma_latest_version()
+        await self.check_if_uhl_latest_version()
+
         user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
             self.user_market_state.user,
             self.market.aver_client.owner,
@@ -983,6 +995,8 @@ class UserMarket():
         Returns:
             RPCResponse: Response
         """
+        await self.check_if_uma_latest_version()
+        await self.check_if_uhl_latest_version()
         ix = self.make_neutralize_positions_instruction(outcome_id)
 
         if(not owner.public_key == self.user_market_state.user):
@@ -995,6 +1009,21 @@ class UserMarket():
             [ix],
             send_options
         )
+
+    async def check_if_uma_latest_version(self):
+        if(self.user_market_state.version < AVER_VERSION):
+            #UPGRADE VERSION WHEN AVAILALBLE
+            #Reload
+            print('UPGRADING UMA VERSION')
+            self = await self.load_by_uma(self.aver_client, self.pubkey, self.market, self.user_host_lifetime.pubkey)
+        
+    async def check_if_uhl_latest_version(self):
+        if(self.user_host_lifetime.user_host_lifetime_state.version < AVER_VERSION):
+            #UPGRADE VERSION WHEN AVAILALBLE
+            #Reload
+            print('UPGRADING UHL VERSION')
+            self = await self.load_by_uma(self.aver_client, self.pubkey, self.market, self.user_host_lifetime.pubkey)
+
 
     def calculate_funds_available_to_withdraw(self):
         """

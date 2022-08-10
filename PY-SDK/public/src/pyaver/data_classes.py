@@ -21,7 +21,7 @@ class MarketState():
     cranker_reward: int 
     matched_count: int
     prize_balance: int
-    withdrawable_quote_token_balance: int
+    stable_quote_token_balance: int
     winning_outcome: int
     permissioned_market_flag: bool
     going_in_play_flag: bool
@@ -37,6 +37,11 @@ class MarketState():
     open_interest: int
     oracle_feed: PublicKey
     fee_tier_collection_bps_rates: list[int]
+    category: int 
+    sub_category: int
+    series: int
+    event: int
+    rounding_format: int   
     inplay_start_time: int = None
    
    

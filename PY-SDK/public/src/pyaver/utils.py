@@ -391,12 +391,36 @@ def can_cancel_order_in_market(market_status: MarketStatus):
     ]
 
 async def fetch_with_version(conn: AsyncClient, program: Program, account_type: AccountTypes, pubkey: PublicKey):
+    """
+    Fetches from onchain taking into account Aver Version
+
+    Args:
+        conn (AsyncClient): Solana AysyncClient object
+        program (Program): AnchorPy Program
+        account_type (AccountTypes): Account Type (e.g., MarketStore)
+        pubkey (PublicKey): Public key to fetch
+
+    Returns:
+        Container: Parsed and fetched object
+    """
     bytes = await load_bytes_data(conn, pubkey)
     #9th byte contains version
     return parse_with_version(program, account_type, bytes)
 
 
 async def fetch_multiple_with_version(conn: AsyncClient, program: Program, account_type: AccountTypes, pubkeys: list[PublicKey]):
+    """
+    Fetches from onchain taking into account Aver Version
+
+    Args:
+        conn (AsyncClient): Solana AysyncClient object
+        program (Program): AnchorPy Program
+        account_type (AccountTypes): Account Type (e.g., MarketStore)
+        pubkeys (list[PublicKey]): Public key to fetch
+
+    Returns:
+        list[Container]: Parsed and fetched objects
+    """
     bytes = await load_multiple_bytes_data(conn, pubkeys)
 
     accounts = []
@@ -406,6 +430,19 @@ async def fetch_multiple_with_version(conn: AsyncClient, program: Program, accou
     return accounts
 
 def parse_with_version(program: Program, account_type: AccountTypes, bytes: bytes):
+    """
+    Parses objects taking into account the Aver Version.
+
+    Rewrites first 8 bytes of discriminator
+
+    Args:
+        program (Program): AnchorPy Program
+        account_type (AccountTypes): Account Type (e.g., MarketStore)
+        bytes (bytes): Raw bytes data
+
+    Returns:
+        Container: Parsed object
+    """
     #Version is 9th byte
     version = bytes[8]
     
@@ -415,7 +452,7 @@ def parse_with_version(program: Program, account_type: AccountTypes, bytes: byte
     else:
         #Reads old version
         print(f'THE {account_type} BEING READ HAS NOT BEEN UPDATED TO THE LATEST VERSION')
-        print('PLEASE CALL THE UPDATE INSTRUCTION FOR THE CORRESPONDING ACCOUNT TYPE TO RECTIFY')
+        print('PLEASE CALL THE UPDATE INSTRUCTION FOR THE CORRESPONDING ACCOUNT TYPE TO RECTIFY, IF POSSIBLE')
         #We need to replace the discriminator on the bytes data to prevent anchor errors
         account_discriminator = get_account_discriminator(account_type, version)
         new_bytes = bytearray(bytes)
@@ -425,5 +462,16 @@ def parse_with_version(program: Program, account_type: AccountTypes, bytes: byte
 
 
 def get_account_discriminator(account_type: AccountTypes, version: int):
+    """
+    Gets the account discriminator (8 bytes) for a specific account type
+
+    Args:
+        account_type (AccountTypes): Account Type (e.g., MarketStore)
+        version (int): Version 
+
+    Returns:
+        bytes: Discriminator bytes
+    """
     name = account_type.value if version == AVER_VERSION else f'{account_type.value}V{version}'
     return sha256(bytes(f'account:{name}', 'utf-8')).digest()[0:8]
+
