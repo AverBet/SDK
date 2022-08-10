@@ -1010,6 +1010,70 @@ class UserMarket():
             send_options
         )
 
+    def make_update_user_market_orders_instruction(
+        self,
+        new_size: int
+        ):
+        """
+        Changes size of UMA account to hold more or less max open orders
+
+        Returns TransactionInstruction object only. Does not send transaction.
+
+        Args:
+            new_size (int): New number of open orders available
+
+        Returns:
+            TransactionInstruction: TransactionInstruction object
+        """
+        return self.aver_client.program.instruction['update_user_market_orders'](
+            new_size,
+            ctx=Context(
+                accounts={
+                    "user_market": self.pubkey,
+                    "user": self.user_market_state.user,
+                    "system_program": SYS_PROGRAM_ID
+                },
+            )
+        )
+    
+    async def update_user_market_orders(
+        self,
+        owner: Keypair,
+        new_size: int,
+        send_options: TxOpts = None
+    ):
+        """
+        Changes size of UMA account to hold more or less max open orders
+
+        Sends instructions on chain 
+
+        Args:
+            owner (Keypair): Owner of UserMarket account
+            new_size (int): New number of open orders available
+            send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+
+        Raises:
+            Exception: Owner must be same as UMA owner
+
+        Returns:
+            RPCResponse: Response
+        """
+        await self.check_if_uma_latest_version()
+        await self.check_if_uhl_latest_version()
+        ix = self.make_update_user_market_orders_instruction(new_size)
+
+        if(not owner.public_key == self.user_market_state.user):
+            raise Exception('Owner must be same as UMA owner')
+
+        return await sign_and_send_transaction_instructions(
+            self.aver_client,
+            [],
+            owner,
+            [ix],
+            send_options
+        )
+
+
     async def check_if_uma_latest_version(self):
         if(self.user_market_state.version < AVER_VERSION):
             #UPGRADE VERSION WHEN AVAILALBLE
