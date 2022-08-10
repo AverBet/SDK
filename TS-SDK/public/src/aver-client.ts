@@ -20,6 +20,7 @@ import { SolanaNetwork } from "./types"
 import NodeWallet from "@project-serum/anchor/dist/cjs/nodewallet"
 import { Wallet } from "@project-serum/anchor/dist/cjs/provider"
 import { SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js"
+import { checkIdlHasSameInstructionsAsSdk } from "./checks"
 
 export class AverClient {
   /**
@@ -126,6 +127,7 @@ export class AverClient {
 
     if (idl) {
       const program = new Program(idl, averProgramId, provider)
+      checkIdlHasSameInstructionsAsSdk(program)
       return new AverClient(program, averApiEndpoint, solanaNetwork, keypair)
     }
 

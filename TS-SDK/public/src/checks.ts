@@ -1,4 +1,4 @@
-import { BN } from "@project-serum/anchor"
+import { BN, Program } from "@project-serum/anchor"
 import { Market } from "./market"
 import {
   MarketStatus,
@@ -10,6 +10,7 @@ import {
 } from "./types"
 import { UserHostLifetime } from "./user-host-lifetime"
 import { roundPriceToNearestTickSize } from "./utils"
+import * as fs from "fs"
 
 export function checkSufficientLamportBalance(
   user_balance_state: UserBalanceState
@@ -266,4 +267,42 @@ export function checkOutcomeHasOrders(
   }
 
   throw Error(`No open orders found for outcome ${outcome_id} in this market.`)
+}
+
+/**
+ * Checks the idl json file's instructions against the instructions in the program
+ *
+ * Warns the user incase their SDK version may be out of date
+ *
+ * @param program -  AnchorPy Program
+ */
+export function checkIdlHasSameInstructionsAsSdk(program: Program) {
+  const data = fs.readFileSync("./idl.json", "utf-8")
+  const fileIdl = JSON.parse(data)
+  const fileInstructions = fileIdl["instructions"]
+
+  program.idl.instructions.map((i) => {
+    const fileInstruction = fileInstructions.find((f) => f["name"] === i.name)
+    if (!fileInstruction) {
+      console.log("-".repeat(10))
+      console.log(`INSTRUCTION ${i.name} IS IN THE IDL BUT IS NOT EXPECTED`)
+      console.log("THIS MEANS YOUR VERSION OF THE SDK MAY NEEDED TO BE UPDATED")
+      console.log("-".repeat(10))
+      return
+    }
+
+    const fileAccountNames = fileInstruction["accounts"].map((a) => a.name)
+    const idlAccountNames = i.accounts.map((a) => a.name)
+    //Checks for array equality
+    if (
+      fileAccountNames.sort().join(",") !== idlAccountNames.sort().join(",")
+    ) {
+      console.log("-".repeat(10))
+      console.log(
+        `INSTRUCTION ${i.name} ACCOUNTS REQUIRED FROM THE IDL ARE DIFFERENT FROM EXPECTED`
+      )
+      console.log("THIS MEANS YOUR VERSION OF THE SDK MAY NEEDED TO BE UPDATED")
+      console.log("-".repeat(10))
+    }
+  })
 }

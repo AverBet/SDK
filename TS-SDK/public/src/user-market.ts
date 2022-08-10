@@ -1092,7 +1092,7 @@ export class UserMarket {
    *
    * @returns {Promise<string>}
    */
-  cancelOrder(
+  async cancelOrder(
     feePayer: Keypair = this._averClient.keypair,
     orderId: BN,
     outcomeIndex: number,
@@ -1192,7 +1192,7 @@ export class UserMarket {
    *
    * @returns {Promise<string>} - Transaction signature
    */
-  cancelAllOrders(
+  async cancelAllOrders(
     feePayer: Keypair = this._averClient.keypair,
     outcomeIdsToCancel: number[],
     sendOptions?: SendOptions,
