@@ -26,7 +26,7 @@ import base58
 #####
 
 #To run all code from an entirely new set of keypairs and markets, set this to True
-program_id = PublicKey()
+program_id = AVER_PROGRAM_ID
 
 #Set to TRUE if Public Key is on V1.1 - This will try to read and upgrade an old market and then read it again
 #Set to FALSE o/w - This will try to create a new market and read it
@@ -35,14 +35,13 @@ v1_1 = False
 class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
-        owner = Keypair()
+        secret_key = base58.b58decode('3onYh3TSCg92X3kD9gD7RCZF1N8JFVSDp39eSkRswsQb5YwWuyMnzuCN2wuPb52XEnPzjVrCtkYe5Xo8Czd3CDyV')
+        owner = Keypair.from_secret_key(secret_key)
         market = Keypair()
         market_authority = Keypair()
 
-        if(not v1_1):
+        if(v1_1):
             market = Keypair.from_secret_key(base58.b58decode(''))
-            secret_key = base58.b58decode('5kaPbsANMg5sCbc4Uq6EkgQd8wHoNfe3Zvv8a8ERaQG5dbXoXMgPt3CDUrWecCv2a6MUExFB6bfrS3gFSwokHXgV')
-            owner = Keypair.from_secret_key(secret_key)
         else:
             print('-'*10)
             print('NEW MARKET IS BEING CREATED... NOTE DOWN SECRET KEY')
@@ -56,7 +55,7 @@ class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
             'confirmed',
             timeout=30
         )
-        client = await AverClient.load(connection, owner, opts, SolanaNetwork.DEVNET, AVER_PROGRAM_ID)
+        client = await AverClient.load(connection, owner, opts, SolanaNetwork.DEVNET, program_id)
 
         self.owner = owner
         self.client = client
@@ -69,7 +68,7 @@ class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
 
         if(not v1_1):
             await create_init_market_smoke_tests(self.client, self.owner, 2, self.market, self.market_authority)
-            market = await AverMarket.load(self.client, self.market)
+            market = await AverMarket.load(self.client, self.market.public_key)
             print('MARKET CREATED AND LOADED')
             print('MARKET STATE:')
             print(market.market_state)
@@ -78,7 +77,7 @@ class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
             print('-'*10)
         else:
             print('LOADING OLD MARKET')
-            market = await AverMarket.load(self.client, self.market)
+            market = await AverMarket.load(self.client, self.market.public_key)
             print('MARKET CREATED AND LOADED')
             print('MARKET STATE:')
             print(market.market_state)
@@ -91,7 +90,7 @@ class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
             con = await self.client.provider.connection.confirm_transaction(sig, Confirmed)
             print('MARKET UPGRADED')
             print('LOADING OLD MARKET')
-            market = await AverMarket.load(self.client, self.market)
+            market = await AverMarket.load(self.client, self.market.public_key)
             print('MARKET CREATED AND LOADED')
             print('MARKET STATE:')
             print(market.market_state)
