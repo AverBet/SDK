@@ -14,9 +14,10 @@ import {
 } from "@solana/web3.js"
 import { AverClient } from "./aver-client"
 import { AVER_PROGRAM_ID, AVER_HOST_ACCOUNT } from "./ids"
-import { FeeTier, UserHostLifetimeState } from "./types"
+import { AccountType, FeeTier, UserHostLifetimeState } from "./types"
 import {
   getBestDiscountToken,
+  parseWithVersion,
   signAndSendTransactionInstructions,
 } from "./utils"
 
@@ -248,9 +249,16 @@ export class UserHostLifetime {
     )[0]
 
     // check if account exists first, and if so return it
-    const userHostLifetimeResult = await averClient.program.account[
-      "userHostLifetime"
-    ].fetchNullable(userHostLifetime)
+    const userHostLifetimeResultUnparsed =
+      await averClient.connection.getAccountInfo(userHostLifetime)
+
+    const userHostLifetimeResult = userHostLifetimeResultUnparsed?.data
+      ? parseWithVersion(
+          averClient.program,
+          AccountType.USER_HOST_LIFETIME,
+          userHostLifetimeResultUnparsed
+        )
+      : null
 
     if (userHostLifetimeResult) {
       const userHostLifetimeState = UserHostLifetime.parseHostState(

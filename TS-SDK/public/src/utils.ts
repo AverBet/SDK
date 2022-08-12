@@ -1,4 +1,4 @@
-import { ProgramError } from "@project-serum/anchor"
+import { Program, ProgramError } from "@project-serum/anchor"
 import {
   Keypair,
   Connection,
@@ -7,15 +7,20 @@ import {
   PublicKey,
   SendOptions,
   SystemProgram,
+  AccountInfo,
 } from "@solana/web3.js"
 import { chunk } from "lodash"
 import { AverClient } from "./aver-client"
+import { sha256 } from "js-sha256"
+import camelcase from "camelcase"
 import { parseError } from "./errors"
 import {
   AVER_COMMUNITY_REWARDS_NFT,
   AVER_TOKEN,
+  AVER_VERSION,
   getAverLaunchZeroFeesToken,
 } from "./ids"
+import { AccountType } from "./types"
 
 /**
  * Cryptographically signs transaction and sends onchain
@@ -202,4 +207,64 @@ export const getBestDiscountToken = async (
   }
 
   return SystemProgram.programId
+}
+
+export function parseWithVersion(
+  program: Program,
+  account_type: AccountType,
+  bytes: AccountInfo<Buffer | null>
+) {
+  if (!bytes.data) throw new Error("Buffer not found")
+  //Version is 9th byte
+  const version = bytes && bytes.data ? bytes.data[8] : null
+  if (version == null) throw new Error(`Error parsing ${account_type}`)
+
+  //Checks if this is reading the correct version OR if it is not possible to read an old version
+  if (
+    version === AVER_VERSION ||
+    !program.account[`${account_type}V${version}`]
+  ) {
+    const firstLetterUppercase = `${account_type}`[0].toUpperCase()
+    return program.account[`${account_type}`].coder.accounts.decode(
+      firstLetterUppercase + `${account_type}`.substring(1),
+      bytes.data
+    )
+  } else {
+    //Reads old version
+    console.log(
+      `THE ${account_type} BEING READ HAS NOT BEEN UPDATED TO THE LATEST VERSION`
+    )
+    console.log(
+      "PLEASE CALL THE UPDATE INSTRUCTION FOR THE CORRESPONDING ACCOUNT TYPE TO RECTIFY, IF POSSIBLE"
+    )
+    //We need to replace the discriminator on the bytes data to prevent anchor errors
+    const account_discriminator = accountDiscriminator(account_type, version)
+    account_discriminator.map((v, i, a) => {
+      //@ts-expect-error
+      bytes.data[i] = v
+      return 1
+    })
+
+    const firstLetterUppercase = `${account_type}V${version}`[0].toUpperCase()
+    return program.account[`${account_type}V${version}`].coder.accounts.decode(
+      firstLetterUppercase + `${account_type}V${version}`.substring(1),
+      bytes.data
+    )
+  }
+}
+
+/**
+ * Calculates and returns a unique 8 byte discriminator prepended to all anchor accounts.
+ *
+ * @param name The name of the account to calculate the discriminator.
+ */
+function accountDiscriminator(
+  account_type: AccountType,
+  version: number
+): Buffer {
+  return Buffer.from(
+    sha256.digest(
+      `account:${camelcase(`${account_type}V${version}`, { pascalCase: true })}`
+    )
+  ).slice(0, 8)
 }

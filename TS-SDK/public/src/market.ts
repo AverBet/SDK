@@ -25,6 +25,7 @@ import {
 } from "./ids"
 import { Orderbook } from "./orderbook"
 import {
+  AccountType,
   MarketState,
   MarketStatus,
   MarketStoreState,
@@ -35,7 +36,7 @@ import {
 } from "./types"
 import { UserHostLifetime } from "./user-host-lifetime"
 import { UserMarket } from "./user-market"
-import { chunkAndFetchMultiple } from "./utils"
+import { chunkAndFetchMultiple, parseWithVersion } from "./utils"
 
 export class Market {
   /**
@@ -174,27 +175,41 @@ export class Market {
     pubkeys: PublicKey[]
   ): Promise<(Market | null)[]> {
     const program = averClient.program
-    const marketStorePubkeys = await Market.deriveMarketStorePubkeysAndBump(
-      pubkeys
-    )
-    const marketResultsAndMarketStoreResults = await Promise.all([
-      program.account["market"].fetchMultiple(pubkeys),
-      program.account["marketStore"].fetchMultiple(
-        marketStorePubkeys.map(([pubkey, bump]) => {
-          return pubkey
-        })
-      ),
-    ])
+    const marketStorePubkeys = (
+      await Market.deriveMarketStorePubkeysAndBump(pubkeys)
+    ).map(([pubkey, bump]) => {
+      return pubkey
+    })
 
-    const marketStates = marketResultsAndMarketStoreResults[0].map(
-      (marketResult) =>
-        marketResult ? Market.parseMarketState(marketResult) : null
-    )
-    const marketStoreStates = marketResultsAndMarketStoreResults[1].map(
-      (marketStoreResult) =>
-        marketStoreResult
-          ? Market.parseMarketStoreState(marketStoreResult)
+    // const marketResultsAndMarketStoreResults = await Promise.all([
+    //   program.account["market"].fetchMultiple(pubkeys),
+    //   program.account["marketStore"].fetchMultiple(marketStorePubkeys),
+    // ])
+
+    const marketResultsAndMarketStoreResults =
+      await averClient.connection.getMultipleAccountsInfo(
+        pubkeys.concat(marketStorePubkeys)
+      )
+
+    const marketStateResults = marketResultsAndMarketStoreResults
+      .slice(0, pubkeys.length)
+      .map((v) =>
+        v ? parseWithVersion(averClient.program, AccountType.MARKET, v) : null
+      )
+
+    const marketStoreStateResults = marketResultsAndMarketStoreResults
+      .slice(pubkeys.length, marketResultsAndMarketStoreResults.length)
+      .map((v) =>
+        v
+          ? parseWithVersion(averClient.program, AccountType.MARKET_STORE, v)
           : null
+      )
+
+    const marketStates = marketStateResults.map((marketResult) =>
+      marketResult ? Market.parseMarketState(marketResult) : null
+    )
+    const marketStoreStates = marketStoreStateResults.map((marketStoreResult) =>
+      marketStoreResult ? Market.parseMarketStoreState(marketStoreResult) : null
     )
 
     const nestedOrderbooks =
@@ -437,12 +452,7 @@ export class Market {
     marketsData: AccountInfo<Buffer | null>[]
   ): (MarketState | null)[] {
     return marketsData.map((marketData) =>
-      marketData?.data
-        ? averClient.program.account["market"].coder.accounts.decode(
-            "Market",
-            marketData.data
-          )
-        : null
+      parseWithVersion(averClient.program, AccountType.MARKET, marketData)
     )
   }
 
@@ -458,12 +468,11 @@ export class Market {
     marketStoresData: AccountInfo<Buffer | null>[]
   ): (MarketStoreState | null)[] {
     return marketStoresData.map((marketStoreData) =>
-      marketStoreData?.data
-        ? averClient.program.account["marketStore"].coder.accounts.decode(
-            "MarketStore",
-            marketStoreData.data
-          )
-        : null
+      parseWithVersion(
+        averClient.program,
+        AccountType.MARKET_STORE,
+        marketStoreData
+      )
     )
   }
 

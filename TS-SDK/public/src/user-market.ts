@@ -17,6 +17,7 @@ import { SelfTradeBehavior } from "@bonfida/aaob"
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token"
 import { AverClient } from "./aver-client"
 import {
+  AccountType,
   OrderbookAccountsState,
   OrderType,
   Side,
@@ -26,6 +27,7 @@ import {
 } from "./types"
 import {
   getBestDiscountToken,
+  parseWithVersion,
   signAndSendTransactionInstructions,
 } from "./utils"
 import { Market } from "./market"
@@ -558,12 +560,11 @@ export class UserMarket {
     userMarketStoresData: AccountInfo<Buffer | null>[]
   ): (UserMarketState | null)[] {
     return userMarketStoresData.map((marketStoreData) =>
-      marketStoreData?.data
-        ? averClient.program.account["userMarket"].coder.accounts.decode(
-            "UserMarket",
-            marketStoreData.data
-          )
-        : null
+      parseWithVersion(
+        averClient.program,
+        AccountType.USER_MARKET,
+        marketStoreData
+      )
     )
   }
 

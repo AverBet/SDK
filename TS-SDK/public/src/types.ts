@@ -236,3 +236,10 @@ export type SlabOrder = {
   // user_market: PublicKey
   // fee_tier: number
 }
+
+export enum AccountType {
+  MARKET = "market",
+  MARKET_STORE = "marketStore",
+  USER_MARKET = "userMarket",
+  USER_HOST_LIFETIME = "userHostLifetime",
+}
