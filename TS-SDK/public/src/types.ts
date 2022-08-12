@@ -63,7 +63,7 @@ export type MarketState = {
   averAccumulatedFees: BN
   thirdPartyAccumulatedFees: BN
   openInterest: BN
-  withdrawableQuoteTokenBalance: BN
+  stableQuoteTokenBalance: BN
   permissionedMarketFlag: boolean
   goingInPlayFlag: boolean
   quoteTokenMint: PublicKey
@@ -75,6 +75,11 @@ export type MarketState = {
   feeTierCollectionBpsRates: [BN, BN, BN, BN, BN, BN, BN]
   marketName: string
   outcomeNames: string[]
+  category: number
+  subCategory: number
+  series: number
+  event: number
+  roundingFormat: number
 }
 
 export type MarketStoreState = {
