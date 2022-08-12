@@ -181,11 +181,6 @@ export class Market {
       return pubkey
     })
 
-    // const marketResultsAndMarketStoreResults = await Promise.all([
-    //   program.account["market"].fetchMultiple(pubkeys),
-    //   program.account["marketStore"].fetchMultiple(marketStorePubkeys),
-    // ])
-
     const marketResultsAndMarketStoreResults =
       await averClient.connection.getMultipleAccountsInfo(
         pubkeys.concat(marketStorePubkeys)
