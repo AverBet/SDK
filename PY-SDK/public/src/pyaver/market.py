@@ -1,3 +1,5 @@
+from asyncio import gather
+from numpy import deprecate
 from solana.rpc.async_api import AsyncClient
 from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .event_queue import load_all_event_queues, prepare_user_accounts_list
@@ -7,7 +9,7 @@ from spl.token.instructions import get_associated_token_address
 from solana.keypair import Keypair
 from .enums import AccountTypes, Fill, MarketStatus
 from .constants import AVER_MARKET_AUTHORITY, AVER_PROGRAM_ID
-from .utils import fetch_multiple_with_version, fetch_with_version, load_multiple_bytes_data, sign_and_send_transaction_instructions, parse_market_store, parse_market_state
+from .utils import fetch_multiple_with_version, fetch_with_version, load_multiple_bytes_data, parse_bytes_data, parse_with_version, sign_and_send_transaction_instructions, parse_market_store, parse_market_state
 from .data_classes import MarketState, MarketStoreState, OrderbookAccountsState
 from .orderbook import Orderbook
 from .slab import Slab
@@ -40,13 +42,18 @@ class AverMarket():
     aver_client: AverClient
     """AverClient object"""
 
+    program_id: PublicKey
+    """Program ID for this Market"""
+
     def __init__(
         self, 
         aver_client: AverClient, 
         market_pubkey: PublicKey,
         market_state: MarketState,
+        program_id: PublicKey, 
         market_store_state: MarketStoreState = None,
         orderbooks: list[Orderbook] = None,
+       
         ):
         """
         Initialise an AverMarket object. Do not use this function; use AverMarket.load() instead.
@@ -55,6 +62,7 @@ class AverMarket():
             aver_client (AverClient): AverClient object
             market_pubkey (PublicKey): Market public key
             market_state (MarketState): MarketState object
+            program_id(PublicKey): Program ID Public Key
             market_store_state (MarketStoreState, optional): MarketStoreState object. Defaults to None.
             orderbooks (list[Orderbook], optional): List of Orderbook objects. Defaults to None.
         """
@@ -63,6 +71,7 @@ class AverMarket():
         self.market_store_state = market_store_state
         self.orderbooks = orderbooks
         self.aver_client = aver_client
+        self.program_id = program_id
 
         if(market_state.number_of_outcomes == 2 and orderbooks is not None and len(orderbooks) == 1):
             orderbooks.append(orderbooks[0].invert())
@@ -81,12 +90,13 @@ class AverMarket():
         Returns:
             AverMarket: AverMarket object
         """
-        market_state_and_store = await AverMarket.load_market_state_and_store(aver_client, market_pubkey)
-        market_state: MarketState = market_state_and_store['market_states'][0]
+        market_state_and_program_id= await AverMarket.load_market_state_and_program_id(aver_client, market_pubkey)
+        market_state: MarketState = market_state_and_program_id['state']
+        program_id: PublicKey = market_state_and_program_id['program_id']
         market_store_state = None
         orderbooks = None
         is_market_status_closed = AverMarket.is_market_status_closed(market_state.market_status)
-        market_store_state: MarketStoreState = market_state_and_store['market_stores'][0]
+        market_store_state: MarketStoreState = await AverMarket.load_market_store_state(aver_client, is_market_status_closed, market_state.market_store)
 
         if(not is_market_status_closed):
             orderbooks = await AverMarket.get_orderbooks_from_orderbook_accounts(
@@ -95,7 +105,7 @@ class AverMarket():
                 [market_state.decimals] * len(market_store_state.orderbook_accounts)
             )
 
-        return AverMarket(aver_client, market_pubkey, market_state, market_store_state, orderbooks)
+        return AverMarket(aver_client, market_pubkey, market_state, program_id, market_store_state, orderbooks)
 
     @staticmethod
     async def load_multiple(aver_client: AverClient, market_pubkeys: list[PublicKey]):
@@ -113,14 +123,16 @@ class AverMarket():
         Returns:
             list[AverMarket]: List of AverMarket objects
         """
-        market_states_and_stores = await AverMarket.load_multiple_market_states_and_stores(aver_client, market_pubkeys)
-        market_states: list[MarketState] = market_states_and_stores['market_states']
-
+        #market_states_and_stores = await AverMarket.load_multiple_market_states_and_stores(aver_client, market_pubkeys)
+        market_states_and_program_ids = await AverMarket.load_multiple_market_states_and_program_ids(aver_client, market_pubkeys)
+        market_states: list[MarketState] = [m['state'] for m in market_states_and_program_ids]
+        program_ids: list[PublicKey] = [m['program_id'] for m in market_states_and_program_ids]
         are_market_statuses_closed = []
         for market_state in market_states:
             are_market_statuses_closed.append(AverMarket.is_market_status_closed(market_state.market_status))
 
-        market_stores: list[MarketStoreState] = market_states_and_stores['market_stores']
+        market_store_pubkeys = [m.market_store for m in market_states]
+        market_stores: list[MarketStoreState] = await AverMarket.load_multiple_market_store_states(aver_client, market_store_pubkeys)
 
         orderbooks_market_list = await AverMarket.get_orderbooks_from_orderbook_accounts_multiple_markets(
             aver_client.provider.connection,
@@ -134,8 +146,9 @@ class AverMarket():
             market = AverMarket(
                 aver_client, 
                 market_pubkey,
-                market_states[index], 
-                market_stores[index], 
+                market_states[index],
+                program_ids[index],
+                market_stores[index],
                 orderbooks_market_list[index]
                 )
             markets.append(market)
@@ -143,7 +156,7 @@ class AverMarket():
         return markets
 
     @staticmethod
-    async def load_market_state(aver_client: AverClient, market_pubkey: PublicKey) -> MarketState:
+    async def load_market_state_and_program_id(aver_client: AverClient, market_pubkey: PublicKey) -> MarketState:
         """
         Loads onchain data for a MarketState
 
@@ -154,11 +167,14 @@ class AverMarket():
         Returns:
             MarketState: MarketState object
         """
-        return await fetch_with_version(aver_client.connection, aver_client.program, AccountTypes.MARKET, market_pubkey)
+        response = await aver_client.connection.get_account_info(market_pubkey)
+        program = await aver_client.get_program_from_program_id(PublicKey(response['result']['value']['owner']))
+        state =  parse_with_version(program, AccountTypes.MARKET, parse_bytes_data(response))
+        return {'state': state, 'program_id': program.program_id}
 
  
     @staticmethod
-    async def load_multiple_market_states(aver_client: AverClient, market_pubkeys: list[PublicKey]) -> list[MarketState]:
+    async def load_multiple_market_states_and_program_ids(aver_client: AverClient, market_pubkeys: list[PublicKey]) -> list[MarketState]:
         """
         Loads onchain data for multiple MarketStates
 
@@ -169,9 +185,18 @@ class AverMarket():
         Returns:
             list[MarketState]: List of MarketState objects
         """
-        return await fetch_with_version(aver_client.connection, aver_client.program, AccountTypes.MARKET, market_pubkeys)
-   
+        res = await load_multiple_bytes_data(aver_client.connection, market_pubkeys, [], False)
+        programs = await gather(*[aver_client.get_program_from_program_id(PublicKey(r['owner'])) for r in res])
+        market_states_and_program_ids = []
+        for i, m in enumerate(res):
+            state = parse_with_version(programs[i], AccountTypes.MARKET, m['data'])
+            program = programs[i]
+            market_states_and_program_ids.append({'state': state, 'program_id': program.program_id})
+        return market_states_and_program_ids
+        
+    
     @staticmethod
+    @deprecate
     async def load_market_state_and_store(aver_client: AverClient, market_pubkey: PublicKey):
         """
         Loads onchain data for multiple MarketStates and MarketStoreStates at once
@@ -185,7 +210,9 @@ class AverMarket():
         """
         return await AverMarket.load_multiple_market_states_and_stores(aver_client, [market_pubkey])
 
+    
     @staticmethod
+    @deprecate
     async def load_multiple_market_states_and_stores(aver_client: AverClient, market_pubkeys: list[PublicKey]):
         """
         Loads onchain data for multiple MarketStates and MarketStoreStates at once
@@ -197,6 +224,7 @@ class AverMarket():
         Returns:
             dict[str, list[MarketState] or list[MarketStoreState]]: Keys are market_states or market_stores
         """
+
         market_store_pubkeys = [AverMarket.derive_market_store_pubkey_and_bump(m, AVER_PROGRAM_ID)[0] for m in market_pubkeys]
 
         data = await load_multiple_bytes_data(aver_client.connection, market_pubkeys + market_store_pubkeys)
@@ -303,7 +331,11 @@ class AverMarket():
         #Closed markets do not have orderbooks
         if(is_market_status_closed):
             return None
-        return await fetch_with_version(aver_client.connection, aver_client.program, AccountTypes.MARKET_STORE, market_store_pubkey)
+        response = await aver_client.connection.get_account_info(market_store_pubkey)
+        program = await aver_client.get_program_from_program_id(PublicKey(response['result']['value']['owner']))
+        state = parse_with_version(program, AccountTypes.MARKET_STORE, parse_bytes_data(response))
+        return state
+        
 
 
     @staticmethod
@@ -321,7 +353,13 @@ class AverMarket():
         Returns:
             list[MarketStoreState]: List of MarketStore public keys
         """
-        return await fetch_multiple_with_version(aver_client.connection, aver_client.program, AccountTypes.MARKET_STORE, market_store_pubkeys)             
+        response = await load_multiple_bytes_data(aver_client.connection, market_store_pubkeys, [], False)
+        market_stores = []
+        for r in response:
+            program = await aver_client.get_program_from_program_id(PublicKey(r['owner']))
+            state = parse_with_version(program, AccountTypes.MARKET_STORE, r['data'])
+            market_stores.append(state)
+        return market_stores
 
     @staticmethod
     def is_market_status_closed(market_status: MarketStatus):

@@ -76,7 +76,6 @@ class UserMarket():
             market: AverMarket, 
             owner: PublicKey, 
             host: PublicKey = AVER_HOST_ACCOUNT,
-            program_id: PublicKey = AVER_PROGRAM_ID
         ):
             """
             Initialises an UserMarket object from Market, Host and Owner public keys
@@ -93,9 +92,9 @@ class UserMarket():
             Returns:
                 UserMarket: UserMarket object
             """
-            uma, bump = UserMarket.derive_pubkey_and_bump(owner, market.market_pubkey, host, program_id)
-            uhl = UserHostLifetime.derive_pubkey_and_bump(owner, host, program_id)[0]
-            return await UserMarket.load_by_uma(aver_client, uma, market, uhl)
+            uma, bump = UserMarket.derive_pubkey_and_bump(owner, market.market_pubkey, host, market.program_id)
+            uhl = UserHostLifetime.derive_pubkey_and_bump(owner, host, market.program_id)[0]
+            return await UserMarket.load_by_uma(aver_client, uma, market, uhl, market.program_id)
 
     @staticmethod
     async def load_multiple(
@@ -103,7 +102,6 @@ class UserMarket():
             markets: list[AverMarket], 
             owners: list[PublicKey], 
             host: PublicKey = AVER_HOST_ACCOUNT,
-            program_id: PublicKey = AVER_PROGRAM_ID,
         ):
             """
             Initialises multiple UserMarket objects from Market, Host and Owner public keys
@@ -124,8 +122,11 @@ class UserMarket():
             """
             umas = []
             for i, m in enumerate(markets):
+                program_id = m.program_id
                 umas.append(UserMarket.derive_pubkey_and_bump(owners[i], m.market_pubkey, host, program_id)[0])
-            uhls = [UserHostLifetime.derive_pubkey_and_bump(owner, host, program_id)[0] for owner in owners]
+            uhls = []
+            for i, o in enumerate(owners):
+                uhls.append(UserHostLifetime.derive_pubkey_and_bump(o, host, markets[i].program_id)[0])
             return await UserMarket.load_multiple_by_uma(aver_client, umas, markets, uhls)
 
     @staticmethod
@@ -133,7 +134,7 @@ class UserMarket():
             aver_client: AverClient,
             pubkey: PublicKey,
             market: (AverMarket or PublicKey),
-            uhl: PublicKey
+            uhl: PublicKey,
         ):
         """
         Initialises an UserMarket object from UserMarket account public key
@@ -149,15 +150,16 @@ class UserMarket():
         Returns:
             UserMarket: UserMarket object
         """
-        res: UserMarketState = await aver_client.program.account['UserMarket'].fetch(pubkey)
+        if(isinstance(market, PublicKey)):
+            market = await AverMarket.load(aver_client, market)
+
+        program = await aver_client.get_program_from_program_id(market.program_id)
+        res: UserMarketState = await program.account['UserMarket'].fetch(pubkey)
         uhl = await UserHostLifetime.load(aver_client, uhl)
 
         lamport_balance = await aver_client.request_lamport_balance(res.user)
         token_balance = await aver_client.request_token_balance(aver_client.quote_token, res.user)
         user_balance_state = UserBalanceState(lamport_balance, token_balance)
-
-        if(isinstance(market, PublicKey)):
-            market = await AverMarket.load(aver_client, market)
 
         if(res.market.to_base58() != market.market_pubkey.to_base58()):
             raise Exception('UserMarket and Market do not match')
@@ -188,8 +190,9 @@ class UserMarket():
         Returns:
             list[UserMarket]: List of UserMarket objects
         """
-
-        res: list[UserMarketState] = await aver_client.program.account['UserMarket'].fetch_multiple(pubkeys)
+        #Just use the first program to load. This should not matter for the purpose of parsing IDLs
+        #TODO - review
+        res: list[UserMarketState] = await aver_client.programs[0].account['UserMarket'].fetch_multiple(pubkeys)
         uhls = await UserHostLifetime.load_multiple(aver_client, uhls)
 
         user_pubkeys = [u.user for u in res]
@@ -394,7 +397,6 @@ class UserMarket():
             number_of_orders: int = None,
             referrer: PublicKey = SYS_PROGRAM_ID,
             discount_token: PublicKey = SYS_PROGRAM_ID,
-            program_id: PublicKey = AVER_PROGRAM_ID 
         ):
         """
         Attempts to load UserMarket object or creates one if not one is not found
@@ -421,9 +423,9 @@ class UserMarket():
         if(owner is None):
             owner = client.owner
         
-        user_market_pubkey = UserMarket.derive_pubkey_and_bump(owner.public_key, market.market_pubkey, host, program_id)[0]
+        user_market_pubkey = UserMarket.derive_pubkey_and_bump(owner.public_key, market.market_pubkey, host, market.program_id)[0]
         try:
-            uma = await UserMarket.load(client, market, owner.public_key, host, program_id)
+            uma = await UserMarket.load(client, market, owner.public_key, host, market.program_id)
             return uma
         except:
             uhl = await UserHostLifetime.get_or_create_user_host_lifetime(
@@ -434,7 +436,7 @@ class UserMarket():
                 host,
                 referrer,
                 discount_token,
-                program_id
+                market.program_id
             )
 
             sig = await UserMarket.create_user_market_account(
@@ -444,7 +446,7 @@ class UserMarket():
                 send_options,
                 host,
                 number_of_orders,
-                program_id,
+                market.program_id
             )
 
             await client.provider.connection.confirm_transaction(
@@ -457,7 +459,7 @@ class UserMarket():
                 market,  
                 owner.public_key,
                 host,
-                program_id)
+                market.program_id)
 
 
 

@@ -142,13 +142,12 @@ async def sign_and_send_transaction_instructions(
     if(send_options == None):
         send_options = client.provider.opts
     
-
     attempts = 0
     while attempts <= manual_max_retry:
         try:
             return await client.provider.connection.send_transaction(tx, *signers, opts=send_options)
         except Exception as e:
-            error = parse_error(e, client.program)
+            error = parse_error(e, client.programs[0])
             if(isinstance(error, ProgramError)):
                 raise error
             else:

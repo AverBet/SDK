@@ -27,8 +27,8 @@ class AverClient():
 
     connection: AsyncClient
     """Solana AsyncClient"""
-    program: Program
-    """AnchorPy Program"""
+    programs: list[Program]
+    """AnchorPy Programs"""
     provider: Provider
     """AnchorPy Provider"""
     aver_api_endpoint: str
@@ -57,7 +57,7 @@ class AverClient():
             solana_network (SolanaNetwork): Solana network
         """
         self.connection = program.provider.connection
-        self.program = program
+        self.programs = [program]
         self.provider = program.provider
         self.aver_api_endpoint = aver_api_endpoint
         self.solana_network = solana_network
@@ -128,55 +128,67 @@ class AverClient():
         idl = await Program.fetch_idl(program_id,provider)
         if(idl):
             program = Program(idl, program_id, provider)
-            check_idl_has_same_instructions_as_sdk(program)
+            AverClient.check_idl_has_same_instructions_as_sdk(program)
             return program
         else:
             raise Exception('Program IDL not loaded')
 
+    async def add_program(self, program_id: PublicKey):
+        program = await AverClient.load_program(self.provider, program_id)
+        self.programs.append(program)
+        return program
+    
+    async def get_program_from_program_id(self, program_id: PublicKey):
+        for p in self.programs:
+            if(p.program_id.to_base58() == program_id.to_base58()):
+                return p
+        return await self.add_program(program_id)
+
     ####
 ## IDL Checks
 
-def check_idl_has_same_instructions_as_sdk(program: Program):
-    """
-    Checks the idl json file's instructions against the instructions in the program
-
-    Warns the user incase their SDK version may be out of date
-
-    Args:
-        program (Program): AnchorPy Program
-    """
-    def camel_to_snake(name: str):
+    @staticmethod
+    def check_idl_has_same_instructions_as_sdk(program: Program):
         """
-        Converts from CamelCase to snake_case
+        Checks the idl json file's instructions against the instructions in the program
+
+        Warns the user incase their SDK version may be out of date
 
         Args:
-            name (str): Camel case name
-
-        Returns:
-            name: Snake case name
+            program (Program): AnchorPy Program
         """
-        name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+        def camel_to_snake(name: str):
+            """
+            Converts from CamelCase to snake_case
 
-    file_path = os.path.join(os.path.dirname(__file__), './idl.json')
-    file_idl = json.load(open(file_path))
-    file_instructions = file_idl['instructions']
-    for i in program.idl.instructions:
-        file_instruction = next((x for x in file_instructions if camel_to_snake(x['name']) == i.name), None)
-        if(file_instruction is None):
-            print('-'*10)
-            print(f'INSTRUCTION {i.name} IS IN THE IDL BUT IS NOT EXPECTED')
-            print('THIS MEANS YOUR VERSION OF THE SDK MAY NEEDED TO BE UPDATED')
-            print('-'*10)
-            continue
+            Args:
+                name (str): Camel case name
 
-        file_account_names = [camel_to_snake(f['name']) for f in file_instruction['accounts']]
-        idl_account_names = [a.name for a in i.accounts]
-        if(not np.array_equal(file_account_names, idl_account_names)):
-            print('-'*10)
-            print(f'INSTRUCTION {i.name} ACCOUNTS REQUIRED FROM THE IDL ARE DIFFERENT FROM EXPECTED')
-            print('THIS MEANS YOUR VERSION OF THE SDK MAY NEEDED TO BE UPDATED')
-            print('-'*10)
+            Returns:
+                name: Snake case name
+            """
+            name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+
+        file_path = os.path.join(os.path.dirname(__file__), './idl.json')
+        file_idl = json.load(open(file_path))
+        file_instructions = file_idl['instructions']
+        for i in program.idl.instructions:
+            file_instruction = next((x for x in file_instructions if camel_to_snake(x['name']) == i.name), None)
+            if(file_instruction is None):
+                print('-'*10)
+                print(f'INSTRUCTION {i.name} IS IN THE IDL BUT IS NOT EXPECTED')
+                print('THIS MEANS YOUR VERSION OF THE SDK MAY NEEDED TO BE UPDATED')
+                print('-'*10)
+                continue
+
+            file_account_names = [camel_to_snake(f['name']) for f in file_instruction['accounts']]
+            idl_account_names = [a.name for a in i.accounts]
+            if(not np.array_equal(file_account_names, idl_account_names)):
+                print('-'*10)
+                print(f'INSTRUCTION {i.name} ACCOUNTS REQUIRED FROM THE IDL ARE DIFFERENT FROM EXPECTED')
+                print('THIS MEANS YOUR VERSION OF THE SDK MAY NEEDED TO BE UPDATED')
+                print('-'*10)
 
 
 

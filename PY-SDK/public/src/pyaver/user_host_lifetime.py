@@ -134,7 +134,7 @@ class UserHostLifetime():
             return await UserHostLifetime.load(client, user_host_lifetime)
     
     @staticmethod
-    def make_create_user_host_lifetime_instruction(
+    async def make_create_user_host_lifetime_instruction(
         aver_client: AverClient,
         user_quote_token_ata: PublicKey,
         owner: Keypair,
@@ -172,7 +172,10 @@ class UserHostLifetime():
             is_writable=True,
             pubkey=referrer,
         )
-        return aver_client.program.instruction['init_user_host_lifetime']( 
+        #Just use the first program as they will all have init_user_host_lifetime
+        #TODO - review
+        program = await aver_client.get_program_from_program_id(program_id)
+        return program.instruction['init_user_host_lifetime']( 
             bump,
             ctx=Context(
                 accounts={
@@ -216,7 +219,7 @@ class UserHostLifetime():
         Returns:
             RPCResponse: Response
         """
-        ix = UserHostLifetime.make_create_user_host_lifetime_instruction(
+        ix = await UserHostLifetime.make_create_user_host_lifetime_instruction(
             aver_client,
             user_quote_token_ata,
             owner,
@@ -234,7 +237,6 @@ class UserHostLifetime():
                 skip_preflight=send_options.skip_confirmation,
                 preflight_commitment=Finalized,
                 max_retries=send_options.max_retries)
-
 
         return await sign_and_send_transaction_instructions(
             aver_client,
