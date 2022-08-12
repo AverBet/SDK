@@ -1366,6 +1366,63 @@ export class UserMarket {
   }
 
   /**
+   * Changes size of UMA account to hold more or less max open orders
+   *
+   * Returns TransactionInstruction object only. Does not send transaction.
+   *
+   * @param {number} newSize - New number of open orders available
+   * @returns {Promise<TransactionInstruction>} TransactionInstruction object
+   */
+  async makeUpdateUserMarketOrders(newSize: number) {
+    return this._averClient.program.instruction["updateUserMarketOrders"](
+      newSize,
+      {
+        accounts: {
+          user: this.user,
+          userMarket: this.pubkey,
+          systemProgram: SystemProgram.programId,
+        },
+      }
+    )
+  }
+
+  /**
+   * Changes size of UMA account to hold more or less max open orders
+   *
+   * Sends instructions on chain
+   *
+   * @param {Keypair} owner - Owner of UserMarket account
+   * @param {number} newSize - New number of open orders available
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction. Defaults to None.
+   * @param {number} manualMaxRetry - No. of times to retry in case of failure
+   *
+   * @returns {Promise<string>} - Transaction signature
+   */
+  async updateUserMarketOrders(
+    owner: Keypair = this._averClient.keypair,
+    newSize: number,
+    sendOptions?: SendOptions,
+    manualMaxRetry?: number
+  ) {
+    if (!owner.publicKey.equals(this.user))
+      throw new Error("Owner must be same as user market owner")
+
+    await this.checkIfUhlLatestVersion()
+    await this.checkIfUmaLatestVersion()
+
+    const ix = await this.makeUpdateUserMarketOrders(newSize)
+
+    return signAndSendTransactionInstructions(
+      this._averClient,
+      [],
+      owner,
+      [ix],
+      sendOptions,
+      manualMaxRetry
+    )
+  }
+
+  /**
    * Loads UserMarket listener
    *
    * @param {(userMarket: UserMarket) => void} callback - Callback function
