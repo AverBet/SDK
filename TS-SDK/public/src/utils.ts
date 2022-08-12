@@ -209,6 +209,16 @@ export const getBestDiscountToken = async (
   return SystemProgram.programId
 }
 
+/**
+ * Parses objects taking into account the Aver Version.
+ *
+ * Rewrites first 8 bytes of discriminator
+ *
+ * @param {Program} program - AnchorPy Program
+ * @param {AccountType} account_type - Account Type (e.g., MarketStore)
+ * @param {AccountInfo<Buffer | null>} bytes - Raw data from onchain
+ * @returns Parsed object
+ */
 export function parseWithVersion(
   program: Program,
   account_type: AccountType,
@@ -256,7 +266,8 @@ export function parseWithVersion(
 /**
  * Calculates and returns a unique 8 byte discriminator prepended to all anchor accounts.
  *
- * @param name The name of the account to calculate the discriminator.
+ * @param {AccountType} account_type - The name of the account to calculate the discriminator.
+ * @param {number} version - Aver version of account
  */
 function accountDiscriminator(
   account_type: AccountType,

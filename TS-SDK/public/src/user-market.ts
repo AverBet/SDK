@@ -1003,6 +1003,9 @@ export class UserMarket {
     selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide,
     averPreFlightCheck: boolean = true
   ) {
+    await this.checkIfUhlLatestVersion()
+    await this.checkIfUmaLatestVersion()
+
     const ix = await this.makePlaceOrderInstruction(
       outcomeIndex,
       side,
@@ -1101,6 +1104,9 @@ export class UserMarket {
     manualMaxRetry?: number,
     averPreFlightCheck: boolean = true
   ) {
+    await this.checkIfUhlLatestVersion()
+    await this.checkIfUmaLatestVersion()
+
     const ix = await this.makeCancelOrderInstruction(
       orderId,
       outcomeIndex,
@@ -1200,6 +1206,9 @@ export class UserMarket {
     manualMaxRetry?: number,
     averPreFlightCheck: boolean = true
   ) {
+    await this.checkIfUhlLatestVersion()
+    await this.checkIfUmaLatestVersion()
+
     const ixs = await this.makeCancelAllOrdersInstructions(
       outcomeIdsToCancel,
       averPreFlightCheck
@@ -1341,6 +1350,9 @@ export class UserMarket {
     if (!owner.publicKey.equals(this.user))
       throw new Error("Owner must be same as user market owner")
 
+    await this.checkIfUhlLatestVersion()
+    await this.checkIfUmaLatestVersion()
+
     const ix = await this.makeNeutralizePositionInstruction(outcomeId)
 
     return signAndSendTransactionInstructions(
@@ -1437,5 +1449,23 @@ export class UserMarket {
     )
 
     return minFreeTokensExceptOutcomeIndex + price * this.tokenBalance
+  }
+
+  async checkIfUmaLatestVersion() {
+    if (this._userMarketState.version < AVER_VERSION) {
+      //UPGRADE VERSION WHEN AVAILALBLE
+      //Reload
+      console.log("UPGRADING UMA VERSION")
+      await this.refresh()
+    }
+  }
+
+  async checkIfUhlLatestVersion() {
+    if (this._userHostLifetime.version < AVER_VERSION) {
+      //UPGRADE VERSION WHEN AVAILALBLE
+      //Reload
+      console.log("UPGRADING UHL VERSION")
+      await this.refresh()
+    }
   }
 }

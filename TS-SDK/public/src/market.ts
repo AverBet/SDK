@@ -882,13 +882,27 @@ export class Market {
     if (!max_iterations || max_iterations > MAX_ITERATIONS_FOR_CONSUME_EVENTS)
       max_iterations = MAX_ITERATIONS_FOR_CONSUME_EVENTS
 
-    const userAccountsUnsorted = user_accounts.map((pk) => {
+    const sortedUserAccounts = user_accounts.sort((a, b) =>
+      a.toString().localeCompare(b.toString())
+    )
+    //@ts-ignore
+    const userMarketAccounts: UserMarketState[] =
+      await this._averClient.program.account["userMarket"].fetchMultiple(
+        sortedUserAccounts
+      )
+    const userAtas = await Promise.all(
+      userMarketAccounts.map((u) =>
+        getAssociatedTokenAddress(this.quoteTokenMint, u.user)
+      )
+    )
+
+    const remainingAccountsUmas = sortedUserAccounts.map((pk) => {
       return { pubkey: pk, isSigner: false, isWritable: true } as AccountMeta
     })
 
-    const remainingAccounts = userAccountsUnsorted.sort((a, b) =>
-      a.pubkey.toString().localeCompare(b.pubkey.toString())
-    )
+    const remainingAccountsAtas = userAtas.map((pk) => {
+      return { pubkey: pk, isSigner: false, isWritable: true } as AccountMeta
+    })
 
     if (!this.orderbookAccounts) throw new Error("No orderbook accounts")
 
@@ -903,7 +917,7 @@ export class Market {
           eventQueue: this.orderbookAccounts[outcome_idx].eventQueue,
           rewardTarget: reward_target,
         },
-        remainingAccounts: remainingAccounts,
+        remainingAccounts: remainingAccountsUmas.concat(remainingAccountsAtas),
       }
     )
   }
