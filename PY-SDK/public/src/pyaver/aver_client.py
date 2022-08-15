@@ -170,7 +170,7 @@ class AverClient():
             name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
             return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
 
-        file_path = os.path.join(os.path.dirname(__file__), './idl.json')
+        file_path = os.path.join(os.path.dirname(__file__), 'idl/idl.json')
         file_idl = json.load(open(file_path))
         file_instructions = file_idl['instructions']
         for i in program.idl.instructions:

@@ -27,6 +27,7 @@ import base58
 
 #To run all code from an entirely new set of keypairs and markets, set this to True
 program_id = AVER_PROGRAM_ID
+program_id = PublicKey('DfMQPAuAeECP7iSCwTKjbpzyx6X1HZT6rz872iYWA8St')
 
 #Set to TRUE if Public Key is on V1.1 - This will try to read and upgrade an old market and then read it again
 #Set to FALSE o/w - This will try to create a new market and read it
@@ -68,7 +69,7 @@ class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
     async def test_setup_tests(self):
 
         if(not v1_1):
-            await create_init_market_smoke_tests(self.client, self.owner, 2, self.market, self.market_authority)
+            await create_init_market_smoke_tests(self.client, self.owner, 2, self.market, self.market_authority, program_id)
             market = await AverMarket.load(self.client, self.market.public_key)
             print('MARKET CREATED AND LOADED')
             print('MARKET STATE:')

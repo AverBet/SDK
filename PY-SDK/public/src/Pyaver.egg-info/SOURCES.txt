@@ -1,3 +1,4 @@
+MANIFEST.in
 README.md
 setup.cfg
 setup.py
@@ -28,3 +29,4 @@ src/pyaver.egg-info/SOURCES.txt
 src/pyaver.egg-info/dependency_links.txt
 src/pyaver.egg-info/requires.txt
 src/pyaver.egg-info/top_level.txt
+src/pyaver/idl/idl.json

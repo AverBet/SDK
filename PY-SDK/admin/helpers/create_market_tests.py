@@ -6,6 +6,7 @@ from asyncio import gather
 from .init_market_instruction import InitMarketAccounts, InitMarketArgs
 from .init_market_instruction import init_market
 import time
+from solana.publickey import PublicKey
 from .supplement_init_market import SupplementInitMarketAccounts, supplement_init_market, SupplementInitMarketArgs
 
 async def create_init_market_smoke_tests(
@@ -13,7 +14,8 @@ async def create_init_market_smoke_tests(
     owner: Keypair,
     outcome_length: int,
     market: Keypair,
-    market_authority: Keypair
+    market_authority: Keypair,
+    program_id: PublicKey
 ):
     #CREATE MARKET
     init_market_args = InitMarketArgs(
@@ -40,7 +42,9 @@ async def create_init_market_smoke_tests(
         payer=owner
     )
 
-    sig = await init_market(client, client.program, init_market_args, init_market_accs)
+    program = await client.get_program_from_program_id(program_id)
+
+    sig = await init_market(client, program, init_market_args, init_market_accs)
     con = await client.provider.connection.confirm_transaction(sig, Confirmed)
     assert(con['result']['value'][0]['err'] is None), 'Init market'
     
