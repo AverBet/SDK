@@ -54,7 +54,7 @@ class UserHostLifetime():
         Returns:
             UserHostLifetime: UserHostLifetime object
         """
-        user_host_lifetime_result = await aver_client.program.account['UserHostLifetime'].fetch(pubkey)
+        user_host_lifetime_result = await aver_client.programs[0].account['UserHostLifetime'].fetch(pubkey)
         return UserHostLifetime(pubkey, user_host_lifetime_result)
 
     @staticmethod

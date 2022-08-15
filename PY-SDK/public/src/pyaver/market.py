@@ -261,6 +261,7 @@ class AverMarket():
         market_states: list[MarketState], 
         market_stores: list[MarketStoreState],
         slabs: list[Slab],
+        program_ids: list[PublicKey]
         ):
         """
         Returns multiple AverMarket objects from their respective MarketStates, stores and orderbook objects
@@ -303,6 +304,7 @@ class AverMarket():
                 aver_client, 
                 m, 
                 market_states[i],
+                program_ids[i],
                 market_stores[i],
                 all_orderbooks[i]
                 )

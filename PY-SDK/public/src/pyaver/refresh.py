@@ -50,6 +50,7 @@ async def refresh_multiple_markets(
         multiple_account_states['market_states'], 
         multiple_account_states['market_stores'], 
         multiple_account_states['slabs'],
+        multiple_account_states['program_ids']
     )
 
     return markets
@@ -120,6 +121,7 @@ async def refresh_multiple_user_markets(
         multiple_account_states['market_states'], 
         multiple_account_states['market_stores'], 
         multiple_account_states['slabs'],
+        multiple_account_states['program_ids']
     )
 
     user_markets = UserMarket.get_user_markets_from_account_state(

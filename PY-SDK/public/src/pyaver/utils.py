@@ -1,3 +1,4 @@
+from asyncio import gather
 from anchorpy import Program
 from .aver_client import AverClient
 from spl.token.instructions import get_associated_token_address
@@ -206,7 +207,7 @@ def round_price_to_nearest_tick_size(limit_price: float):
 
     return rounded_limit_price
 
-def parse_user_market_state(buffer: bytes, aver_client: AverClient):
+def parse_user_market_state(buffer: bytes, aver_client: AverClient, program: Program = None):
         """
         Parses raw onchain data to UserMarketState object        
         Args:
@@ -216,10 +217,12 @@ def parse_user_market_state(buffer: bytes, aver_client: AverClient):
         Returns:
             UserMarket: UserMarketState object
         """
-        return parse_with_version(aver_client.program, AccountTypes.USER_MARKET, buffer)
+        if(program is None):
+            program = aver_client.programs[0]
+        return parse_with_version(program, AccountTypes.USER_MARKET, buffer)
 
 
-def parse_market_state(buffer: bytes, aver_client: AverClient):
+def parse_market_state(buffer: bytes, aver_client: AverClient, program: Program = None):
         """
         Parses raw onchain data to MarketState object        
         Args:
@@ -229,11 +232,12 @@ def parse_market_state(buffer: bytes, aver_client: AverClient):
         Returns:
             MarketState: MarketState object
         """
-        
-        return parse_with_version(aver_client.program, AccountTypes.MARKET, buffer)
+        if(program is None):
+            program = aver_client.programs[0]
+        return parse_with_version(program, AccountTypes.MARKET, buffer)
 
 
-def parse_market_store(buffer: bytes, aver_client: AverClient):
+def parse_market_store(buffer: bytes, aver_client: AverClient, program = None):
         """
         Parses onchain data for a MarketStore State
 
@@ -244,11 +248,13 @@ def parse_market_store(buffer: bytes, aver_client: AverClient):
         Returns:
             MarketStore: MarketStore object
         """
-        return parse_with_version(aver_client.program, AccountTypes.MARKET_STORE, buffer)
+        if(program is None):
+            program = aver_client.programs[0]
+        return parse_with_version(program, AccountTypes.MARKET_STORE, buffer)
 
 
 
-def parse_user_host_lifetime_state(aver_client: AverClient, buffer):
+def parse_user_host_lifetime_state(aver_client: AverClient, buffer, program: Program=None):
         """
         Parses raw onchain data to UserHostLifetime object
 
@@ -259,7 +265,9 @@ def parse_user_host_lifetime_state(aver_client: AverClient, buffer):
         Returns:
             UserHostLifetime: UserHostLifetime object
         """
-        return parse_with_version(aver_client.program, AccountTypes.USER_HOST_LIFETIME, buffer)
+        if(program is None):
+            program = aver_client.programs[0]
+        return parse_with_version(program, AccountTypes.USER_HOST_LIFETIME, buffer)
 
 async def load_multiple_account_states(
         aver_client: AverClient,
@@ -289,13 +297,15 @@ async def load_multiple_account_states(
         """
         all_ata_pubkeys = [get_associated_token_address(u, aver_client.quote_token) for u in user_pubkeys]
 
-        all_pubkeys = market_pubkeys + market_store_pubkeys + slab_pubkeys + user_market_pubkeys + user_pubkeys + all_ata_pubkeys + uhl_pubkeys
+        all_pubkeys = market_pubkeys + market_store_pubkeys + user_market_pubkeys + uhl_pubkeys +  slab_pubkeys + user_pubkeys + all_ata_pubkeys 
         data = await load_multiple_bytes_data(aver_client.provider.connection, all_pubkeys, [], False)
 
+        programs = await gather(*[aver_client.get_program_from_program_id(PublicKey(d['owner'])) for d in data[0: len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]])
+       
         deserialized_market_state = []
         for index, m in enumerate(market_pubkeys):
             buffer = data[index]
-            deserialized_market_state.append(parse_market_state(buffer['data'], aver_client))
+            deserialized_market_state.append(parse_market_state(buffer['data'], aver_client, programs[index]))
         
         deserialized_market_store = []
         for index, m in enumerate(market_pubkeys):
@@ -303,35 +313,45 @@ async def load_multiple_account_states(
             if(buffer is None):
                 deserialized_market_store.append(None)
                 continue
-            deserialized_market_store.append(parse_market_store(buffer['data'], aver_client))
+            deserialized_market_store.append(parse_market_store(buffer['data'], aver_client, programs[index]))
+
+        deserialized_uma_data = []
+        if(user_market_pubkeys is not None):
+            for index, u in enumerate(user_market_pubkeys):
+                buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys)]
+                if(buffer is None):
+                    deserialized_uma_data.append(None)
+                    continue
+                deserialized_uma_data.append(parse_user_market_state(buffer['data'], aver_client, programs[index]))
+        
+
+        uhl_states = []
+        for index, pubkey in enumerate(uhl_pubkeys):
+            buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]
+            if(buffer is None):
+                uhl_states.append(None)
+                continue
+            uhl_state = parse_user_host_lifetime_state(aver_client, buffer['data'], programs[index])
+            uhl_states.append(uhl_state)
 
         deserialized_slab_data = []
         for index, s in enumerate(slab_pubkeys):
-            buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys)]
+            buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys) + len(uhl_pubkeys)]
             if(buffer is None):
                 deserialized_slab_data.append(None)
                 continue
             deserialized_slab_data.append(Slab.from_bytes(buffer['data']))
 
-        deserialized_uma_data = []
-        if(user_market_pubkeys is not None):
-            for index, u in enumerate(user_market_pubkeys):
-                buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(slab_pubkeys)]
-                if(buffer is None):
-                    deserialized_uma_data.append(None)
-                    continue
-                deserialized_uma_data.append(parse_user_market_state(buffer['data'], aver_client))
-
         lamport_balances = []
         if(user_pubkeys is not None):
             for index, pubkey in enumerate(user_pubkeys):
-                balance = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(slab_pubkeys) + len(user_market_pubkeys)]
+                balance = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys) + len(uhl_pubkeys) + len(slab_pubkeys)]
                 lamport_balances.append(balance['lamports'] if balance and balance['lamports'] is not None else 0)
 
         token_balances = []
         if(all_ata_pubkeys is not None):
             for index, pubkey in enumerate(all_ata_pubkeys):
-                buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(slab_pubkeys) + len(user_market_pubkeys) + len(user_pubkeys)]
+                buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys) + len(uhl_pubkeys) + len(slab_pubkeys) + len(user_pubkeys)]
                 if(len(buffer['data']) == ACCOUNT_LEN):
                     token_balances.append(ACCOUNT_LAYOUT.parse(buffer['data'])['amount'])
                 else:
@@ -342,22 +362,14 @@ async def load_multiple_account_states(
             user_balance_state = UserBalanceState(lamport_balances[index], token_balances[index])
             user_balance_states.append(user_balance_state)
 
-        uhl_states = []
-        for index, pubkey in enumerate(uhl_pubkeys):
-            buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(slab_pubkeys) + len(user_market_pubkeys) + len(user_pubkeys) + len(all_ata_pubkeys)]
-            if(buffer is None):
-                uhl_states.append(None)
-                continue
-            uhl_state = parse_user_host_lifetime_state(aver_client, buffer['data'])
-            uhl_states.append(uhl_state)
-
         return {
             'market_states': deserialized_market_state,
             'market_stores': deserialized_market_store,
             'slabs': deserialized_slab_data,
             'user_market_states': deserialized_uma_data,
             'user_balance_states': user_balance_states,
-            'user_host_lifetime_states': uhl_states
+            'user_host_lifetime_states': uhl_states,
+            'program_ids': [p.program_id for p in programs[0: len(market_pubkeys)]]
         }
 
 def is_market_tradeable(market_status: MarketStatus):

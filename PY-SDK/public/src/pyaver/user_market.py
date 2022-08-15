@@ -94,7 +94,7 @@ class UserMarket():
             """
             uma, bump = UserMarket.derive_pubkey_and_bump(owner, market.market_pubkey, host, market.program_id)
             uhl = UserHostLifetime.derive_pubkey_and_bump(owner, host, market.program_id)[0]
-            return await UserMarket.load_by_uma(aver_client, uma, market, uhl, market.program_id)
+            return await UserMarket.load_by_uma(aver_client, uma, market, uhl)
 
     @staticmethod
     async def load_multiple(
@@ -282,7 +282,7 @@ class UserMarket():
         )    
 
     @staticmethod
-    def make_create_user_market_account_instruction(
+    async def make_create_user_market_account_instruction(
             aver_client: AverClient,
             market: AverMarket,
             owner: PublicKey,
@@ -312,7 +312,9 @@ class UserMarket():
         uma, uma_bump = UserMarket.derive_pubkey_and_bump(owner, market.market_pubkey, host, program_id)
         user_host_lifetime, uhl_bump = UserHostLifetime.derive_pubkey_and_bump(owner, host, program_id)
 
-        return aver_client.program.instruction['init_user_market'](
+        program = await aver_client.get_program_from_program_id(program_id)
+
+        return program.instruction['init_user_market'](
             number_of_orders,
             uma_bump, 
             ctx=Context(
@@ -335,7 +337,7 @@ class UserMarket():
             send_options: TxOpts = None,
             host: PublicKey = AVER_HOST_ACCOUNT,
             number_of_orders: int = None,
-            program_id: PublicKey = AVER_PROGRAM_ID
+            program_id: PublicKey = None
         ):
         """
         Creates UserMarket account
@@ -349,7 +351,7 @@ class UserMarket():
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             host (PublicKey, optional): Host account public key. Defaults to AVER_HOST_ACCOUNT.
             number_of_orders (int, optional): _description_. Defaults to 5 * number of market outcomes.
-            program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Returns:
             RPCResponse: Response
@@ -359,8 +361,11 @@ class UserMarket():
 
         if(owner is None):
             owner = aver_client.owner
+        
+        if(program_id is None):
+            program_id = market.program_id
 
-        ix = UserMarket.make_create_user_market_account_instruction(
+        ix = await UserMarket.make_create_user_market_account_instruction(
             aver_client,
             market,
             owner.public_key,
@@ -425,7 +430,7 @@ class UserMarket():
         
         user_market_pubkey = UserMarket.derive_pubkey_and_bump(owner.public_key, market.market_pubkey, host, market.program_id)[0]
         try:
-            uma = await UserMarket.load(client, market, owner.public_key, host, market.program_id)
+            uma = await UserMarket.load(client, market, owner.public_key, host)
             return uma
         except:
             uhl = await UserHostLifetime.get_or_create_user_host_lifetime(
@@ -459,7 +464,7 @@ class UserMarket():
                 market,  
                 owner.public_key,
                 host,
-                market.program_id)
+                )
 
 
 
