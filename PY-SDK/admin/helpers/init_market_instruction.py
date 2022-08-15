@@ -40,9 +40,9 @@ async def init_market(
   program: Program,
   args: InitMarketArgs,
   accs: InitMarketAccounts,
-  program_id: PublicKey = AVER_PROGRAM_ID
 ):
-  market_store_pubkey, market_store_bump = derive_market_store(accs.market.public_key)
+  program_id = program.program_id
+  market_store_pubkey, market_store_bump = derive_market_store(accs.market.public_key, program_id)
   vault_authority, vault_bump = PublicKey.find_program_address(
     [bytes(accs.market.public_key)], program_id
   )

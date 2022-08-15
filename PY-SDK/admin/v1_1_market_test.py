@@ -31,7 +31,7 @@ program_id = PublicKey('DfMQPAuAeECP7iSCwTKjbpzyx6X1HZT6rz872iYWA8St')
 
 #Set to TRUE if Public Key is on V1.1 - This will try to read and upgrade an old market and then read it again
 #Set to FALSE o/w - This will try to create a new market and read it
-v1_1 = False
+v1_1 = True
 
 class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
 
@@ -42,7 +42,7 @@ class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
         market_authority = Keypair()
 
         if(v1_1):
-            market = Keypair.from_secret_key(base58.b58decode(''))
+            market = Keypair.from_secret_key(base58.b58decode('2gj4s7CgWPPeSUMEti2yoCYokKU5a61z9yN9e83TyBgdE59LXLXVoyMm2TBMi37RW1JdpiSPusKe9tnacA6z2dq5'))
         else:
             print('-'*10)
             print('NEW MARKET IS BEING CREATED... NOTE DOWN SECRET KEY')
@@ -88,7 +88,7 @@ class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
             print('-'*10)
 
             print('UPGRADING MARKET BEGIN')
-            sig = await update_market_state(market, self.client, self.owner)
+            sig = await update_market_state(market, self.client, self.owner, program_id)
             con = await self.client.provider.connection.confirm_transaction(sig, Confirmed)
             print('MARKET UPGRADED')
             print('LOADING OLD MARKET')

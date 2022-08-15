@@ -70,7 +70,7 @@ async def create_init_market_smoke_tests(
         )
 
         print(f'creating supplement init market: {i}')
-        coroutines.append(supplement_init_market(client.program, supplement_init_market_args, supplement_init_market_accs))
+        coroutines.append(supplement_init_market(program, supplement_init_market_args, supplement_init_market_accs))
     sigs = await gather(*coroutines)
     time.sleep(10)
     cons = await gather(*[client.provider.connection.confirm_transaction(sig, Confirmed) for sig in sigs])
@@ -80,7 +80,7 @@ async def create_init_market_smoke_tests(
 
     #LOAD CREATED MARKET
     market_object = await AverMarket.load(client, market.public_key)
-    [expected_market_store_pubkey, _] = AverMarket.derive_market_store_pubkey_and_bump(market.public_key)
+    [expected_market_store_pubkey, _] = AverMarket.derive_market_store_pubkey_and_bump(market.public_key, program_id)
     assert(market_object.market_pubkey == market.public_key), 'Loaded market matching'
     assert(market_object.market_state.market_authority == market_authority.public_key), 'Loaded matching market authority'
     assert(market_object.market_state.market_store == expected_market_store_pubkey), 'Loaded market store'

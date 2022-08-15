@@ -4,11 +4,13 @@ from solana.keypair import Keypair
 from pyaver.utils import sign_and_send_transaction_instructions
 from solana.rpc.types import TxOpts
 from solana.system_program import SYS_PROGRAM_ID
+from solana.publickey import PublicKey
 from pyaver.market import AverMarket
 
 
-async def update_market_state(market: AverMarket, client: AverClient, account_owner: Keypair, opts: TxOpts = None):
-    ix = client.program.instruction['update_market_state'](
+async def update_market_state(market: AverMarket, client: AverClient, account_owner: Keypair, program_id: PublicKey, opts: TxOpts = None):
+    program = await client.get_program_from_program_id(program_id)
+    ix = program.instruction['update_market_state'](
         ctx=Context(accounts={
             "payer": account_owner.public_key,
             "market_authority": market.market_state.market_authority,
@@ -20,7 +22,7 @@ async def update_market_state(market: AverMarket, client: AverClient, account_ow
     return await sign_and_send_transaction_instructions(
         client,
         [],
-        [account_owner],
+        account_owner,
         [ix],
         opts
     )
