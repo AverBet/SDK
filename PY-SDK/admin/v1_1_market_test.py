@@ -46,6 +46,7 @@ class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
             print('-'*10)
             print('NEW MARKET IS BEING CREATED... NOTE DOWN SECRET KEY')
             print('Market: ', base58.b58encode(market.secret_key))
+            print('Market pubkey: ', market.public_key)
             print('-'*10)
 
         network = SolanaNetwork.DEVNET
