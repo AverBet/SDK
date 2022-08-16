@@ -468,7 +468,7 @@ class UserMarket():
 
 
 
-    def make_place_order_instruction(
+    async def make_place_order_instruction(
             self,
             outcome_id: int,
             side: Side,
@@ -479,6 +479,7 @@ class UserMarket():
             order_type: OrderType = OrderType.LIMIT,
             self_trade_behavior: SelfTradeBehavior = SelfTradeBehavior.CANCEL_PROVIDE,
             active_pre_flight_check: bool = False,
+            progam_id: PublicKey = None,
         ):
         """
         Creates instruction to place order.
@@ -505,6 +506,9 @@ class UserMarket():
         if(self.market.orderbooks is None):
             raise Exception('Cannot place error on closed market')
 
+        if(progam_id is None):
+            progam_id = self.market.program_id
+
         if(active_pre_flight_check):
             check_sufficient_lamport_balance(self.user_balance_state)
             check_correct_uma_market_match(self.user_market_state, self.market)
@@ -528,7 +532,9 @@ class UserMarket():
         orderbook_account_index = outcome_id if not is_binary_market_second_outcome else 0
         orderbook_account = self.market.market_store_state.orderbook_accounts[orderbook_account_index]
 
-        return self.aver_client.program.instruction['place_order'](
+        program = await self.aver_client.get_program_from_program_id(progam_id)
+
+        return program.instruction['place_order'](
             {
                 "limit_price": limit_price_u64,
                 "size": max_base_qty,
@@ -570,6 +576,7 @@ class UserMarket():
             order_type: OrderType = OrderType.LIMIT,
             self_trade_behavior: SelfTradeBehavior = SelfTradeBehavior.CANCEL_PROVIDE,
             active_pre_flight_check: bool = True,  
+            program_id: PublicKey = None,
         ):
         """
         Places a new order
@@ -596,6 +603,9 @@ class UserMarket():
         """
         if(not owner.public_key == self.user_market_state.user):
             raise Exception('Owner must be same as user market owner')
+
+        if(program_id is None):
+            program_id = self.market.program_id
         
         await self.check_if_uma_latest_version()
         await self.check_if_uhl_latest_version()
@@ -606,7 +616,7 @@ class UserMarket():
             self.market.market_state.quote_token_mint
         )
 
-        ix = self.make_place_order_instruction(
+        ix = await self.make_place_order_instruction(
             outcome_id,
             side, 
             limit_price,
@@ -615,7 +625,8 @@ class UserMarket():
             user_quote_token_ata,
             order_type,
             self_trade_behavior,
-            active_pre_flight_check
+            active_pre_flight_check,
+            program_id
         )
         return await sign_and_send_transaction_instructions(
             self.aver_client,
@@ -630,6 +641,7 @@ class UserMarket():
             order_id: int,
             outcome_id: int,
             active_pre_flight_check: bool = False,
+            program_id: PublicKey = None
         ):
         """
         Creates instruction for to cancel order.
@@ -652,6 +664,9 @@ class UserMarket():
         """
         if(self.market.orderbooks is None):
             raise Exception('Cannot cancel orders on closed market')
+        
+        if(program_id is None):
+            program_id = self.market.program_id
 
         if(active_pre_flight_check):
             check_sufficient_lamport_balance(self.user_balance_state)
@@ -668,7 +683,9 @@ class UserMarket():
         orderbook_account_index = outcome_id if not is_binary_market_second_outcome else 0
         orderbook_account = self.market.market_store_state.orderbook_accounts[orderbook_account_index]
 
-        return self.aver_client.program.instruction['cancel_order'](
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
+        return program.instruction['cancel_order'](
             order_id, 
             orderbook_account_index, 
             ctx=Context(accounts={
@@ -694,6 +711,7 @@ class UserMarket():
         fee_payer: Keypair = None,
         send_options: TxOpts = None,
         active_pre_flight_check: bool = True,
+        program_id: PublicKey = None
     ):
         """
         Cancels order
@@ -713,6 +731,9 @@ class UserMarket():
 
         if(fee_payer is None):
             fee_payer = self.aver_client.owner
+
+        if(program_id is None):
+            program_id = self.market.program_id
         
         await self.check_if_uma_latest_version()
         await self.check_if_uhl_latest_version()
@@ -720,7 +741,8 @@ class UserMarket():
         ix = await self.make_cancel_order_instruction(
             order_id,
             outcome_id,
-            active_pre_flight_check
+            active_pre_flight_check,
+            program_id
         )
 
         return await sign_and_send_transaction_instructions(
@@ -735,6 +757,7 @@ class UserMarket():
         self, 
         outcome_ids_to_cancel: list[int],
         active_pre_flight_check: bool = False,
+        program_id: PublicKey = None,
         ):
         """
         Creates instruction for to cancelling all orders
@@ -757,6 +780,9 @@ class UserMarket():
         """
         if(self.market.orderbooks is None):
             raise Exception('Cannot cancel orders on closed market')
+
+        if(program_id is None):
+            program_id = self.market.program_id
 
         if(active_pre_flight_check):
             check_sufficient_lamport_balance(self.user_balance_state)
@@ -801,9 +827,11 @@ class UserMarket():
 
         ixs = []
 
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
         for i, outcome_ids in enumerate(chunked_outcome_ids):
             ixs.append(
-                self.aver_client.program.instruction['cancel_all_orders'](
+                program.instruction['cancel_all_orders'](
                     outcome_ids,
                     ctx=Context(
                         accounts={
@@ -829,6 +857,7 @@ class UserMarket():
         fee_payer: Keypair = None, 
         send_options: TxOpts = None,
         active_pre_flight_check: bool = True,
+        program_id: PublicKey = None,
     ):
         """
         Cancels all orders on particular outcome_ids (not by order_id)
@@ -846,11 +875,14 @@ class UserMarket():
         """
         if(fee_payer is None):
             fee_payer = self.aver_client.owner
+        
+        if(program_id is None):
+            program_id = self.market.program_id
 
         await self.check_if_uma_latest_version()
         await self.check_if_uhl_latest_version()
         
-        ixs = await self.make_cancel_all_orders_instruction(outcome_ids_to_cancel, active_pre_flight_check)
+        ixs = await self.make_cancel_all_orders_instruction(outcome_ids_to_cancel, active_pre_flight_check, program_id)
 
         sigs = await gather(
             *[sign_and_send_transaction_instructions(
