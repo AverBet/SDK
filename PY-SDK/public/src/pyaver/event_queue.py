@@ -119,16 +119,18 @@ async def consume_events(
         if quote_token == None:
             quote_token = market.aver_client.quote_token
         
+        program = await market.aver_client.get_program_from_program_id(market.program_id)
+
         user_accounts_unsorted = [AccountMeta(
                 pk, False, True) for pk in user_accounts]
                 
         sorted_user_accounts = sorted(user_accounts_unsorted, key=lambda account: bytes(account.pubkey))
-        sorted_loaded_umas: list[UserMarketState] = await market.aver_client.program.account['UserMarket'].fetch_multiple(sorted_user_accounts)
+        sorted_loaded_umas: list[UserMarketState] = await program.account['UserMarket'].fetch_multiple(sorted_user_accounts)
         user_atas =  [get_associated_token_address(u.user, quote_token) for u in sorted_loaded_umas]
 
         remaining_accounts  = sorted_user_accounts + user_atas
 
-        return await market.aver_client.program.rpc["consume_events"](
+        return await program.rpc["consume_events"](
                 max_iterations,
                 outcome_idx,
                 ctx=Context(

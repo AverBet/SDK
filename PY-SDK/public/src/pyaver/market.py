@@ -5,6 +5,7 @@ from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .event_queue import load_all_event_queues, prepare_user_accounts_list
 from .aver_client import AverClient
 from solana.publickey import PublicKey
+from .event_queue import consume_events
 from solana.system_program import SYS_PROGRAM_ID
 from spl.token.instructions import get_associated_token_address
 from solana.keypair import Keypair
@@ -645,7 +646,8 @@ class AverMarket():
                 events_to_crank = min(
                     loaded_event_queues[idx]['header'].count, MAX_ITERATIONS_FOR_CONSUME_EVENTS)
 
-                sig = await self.consume_events(
+                sig = await consume_events(
+                    market=self,
                     outcome_idx=idx,
                     max_iterations=events_to_crank,
                     user_accounts=user_accounts,

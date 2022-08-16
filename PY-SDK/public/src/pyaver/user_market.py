@@ -11,7 +11,6 @@ from solana.system_program import SYS_PROGRAM_ID
 from spl.token.constants import TOKEN_PROGRAM_ID
 from anchorpy import Context
 from .user_host_lifetime import UserHostLifetime
-from spl.token.instructions import get_associated_token_address
 from .aver_client import AverClient
 from .utils import get_version_of_account_type_in_program, sign_and_send_transaction_instructions, load_multiple_account_states, parse_user_market_state
 from solana.rpc.types import TxOpts
@@ -625,6 +624,10 @@ class UserMarket():
         
         await self.check_if_uma_latest_version()
         await self.check_if_uhl_latest_version()
+        is_market_latest_version = await self.check_if_market_latest_version()
+
+        if(not is_market_latest_version):
+            await self.market.update_market_state(self.market, self.aver_client.owner, self.market.program_id)
 
         user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
             self.user_market_state.user,
@@ -761,6 +764,10 @@ class UserMarket():
         
         await self.check_if_uma_latest_version()
         await self.check_if_uhl_latest_version()
+        is_market_latest_version = await self.check_if_market_latest_version()
+
+        if(not is_market_latest_version):
+            await self.market.update_market_state(self.market, self.aver_client.owner, self.market.program_id)
 
         ix = await self.make_cancel_order_instruction(
             order_id,
@@ -913,7 +920,11 @@ class UserMarket():
 
         await self.check_if_uma_latest_version()
         await self.check_if_uhl_latest_version()
-        
+        is_market_latest_version = await self.check_if_market_latest_version()
+
+        if(not is_market_latest_version):
+            await self.market.update_market_state(self.market, self.aver_client.owner, self.market.program_id)
+
         ixs = await self.make_cancel_all_orders_instruction(outcome_ids_to_cancel, active_pre_flight_check, program_id)
 
         sigs = await gather(
@@ -994,6 +1005,10 @@ class UserMarket():
         """
         await self.check_if_uma_latest_version()
         await self.check_if_uhl_latest_version()
+        is_market_latest_version = await self.check_if_market_latest_version()
+
+        if(not is_market_latest_version):
+            await self.market.update_market_state(self.market, self.aver_client.owner, self.market.program_id)
 
         user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
             self.user_market_state.user,
@@ -1101,6 +1116,11 @@ class UserMarket():
 
         await self.check_if_uma_latest_version()
         await self.check_if_uhl_latest_version()
+        is_market_latest_version = await self.check_if_market_latest_version()
+
+        if(not is_market_latest_version):
+            await self.market.update_market_state(self.market, self.aver_client.owner, self.market.program_id)
+        
         ix = self.make_neutralize_positions_instruction(outcome_id, program_id)
 
         if(not owner.public_key == self.user_market_state.user):
@@ -1182,12 +1202,15 @@ class UserMarket():
 
         await self.check_if_uma_latest_version()
         await self.check_if_uhl_latest_version()
+        is_market_latest_version = await self.check_if_market_latest_version()
+
         ix = await self.make_update_user_market_orders_instruction(new_size, program_id)
-
-
 
         if(not owner.public_key == self.user_market_state.user):
             raise Exception('Owner must be same as UMA owner')
+
+        if(not is_market_latest_version):
+            await self.market.update_market_state(self.market, self.aver_client.owner, self.market.program_id)
 
         return await sign_and_send_transaction_instructions(
             self.aver_client,
@@ -1212,6 +1235,14 @@ class UserMarket():
             #Reload
             print('UPGRADING UHL VERSION')
             self = await self.load_by_uma(self.aver_client, self.pubkey, self.market, self.user_host_lifetime.pubkey)
+    
+    async def check_if_market_latest_version(self):
+        program = await self.aver_client.get_program_from_program_id(self.market.program_id)
+        if(self.market.market_state.version < get_version_of_account_type_in_program(AccountTypes.MARKET, program)):
+            #UPGRADE VERSION WHEN AVAILALBLE
+            print('UPGRADING MARKET VERSION')
+            return False
+        return True
 
     def calculate_funds_available_to_withdraw(self):
         """

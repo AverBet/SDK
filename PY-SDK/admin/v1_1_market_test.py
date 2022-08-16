@@ -40,7 +40,7 @@ class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
         market_authority = Keypair()
 
         if(v1_1):
-            market = Keypair.from_secret_key(base58.b58decode('2gj4s7CgWPPeSUMEti2yoCYokKU5a61z9yN9e83TyBgdE59LXLXVoyMm2TBMi37RW1JdpiSPusKe9tnacA6z2dq5'))
+            market = Keypair.from_secret_key(base58.b58decode('57DLck9gJaMkBpZ6hbj7XvPBCENyJ6rc6FucydqyKEEHtEtWM4umYfx3cFn8ztDEGFnue1vpyjAUgiSWuk1LT4tt'))
         else:
             print('-'*10)
             print('NEW MARKET IS BEING CREATED... NOTE DOWN SECRET KEY')
