@@ -52,8 +52,10 @@ def check_idl_has_same_instructions_as_sdk(program: Program):
     for i in USER_FACING_INSTRUCTIONS_TO_CHECK_IN_IDL:
         file_instruction = next((x for x in file_instructions if camel_to_snake(x['name']) == i), None)
         program_instruction = next((x for x in program.idl.instructions if x.name == i), None)
-        print(i)
-        print(i, program_instruction.name)
+        if(program_instruction is None):
+            print(f'INSTRUCTION {i} IS NOT FOUND...')
+            print('PLEASE UPDATE YOUR SDK')
+            continue
         get_differences_between_idl_and_program_instruction(file_instruction, program_instruction, True)
 
 
@@ -93,7 +95,7 @@ def get_differences_between_idl_and_program_instruction(file_instruction, progra
     return are_they_the_same
 
 def check_if_instruction_is_out_of_date_with_idl(instruction: str, program: Program):
-    file_idl = load_idl_from_json(program.program_id.to_base58())
+    file_idl = load_idl_from_json(program.program_id.__str__())
     if(file_idl is None):
         print('CANNOT FIND IDL FOR THIS PROGRAM_ID IN PRE-FLIGHT CHECK')
         return
