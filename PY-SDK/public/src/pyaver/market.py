@@ -238,23 +238,23 @@ class AverMarket():
 
     #     return {'market_states': market_states, 'market_stores': market_stores}
 
-    # @staticmethod
-    # def derive_market_store_pubkey_and_bump(market_pubkey: PublicKey, program_id: PublicKey = AVER_PROGRAM_ID):
-    #     """
-    #     Derives PDA (Program Derived Account) for MarketStore public key.
-    #     MarketStore account addresses are derived deterministically using the market's pubkey.
+    @staticmethod
+    def derive_market_store_pubkey_and_bump(market_pubkey: PublicKey, program_id: PublicKey = AVER_PROGRAM_ID):
+        """
+        Derives PDA (Program Derived Account) for MarketStore public key.
+        MarketStore account addresses are derived deterministically using the market's pubkey.
 
-    #     Args:
-    #         market_pubkey (PublicKey): Market public key
-    #         program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
+        Args:
+            market_pubkey (PublicKey): Market public key
+            program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
 
-    #     Returns:
-    #         PublicKey: MarketStore public key
-    #     """
-    #     return PublicKey.find_program_address(
-    #         [bytes('market-store', 'utf-8'), bytes(market_pubkey)], 
-    #         program_id
-    #     )
+        Returns:
+            PublicKey: MarketStore public key
+        """
+        return PublicKey.find_program_address(
+            [bytes('market-store', 'utf-8'), bytes(market_pubkey)], 
+            program_id
+        )
 
     @staticmethod
     def get_markets_from_account_states(
