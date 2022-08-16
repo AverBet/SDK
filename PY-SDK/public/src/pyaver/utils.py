@@ -4,7 +4,6 @@ from .aver_client import AverClient
 from spl.token.instructions import get_associated_token_address
 from spl.token._layouts import ACCOUNT_LAYOUT
 from spl.token.constants import ACCOUNT_LEN
-from .constants import AVER_VERSION
 from .data_classes import UserBalanceState, MarketStatus
 from solana.publickey import PublicKey
 from .errors import parse_error
@@ -456,23 +455,26 @@ def parse_with_version(program: Program, account_type: AccountTypes, bytes: byte
     """
     #Version is 9th byte
     version = bytes[8]
+
+    #Latest version according to program
+    latest_version = get_version_of_account_type_in_program(account_type, program)
     
     #Checks if this is reading the correct version OR if it is not possible to read an old version
-    if(version == AVER_VERSION or program.account.get(f'{account_type.value}V{version}') is None):
+    if(version == latest_version or program.account.get(f'{account_type.value}V{version}') is None):
         return program.account[f'{account_type.value}'].coder.accounts.decode(bytes)
     else:
         #Reads old version
         print(f'THE {account_type} BEING READ HAS NOT BEEN UPDATED TO THE LATEST VERSION')
         print('PLEASE CALL THE UPDATE INSTRUCTION FOR THE CORRESPONDING ACCOUNT TYPE TO RECTIFY, IF POSSIBLE')
         #We need to replace the discriminator on the bytes data to prevent anchor errors
-        account_discriminator = get_account_discriminator(account_type, version)
+        account_discriminator = get_account_discriminator(account_type, version, latest_version)
         new_bytes = bytearray(bytes)
         for i, a in enumerate(account_discriminator):
             new_bytes[i] = a
         return program.account[f'{account_type.value}V{version}'].coder.accounts.decode(new_bytes)
 
 
-def get_account_discriminator(account_type: AccountTypes, version: int):
+def get_account_discriminator(account_type: AccountTypes, version: int, latest_version: int):
     """
     Gets the account discriminator (8 bytes) for a specific account type
 
@@ -483,6 +485,18 @@ def get_account_discriminator(account_type: AccountTypes, version: int):
     Returns:
         bytes: Discriminator bytes
     """
-    name = account_type.value if version == AVER_VERSION else f'{account_type.value}V{version}'
+    name = account_type.value if version == latest_version else f'{account_type.value}V{version}'
     return sha256(bytes(f'account:{name}', 'utf-8')).digest()[0:8]
+
+#Latest version according to the program
+def get_version_of_account_type_in_program(account_type: AccountTypes, program: Program):
+    version = 0
+    while True:
+        account = program.account.get(f'{account_type.value}V{version}')
+        if(account is None):
+            break
+        else:
+            version = version + 1
+    
+    return version
 

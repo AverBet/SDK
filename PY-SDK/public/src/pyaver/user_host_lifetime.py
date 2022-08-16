@@ -1,7 +1,7 @@
 from .aver_client import AverClient
 from solana.publickey import PublicKey
 from .data_classes import UserHostLifetimeState
-from .constants import AVER_PROGRAM_ID, AVER_HOST_ACCOUNT
+from .constants import AVER_HOST_ACCOUNT, AVER_PROGRAM_IDS
 from .utils import sign_and_send_transaction_instructions
 from solana.system_program import SYS_PROGRAM_ID
 from solana.rpc.commitment import Finalized
@@ -84,7 +84,7 @@ class UserHostLifetime():
         host: PublicKey = AVER_HOST_ACCOUNT,
         referrer: PublicKey = SYS_PROGRAM_ID,
         discount_token: PublicKey = SYS_PROGRAM_ID,
-        program_id: PublicKey = AVER_PROGRAM_ID
+        program_id: PublicKey = AVER_PROGRAM_IDS[0]
     ):
         """
         Attempts to load a UserHostLifetime account and creates one if not found
@@ -141,7 +141,7 @@ class UserHostLifetime():
         host: PublicKey = AVER_HOST_ACCOUNT,
         referrer: PublicKey = SYS_PROGRAM_ID,
         discount_token: PublicKey = SYS_PROGRAM_ID,
-        program_id = AVER_PROGRAM_ID
+        program_id = AVER_PROGRAM_IDS[0]
     ):
         """
         Creates instruction for UserHostLifetime account creation
@@ -199,7 +199,7 @@ class UserHostLifetime():
         host: PublicKey = AVER_HOST_ACCOUNT,
         referrer: PublicKey = SYS_PROGRAM_ID,
         discount_token: PublicKey = SYS_PROGRAM_ID,
-        program_id: PublicKey = AVER_PROGRAM_ID,
+        program_id: PublicKey = AVER_PROGRAM_IDS[0],
     ):
         """
         Creates UserHostLifetime account
@@ -247,7 +247,7 @@ class UserHostLifetime():
         )
 
     @staticmethod
-    def derive_pubkey_and_bump(owner: PublicKey, host: PublicKey, program_id: PublicKey = AVER_PROGRAM_ID):
+    def derive_pubkey_and_bump(owner: PublicKey, host: PublicKey, program_id: PublicKey = AVER_PROGRAM_IDS[0]):
         """
         Derives PDA for UserHostLifetime public key
 

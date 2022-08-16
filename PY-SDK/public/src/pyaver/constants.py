@@ -3,15 +3,13 @@ from .enums import SolanaNetwork
 
 
 ##### SHARED DEVNET AND MAINNET CONSTANTS
-AVER_PROGRAM_ID = PublicKey('6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ')
+AVER_PROGRAM_IDS = [PublicKey('6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ')]
 AVER_TOKEN = PublicKey('AVERsCxn9wr9YZ4WVavPbjm13hrLTPAkdnu1QqK9ZL1y')
 AVER_MARKET_AUTHORITY = PublicKey('EEg375Q8wEsPTyaQ4jG4hmNsMojmMHs6gB58iVWUXSwF')
 AVER_HOST_ACCOUNT = PublicKey('5xhmqK1Dh48TiqvHxoZi6WWWKL6THtsUjh3GoiVEbbR8')
 AVER_COMMUNITY_REWARDS_NFT = PublicKey(
   'AVERojzZ8649E1oLPvcgG2SSbVECxs8PcG5JkpuK2Dvq'
 )
-
-
 
 ##### DEVNET ONLY CONSTANTS
 AVER_API_ENDPOINT_DEVNET = 'https://dev.api.aver.exchange'
@@ -75,7 +73,18 @@ CALLBACK_INFO_LEN = 33
 
 CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE = 5
 
-AVER_VERSION = 1
+USER_FACING_INSTRUCTIONS_TO_CHECK_IN_IDL = [
+  'init_user_market', 
+  'place_order', 
+  'cancel_order', 
+  'cancel_all_orders', 
+  'withdraw_tokens', 
+  'neutralize_outcome_position', 
+  'update_user_market_orders',
+  'init_user_host_lifetime',
+  'update_market_state',
+  'sweep_fees'
+  ]
 
 
 ###### HELPER FUNCTIONS

@@ -6,18 +6,19 @@ from asyncio import gather
 from .checks import *
 from solana.transaction import AccountMeta
 from solana.keypair import Keypair
+from .version_checks import check_if_instruction_is_out_of_date_with_idl
 from solana.system_program import SYS_PROGRAM_ID
 from spl.token.constants import TOKEN_PROGRAM_ID
 from anchorpy import Context
 from .user_host_lifetime import UserHostLifetime
 from spl.token.instructions import get_associated_token_address
 from .aver_client import AverClient
-from .utils import sign_and_send_transaction_instructions, load_multiple_account_states, parse_user_market_state
+from .utils import get_version_of_account_type_in_program, sign_and_send_transaction_instructions, load_multiple_account_states, parse_user_market_state
 from solana.rpc.types import TxOpts
 from solana.rpc.commitment import Finalized
 from .data_classes import UserHostLifetimeState, UserMarketState, UserBalanceState
-from .constants import AVER_PROGRAM_ID, AVER_HOST_ACCOUNT, AVER_VERSION, CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
-from .enums import OrderType, SelfTradeBehavior, Side, SizeFormat
+from .constants import AVER_HOST_ACCOUNT, AVER_PROGRAM_IDS, AVER_VERSION, CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
+from .enums import AccountTypes, OrderType, SelfTradeBehavior, Side, SizeFormat
 import math
 
 class UserMarket():
@@ -261,7 +262,7 @@ class UserMarket():
             owner: PublicKey,
             market: PublicKey,
             host: PublicKey,
-            program_id: PublicKey = AVER_PROGRAM_ID
+            program_id: PublicKey = AVER_PROGRAM_IDS[0]
         ) -> PublicKey:
         """
         Derives PDA (Program Derived Account) for UserMarket public key given a user, host and market
@@ -288,7 +289,7 @@ class UserMarket():
             owner: PublicKey,
             host: PublicKey = AVER_HOST_ACCOUNT, 
             number_of_orders: int = None,
-            program_id: PublicKey = AVER_PROGRAM_ID
+            program_id: PublicKey = AVER_PROGRAM_IDS[0]
         ):
         """
         Creates instruction for UserMarket account creation
@@ -314,20 +315,27 @@ class UserMarket():
 
         program = await aver_client.get_program_from_program_id(program_id)
 
-        return program.instruction['init_user_market'](
-            number_of_orders,
-            uma_bump, 
-            ctx=Context(
-                accounts={
-                    "user": owner,
-                    "user_host_lifetime": user_host_lifetime,
-                    "user_market": uma,
-                    "market": market.market_pubkey,
-                    "host": host,
-                    "system_program": SYS_PROGRAM_ID,
-                },
+        check_if_instruction_is_out_of_date_with_idl('place_order', program)
+
+        #Logic to return correct instruction based on ProgramID
+        if(program_id.to_base58() == ''):
+            #return program.instruction()...
+            return ''
+        else:
+            return program.instruction['init_user_market'](
+                number_of_orders,
+                uma_bump, 
+                ctx=Context(
+                    accounts={
+                        "user": owner,
+                        "user_host_lifetime": user_host_lifetime,
+                        "user_market": uma,
+                        "market": market.market_pubkey,
+                        "host": host,
+                        "system_program": SYS_PROGRAM_ID,
+                    },
+                )
             )
-        )
 
     @staticmethod
     async def create_user_market_account(
@@ -479,7 +487,7 @@ class UserMarket():
             order_type: OrderType = OrderType.LIMIT,
             self_trade_behavior: SelfTradeBehavior = SelfTradeBehavior.CANCEL_PROVIDE,
             active_pre_flight_check: bool = False,
-            progam_id: PublicKey = None,
+            program_id: PublicKey = None,
         ):
         """
         Creates instruction to place order.
@@ -506,10 +514,13 @@ class UserMarket():
         if(self.market.orderbooks is None):
             raise Exception('Cannot place error on closed market')
 
-        if(progam_id is None):
-            progam_id = self.market.program_id
+        if(program_id is None):
+            program_id = self.market.program_id
+
+        program = await self.aver_client.get_program_from_program_id(program_id)
 
         if(active_pre_flight_check):
+            check_if_instruction_is_out_of_date_with_idl('place_order', program)
             check_sufficient_lamport_balance(self.user_balance_state)
             check_correct_uma_market_match(self.user_market_state, self.market)
             check_market_active_pre_event(self.market.market_state.market_status)
@@ -532,37 +543,42 @@ class UserMarket():
         orderbook_account_index = outcome_id if not is_binary_market_second_outcome else 0
         orderbook_account = self.market.market_store_state.orderbook_accounts[orderbook_account_index]
 
-        program = await self.aver_client.get_program_from_program_id(progam_id)
+        
 
-        return program.instruction['place_order'](
-            {
-                "limit_price": limit_price_u64,
-                "size": max_base_qty,
-                "size_format": size_format,
-                "side": side,
-                "order_type": order_type,
-                "self_trade_behavior": self_trade_behavior,
-                "outcome_id": outcome_id,
-            },
-            ctx=Context(
-                accounts={
-                    "user": self.user_market_state.user,
-                    "user_host_lifetime": self.user_market_state.user_host_lifetime,
-                    "market": self.market.market_pubkey,
-                    "market_store": self.market.market_state.market_store,
-                    "user_market": self.pubkey,
-                    "user": self.user_market_state.user,
-                    "user_quote_token_ata": user_quote_token_ata,
-                    "quote_vault": self.market.market_state.quote_vault,
-                    "orderbook": orderbook_account.orderbook,
-                    "bids": orderbook_account.bids,
-                    "asks": orderbook_account.asks,
-                    "event_queue": orderbook_account.event_queue,
-                    "spl_token_program": TOKEN_PROGRAM_ID,
-                    "system_program": SYS_PROGRAM_ID,
-                    "vault_authority": self.market.market_state.vault_authority
-               },)
-        )
+        #Logic to return correct instruction based on ProgramID
+        if(program_id.to_base58() == ''):
+            #return program.instruction()...
+            return ''
+        else:        
+            return program.instruction['place_order'](
+                {
+                    "limit_price": limit_price_u64,
+                    "size": max_base_qty,
+                    "size_format": size_format,
+                    "side": side,
+                    "order_type": order_type,
+                    "self_trade_behavior": self_trade_behavior,
+                    "outcome_id": outcome_id,
+                },
+                ctx=Context(
+                    accounts={
+                        "user": self.user_market_state.user,
+                        "user_host_lifetime": self.user_market_state.user_host_lifetime,
+                        "market": self.market.market_pubkey,
+                        "market_store": self.market.market_state.market_store,
+                        "user_market": self.pubkey,
+                        "user": self.user_market_state.user,
+                        "user_quote_token_ata": user_quote_token_ata,
+                        "quote_vault": self.market.market_state.quote_vault,
+                        "orderbook": orderbook_account.orderbook,
+                        "bids": orderbook_account.bids,
+                        "asks": orderbook_account.asks,
+                        "event_queue": orderbook_account.event_queue,
+                        "spl_token_program": TOKEN_PROGRAM_ID,
+                        "system_program": SYS_PROGRAM_ID,
+                        "vault_authority": self.market.market_state.vault_authority
+                },)
+            )
 
     async def place_order(
             self,
@@ -668,7 +684,10 @@ class UserMarket():
         if(program_id is None):
             program_id = self.market.program_id
 
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
         if(active_pre_flight_check):
+            check_if_instruction_is_out_of_date_with_idl('cancel_order', program)
             check_sufficient_lamport_balance(self.user_balance_state)
             check_cancel_order_market_status(self.market.market_state.market_status)
             check_order_exists(self.user_market_state, order_id)
@@ -683,27 +702,32 @@ class UserMarket():
         orderbook_account_index = outcome_id if not is_binary_market_second_outcome else 0
         orderbook_account = self.market.market_store_state.orderbook_accounts[orderbook_account_index]
 
-        program = await self.aver_client.get_program_from_program_id(program_id)
+       
 
-        return program.instruction['cancel_order'](
-            order_id, 
-            orderbook_account_index, 
-            ctx=Context(accounts={
-                "orderbook": orderbook_account.orderbook,
-                "event_queue": orderbook_account.event_queue,
-                "bids": orderbook_account.bids,
-                "asks": orderbook_account.asks,
-                "market": self.market.market_pubkey,
-                "user_market": self.pubkey,
-                "user": self.user_market_state.user,
-                "market_store": self.market.market_state.market_store,
-                "user_quote_token_ata": user_quote_token_ata,
-                "quote_vault": self.market.market_state.quote_vault,
-                "vault_authority": self.market.market_state.vault_authority,
-                "spl_token_program": TOKEN_PROGRAM_ID,
-            })
-        )
-    
+        #Logic to return correct instruction based on ProgramID
+        if(program_id.to_base58() == ''):
+            #return program.instruction()...
+            return ''
+        else:
+            return program.instruction['cancel_order'](
+                order_id, 
+                orderbook_account_index, 
+                ctx=Context(accounts={
+                    "orderbook": orderbook_account.orderbook,
+                    "event_queue": orderbook_account.event_queue,
+                    "bids": orderbook_account.bids,
+                    "asks": orderbook_account.asks,
+                    "market": self.market.market_pubkey,
+                    "user_market": self.pubkey,
+                    "user": self.user_market_state.user,
+                    "market_store": self.market.market_state.market_store,
+                    "user_quote_token_ata": user_quote_token_ata,
+                    "quote_vault": self.market.market_state.quote_vault,
+                    "vault_authority": self.market.market_state.vault_authority,
+                    "spl_token_program": TOKEN_PROGRAM_ID,
+                })
+            )
+        
     async def cancel_order(
         self,
         order_id: int,
@@ -784,7 +808,10 @@ class UserMarket():
         if(program_id is None):
             program_id = self.market.program_id
 
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
         if(active_pre_flight_check):
+            check_if_instruction_is_out_of_date_with_idl('cancel_all_orders', program)
             check_sufficient_lamport_balance(self.user_balance_state)
             check_cancel_order_market_status(self.market.market_state.market_status)
             for outcome_id in outcome_ids_to_cancel:
@@ -827,11 +854,16 @@ class UserMarket():
 
         ixs = []
 
-        program = await self.aver_client.get_program_from_program_id(program_id)
+        
 
         for i, outcome_ids in enumerate(chunked_outcome_ids):
-            ixs.append(
-                program.instruction['cancel_all_orders'](
+            #Logic to return correct instruction based on ProgramID
+            ix = None
+            if(program_id.to_base58() == ''):
+                #ix = program.instruction()...
+                pass
+            else:
+                ix = program.instruction['cancel_all_orders'](
                     outcome_ids,
                     ctx=Context(
                         accounts={
@@ -847,7 +879,7 @@ class UserMarket():
                         remaining_accounts = chunked_remaining_accounts[i],
                         )
                     )
-            )
+            ixs.append(ix)
 
         return ixs
     
@@ -895,10 +927,11 @@ class UserMarket():
             )
         return sigs
 
-    def make_withdraw_idle_funds_instruction(
+    async def make_withdraw_idle_funds_instruction(
         self,
         user_quote_token_ata: PublicKey,
         amount: float = None,
+        program_id: PublicKey = None
     ):
         """
         Creates instruction for withdrawing funds in ATA 
@@ -914,23 +947,35 @@ class UserMarket():
         """
         if(amount is None):
             amount = self.calculate_funds_available_to_withdraw()
+
+        if(program_id is None):
+            program_id = self.market.program_id
         
-        return self.aver_client.program.instruction['withdraw_tokens'](
-            amount,
-            ctx=Context(
-                accounts={
-                    "market": self.market.market_pubkey,
-                    "user_market": self.pubkey,
-                    "user": self.user_market_state.user,
-                    "user_quote_token_ata": user_quote_token_ata,
-                    "quote_vault": self.market.market_state.quote_vault,
-                    "vault_authority": self.market.market_state.vault_authority,
-                    "spl_token_program": TOKEN_PROGRAM_ID,
-                },
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
+        check_if_instruction_is_out_of_date_with_idl('cancel_all_orders', program)
+        
+        #Logic to return correct instruction based on ProgramID
+        if(program_id.to_base58() == ''):
+            #return program.instruction()...
+            return ''
+        else:        
+            return program.instruction['withdraw_tokens'](
+                amount,
+                ctx=Context(
+                    accounts={
+                        "market": self.market.market_pubkey,
+                        "user_market": self.pubkey,
+                        "user": self.user_market_state.user,
+                        "user_quote_token_ata": user_quote_token_ata,
+                        "quote_vault": self.market.market_state.quote_vault,
+                        "vault_authority": self.market.market_state.vault_authority,
+                        "spl_token_program": TOKEN_PROGRAM_ID,
+                    },
+                )
             )
-        )
     
-    async def withdraw_idle_funds(self, owner: Keypair, send_options: TxOpts = None, amount: float = None):
+    async def withdraw_idle_funds(self, owner: Keypair, send_options: TxOpts = None, amount: float = None, program_id: PublicKey = None):
         """
         Withdraws idle funds in ATA
 
@@ -955,8 +1000,11 @@ class UserMarket():
             self.market.aver_client.owner,
             self.market.market_state.quote_token_mint
         )
+
+        if(program_id is None):
+            program_id = self.market.program_id
         
-        ix = self.make_withdraw_idle_funds_instruction(user_quote_token_ata, amount)
+        ix = await self.make_withdraw_idle_funds_instruction(user_quote_token_ata, amount, program_id)
 
         if(not owner.public_key == self.user_market_state.user):
             raise Exception('Owner must be same as UMA owner')
@@ -971,7 +1019,8 @@ class UserMarket():
 
     async def make_neutralize_positions_instruction(
         self,
-        outcome_id: int
+        outcome_id: int,
+        program_id: PublicKey = None,
     ):
         """
         Format instruction to neutralise the outcome position
@@ -984,39 +1033,52 @@ class UserMarket():
         Returns:
             TransactionInstruction: TransactionInstruction object
         """
+        if(program_id is None):
+            program_id = self.market.program_id
+        
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
         user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
             self.user_market_state.user,
             self.market.aver_client.owner,
             self.market.market_state.quote_token_mint
         )
 
-        return self.aver_client.program.instruction['neutralize_outcome_position'](
-            outcome_id,
-            ctx=Context(
-                accounts={
-                    "market": self.market.market_pubkey,
-                    "user_market": self.pubkey,
-                    "user": self.user_market_state.user,
-                    "user_host_lifetime": self.user_host_lifetime.pubkey,
-                    "user_quote_token_ata": user_quote_token_ata,
-                    "quote_vault": self.market.market_state.quote_vault,
-                    "market_store": self.market.market_state.market_store,
-                    "orderbook": self.market.market_store_state.orderbook_accounts[outcome_id].orderbook,
-                    "bids": self.market.market_store_state.orderbook_accounts[outcome_id].bids,
-                    "asks": self.market.market_store_state.orderbook_accounts[outcome_id].asks,
-                    "event_queue": self.market.market_store_state.orderbook_accounts[outcome_id].event_queue,
-                    "system_program": SYS_PROGRAM_ID,
-                    "spl_token_program": TOKEN_PROGRAM_ID,
-                    "vault_authority": self.market.market_state.vault_authority,
-                },
+        check_if_instruction_is_out_of_date_with_idl('cancel_all_orders', program)
+
+         #Logic to return correct instruction based on ProgramID
+        if(program_id.to_base58() == ''):
+            #return program.instruction()...
+            return ''
+        else:       
+            return program.instruction['neutralize_outcome_position'](
+                outcome_id,
+                ctx=Context(
+                    accounts={
+                        "market": self.market.market_pubkey,
+                        "user_market": self.pubkey,
+                        "user": self.user_market_state.user,
+                        "user_host_lifetime": self.user_host_lifetime.pubkey,
+                        "user_quote_token_ata": user_quote_token_ata,
+                        "quote_vault": self.market.market_state.quote_vault,
+                        "market_store": self.market.market_state.market_store,
+                        "orderbook": self.market.market_store_state.orderbook_accounts[outcome_id].orderbook,
+                        "bids": self.market.market_store_state.orderbook_accounts[outcome_id].bids,
+                        "asks": self.market.market_store_state.orderbook_accounts[outcome_id].asks,
+                        "event_queue": self.market.market_store_state.orderbook_accounts[outcome_id].event_queue,
+                        "system_program": SYS_PROGRAM_ID,
+                        "spl_token_program": TOKEN_PROGRAM_ID,
+                        "vault_authority": self.market.market_state.vault_authority,
+                    },
+                )
             )
-        )
 
     async def neutralize_positions(
         self,
         owner: Keypair,
         outcome_id: int,
-        send_options: TxOpts = None
+        send_options: TxOpts = None,
+        program_id: PublicKey = None,
     ):
         """
         Neutralise the outcome position
@@ -1034,12 +1096,16 @@ class UserMarket():
         Returns:
             RPCResponse: Response
         """
+        if(program_id is None):
+            program_id = self.market.program_id
+
         await self.check_if_uma_latest_version()
         await self.check_if_uhl_latest_version()
-        ix = self.make_neutralize_positions_instruction(outcome_id)
+        ix = self.make_neutralize_positions_instruction(outcome_id, program_id)
 
         if(not owner.public_key == self.user_market_state.user):
             raise Exception('Owner must be same as UMA owner')
+        
 
         return await sign_and_send_transaction_instructions(
             self.aver_client,
@@ -1049,9 +1115,10 @@ class UserMarket():
             send_options
         )
 
-    def make_update_user_market_orders_instruction(
+    async def make_update_user_market_orders_instruction(
         self,
-        new_size: int
+        new_size: int,
+        program_id: PublicKey = None
         ):
         """
         Changes size of UMA account to hold more or less max open orders
@@ -1064,22 +1131,35 @@ class UserMarket():
         Returns:
             TransactionInstruction: TransactionInstruction object
         """
-        return self.aver_client.program.instruction['update_user_market_orders'](
-            new_size,
-            ctx=Context(
-                accounts={
-                    "user_market": self.pubkey,
-                    "user": self.user_market_state.user,
-                    "system_program": SYS_PROGRAM_ID
-                },
+        if(program_id is None):
+            program_id = self.market.program_id
+        
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
+        check_if_instruction_is_out_of_date_with_idl('cancel_all_orders', program)
+        
+        #Logic to return correct instruction based on ProgramID
+        if(program_id.to_base58() == ''):
+            #return program.instruction()...
+            return ''
+        else:
+            return program.instruction['update_user_market_orders'](
+                new_size,
+                ctx=Context(
+                    accounts={
+                        "user_market": self.pubkey,
+                        "user": self.user_market_state.user,
+                        "system_program": SYS_PROGRAM_ID
+                    },
+                )
             )
-        )
     
     async def update_user_market_orders(
         self,
         owner: Keypair,
         new_size: int,
-        send_options: TxOpts = None
+        send_options: TxOpts = None,
+        program_id: PublicKey = None,
     ):
         """
         Changes size of UMA account to hold more or less max open orders
@@ -1097,9 +1177,14 @@ class UserMarket():
         Returns:
             RPCResponse: Response
         """
+        if(program_id is None):
+            program_id = self.market.program_id
+
         await self.check_if_uma_latest_version()
         await self.check_if_uhl_latest_version()
-        ix = self.make_update_user_market_orders_instruction(new_size)
+        ix = await self.make_update_user_market_orders_instruction(new_size, program_id)
+
+
 
         if(not owner.public_key == self.user_market_state.user):
             raise Exception('Owner must be same as UMA owner')
@@ -1112,21 +1197,21 @@ class UserMarket():
             send_options
         )
 
-
     async def check_if_uma_latest_version(self):
-        if(self.user_market_state.version < AVER_VERSION):
+        program = await self.aver_client.get_program_from_program_id(self.market.program_id)
+        if(self.user_market_state.version < get_version_of_account_type_in_program(AccountTypes.USER_MARKET, program)):
             #UPGRADE VERSION WHEN AVAILALBLE
             #Reload
             print('UPGRADING UMA VERSION')
             self = await self.load_by_uma(self.aver_client, self.pubkey, self.market, self.user_host_lifetime.pubkey)
         
     async def check_if_uhl_latest_version(self):
-        if(self.user_host_lifetime.user_host_lifetime_state.version < AVER_VERSION):
+        program = await self.aver_client.get_program_from_program_id(self.market.program_id)
+        if(self.user_host_lifetime.user_host_lifetime_state.version < get_version_of_account_type_in_program(AccountTypes.USER_HOST_LIFETIME, program)):
             #UPGRADE VERSION WHEN AVAILALBLE
             #Reload
             print('UPGRADING UHL VERSION')
             self = await self.load_by_uma(self.aver_client, self.pubkey, self.market, self.user_host_lifetime.pubkey)
-
 
     def calculate_funds_available_to_withdraw(self):
         """
@@ -1175,7 +1260,7 @@ class UserMarket():
         Returns:
             float: Token amount
         """
-        return self.user_market_state.outcome_positions[outcome_index].free + price * self.user_balance_state.token_balance
+        return self.user_market_state.outcome_positions[outcome_index].free + (1 - price) * self.user_balance_state.token_balance
     
     def calculate_tokens_available_to_buy(self, outcome_index: int, price: float):
         """

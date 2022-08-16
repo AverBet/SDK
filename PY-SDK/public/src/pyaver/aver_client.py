@@ -1,3 +1,4 @@
+from asyncio import gather
 import base64
 import datetime
 import json
@@ -6,12 +7,13 @@ import re
 from anchorpy import Provider, Wallet, Program
 import numpy as np
 from solana.rpc import types
+from .version_checks import check_idl_has_same_instructions_as_sdk
 from solana.rpc.async_api import AsyncClient
 from solana.publickey import PublicKey
 from solana.transaction import Transaction
 from solana.rpc.api import Client
 # from constants import AVER_API_URL_DEVNET, DEVNET_SOLANA_URL, DEFAULT_QUOTE_TOKEN_DEVNET, AVER_PROGRAM_ID_DEVNET_2
-from .constants import SYS_VAR_CLOCK, get_aver_api_endpoint, get_quote_token, get_solana_endpoint, AVER_PROGRAM_ID
+from .constants import AVER_PROGRAM_IDS, SYS_VAR_CLOCK, USER_FACING_INSTRUCTIONS_TO_CHECK_IN_IDL, get_aver_api_endpoint, get_quote_token, get_solana_endpoint
 from solana.keypair import Keypair
 from requests import get
 from spl.token.instructions import get_associated_token_address, create_associated_token_account
@@ -44,7 +46,7 @@ class AverClient():
 
     def __init__(
             self, 
-            program: Program,
+            programs: list[Program],
             aver_api_endpoint: str,
             solana_network: SolanaNetwork,
         ):
@@ -56,14 +58,14 @@ class AverClient():
             aver_api_endpoint (str): Endpoint for Aver API (to be removed soon)
             solana_network (SolanaNetwork): Solana network
         """
-        self.connection = program.provider.connection
-        self.programs = [program]
-        self.provider = program.provider
+        self.connection = programs[0].provider.connection
+        self.programs = programs
+        self.provider = programs[0].provider
         self.aver_api_endpoint = aver_api_endpoint
         self.solana_network = solana_network
         self.quote_token = get_quote_token(solana_network)
         self.solana_client = Client(get_solana_endpoint(solana_network))
-        self.owner = program.provider.wallet.payer
+        self.owner = programs[0].provider.wallet.payer
 
     @staticmethod
     async def load(
@@ -71,7 +73,7 @@ class AverClient():
             owner: Keypair or Wallet, 
             opts: types.TxOpts,
             network: SolanaNetwork,
-            program_id: PublicKey = AVER_PROGRAM_ID,
+            program_ids: list[PublicKey] = AVER_PROGRAM_IDS,
         ):
             """
             Initialises an AverClient object
@@ -102,15 +104,15 @@ class AverClient():
                 opts
             )
             api_endpoint = get_aver_api_endpoint(network)
-            program = await AverClient.load_program(provider, program_id)
+            programs = await gather(*[AverClient.load_program(provider, p) for  p in program_ids])
 
-            aver_client = AverClient(program, api_endpoint, network)    
+            aver_client = AverClient(programs, api_endpoint, network)    
             return aver_client
 
     @staticmethod
     async def load_program(
             provider: Provider,
-            program_id: PublicKey = AVER_PROGRAM_ID
+            program_id: PublicKey
         ):
         """
         Loads Aver Program
@@ -128,7 +130,7 @@ class AverClient():
         idl = await Program.fetch_idl(program_id,provider)
         if(idl):
             program = Program(idl, program_id, provider)
-            AverClient.check_idl_has_same_instructions_as_sdk(program)
+            check_idl_has_same_instructions_as_sdk(program)
             return program
         else:
             raise Exception('Program IDL not loaded')
@@ -146,52 +148,6 @@ class AverClient():
 
     ####
 ## IDL Checks
-
-    @staticmethod
-    def check_idl_has_same_instructions_as_sdk(program: Program):
-        """
-        Checks the idl json file's instructions against the instructions in the program
-
-        Warns the user incase their SDK version may be out of date
-
-        Args:
-            program (Program): AnchorPy Program
-        """
-        def camel_to_snake(name: str):
-            """
-            Converts from CamelCase to snake_case
-
-            Args:
-                name (str): Camel case name
-
-            Returns:
-                name: Snake case name
-            """
-            name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
-
-        file_path = os.path.join(os.path.dirname(__file__), 'idl/idl.json')
-        file_idl = json.load(open(file_path))
-        file_instructions = file_idl['instructions']
-        for i in program.idl.instructions:
-            file_instruction = next((x for x in file_instructions if camel_to_snake(x['name']) == i.name), None)
-            if(file_instruction is None):
-                print('-'*10)
-                print(f'INSTRUCTION {i.name} IS IN THE IDL BUT IS NOT EXPECTED')
-                print('THIS MEANS YOUR VERSION OF THE SDK MAY NEEDED TO BE UPDATED')
-                print('-'*10)
-                continue
-
-            file_account_names = [camel_to_snake(f['name']) for f in file_instruction['accounts']]
-            idl_account_names = [a.name for a in i.accounts]
-            if(not np.array_equal(file_account_names, idl_account_names)):
-                print('-'*10)
-                print(f'INSTRUCTION {i.name} ACCOUNTS REQUIRED FROM THE IDL ARE DIFFERENT FROM EXPECTED')
-                print('THIS MEANS YOUR VERSION OF THE SDK MAY NEEDED TO BE UPDATED')
-                print('-'*10)
-
-
-
 
     async def close(self):
         """

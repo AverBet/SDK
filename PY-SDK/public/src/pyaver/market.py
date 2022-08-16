@@ -5,10 +5,11 @@ from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .event_queue import load_all_event_queues, prepare_user_accounts_list
 from .aver_client import AverClient
 from solana.publickey import PublicKey
+from solana.system_program import SYS_PROGRAM_ID
 from spl.token.instructions import get_associated_token_address
 from solana.keypair import Keypair
 from .enums import AccountTypes, Fill, MarketStatus
-from .constants import AVER_MARKET_AUTHORITY, AVER_PROGRAM_ID
+from .constants import AVER_MARKET_AUTHORITY
 from .utils import fetch_multiple_with_version, fetch_with_version, load_multiple_bytes_data, parse_bytes_data, parse_with_version, sign_and_send_transaction_instructions, parse_market_store, parse_market_state
 from .data_classes import MarketState, MarketStoreState, OrderbookAccountsState
 from .orderbook import Orderbook
@@ -211,48 +212,48 @@ class AverMarket():
         return await AverMarket.load_multiple_market_states_and_stores(aver_client, [market_pubkey])
 
     
-    @staticmethod
-    @deprecate
-    async def load_multiple_market_states_and_stores(aver_client: AverClient, market_pubkeys: list[PublicKey]):
-        """
-        Loads onchain data for multiple MarketStates and MarketStoreStates at once
+    # @staticmethod
+    # @deprecate
+    # async def load_multiple_market_states_and_stores(aver_client: AverClient, market_pubkeys: list[PublicKey]):
+    #     """
+    #     Loads onchain data for multiple MarketStates and MarketStoreStates at once
 
-        Args:
-            aver_client (AverClient): AverClient object
-            market_pubkeys (list[PublicKey]): List of market public keys
+    #     Args:
+    #         aver_client (AverClient): AverClient object
+    #         market_pubkeys (list[PublicKey]): List of market public keys
 
-        Returns:
-            dict[str, list[MarketState] or list[MarketStoreState]]: Keys are market_states or market_stores
-        """
+    #     Returns:
+    #         dict[str, list[MarketState] or list[MarketStoreState]]: Keys are market_states or market_stores
+    #     """
 
-        market_store_pubkeys = [AverMarket.derive_market_store_pubkey_and_bump(m, AVER_PROGRAM_ID)[0] for m in market_pubkeys]
+    #     market_store_pubkeys = [AverMarket.derive_market_store_pubkey_and_bump(m, AVER_PROGRAM_ID)[0] for m in market_pubkeys]
 
-        data = await load_multiple_bytes_data(aver_client.connection, market_pubkeys + market_store_pubkeys)
-        market_states_data = data[0:len(market_pubkeys)]
-        market_stores_data = data[len(market_pubkeys):]
+    #     data = await load_multiple_bytes_data(aver_client.connection, market_pubkeys + market_store_pubkeys)
+    #     market_states_data = data[0:len(market_pubkeys)]
+    #     market_stores_data = data[len(market_pubkeys):]
 
-        market_states = [parse_market_state(d, aver_client) for d in market_states_data]
-        market_stores = [parse_market_store(d, aver_client) if d is not None else None for d in market_stores_data]
+    #     market_states = [parse_market_state(d, aver_client) for d in market_states_data]
+    #     market_stores = [parse_market_store(d, aver_client) if d is not None else None for d in market_stores_data]
 
-        return {'market_states': market_states, 'market_stores': market_stores}
+    #     return {'market_states': market_states, 'market_stores': market_stores}
 
-    @staticmethod
-    def derive_market_store_pubkey_and_bump(market_pubkey: PublicKey, program_id: PublicKey = AVER_PROGRAM_ID):
-        """
-        Derives PDA (Program Derived Account) for MarketStore public key.
-        MarketStore account addresses are derived deterministically using the market's pubkey.
+    # @staticmethod
+    # def derive_market_store_pubkey_and_bump(market_pubkey: PublicKey, program_id: PublicKey = AVER_PROGRAM_ID):
+    #     """
+    #     Derives PDA (Program Derived Account) for MarketStore public key.
+    #     MarketStore account addresses are derived deterministically using the market's pubkey.
 
-        Args:
-            market_pubkey (PublicKey): Market public key
-            program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
+    #     Args:
+    #         market_pubkey (PublicKey): Market public key
+    #         program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
 
-        Returns:
-            PublicKey: MarketStore public key
-        """
-        return PublicKey.find_program_address(
-            [bytes('market-store', 'utf-8'), bytes(market_pubkey)], 
-            program_id
-        )
+    #     Returns:
+    #         PublicKey: MarketStore public key
+    #     """
+    #     return PublicKey.find_program_address(
+    #         [bytes('market-store', 'utf-8'), bytes(market_pubkey)], 
+    #         program_id
+    #     )
 
     @staticmethod
     def get_markets_from_account_states(
@@ -478,7 +479,7 @@ class AverMarket():
         return orderbooks_market_list
 
     
-    def make_sweep_fees_instruction(self):
+    async def make_sweep_fees_instruction(self):
         """
         Creates instruction to sweeps fees and sends to relevant accounts
 
@@ -489,7 +490,7 @@ class AverMarket():
         """
         quote_token = self.aver_client.quote_token
         third_party_vault_authority, bump = PublicKey.find_program_address(
-            [b"third-party-token-vault", bytes(quote_token)], AVER_PROGRAM_ID)
+            [b"third-party-token-vault", bytes(quote_token)], self.program_id)
 
         third_party_vault_token_account = get_associated_token_address(
             third_party_vault_authority, quote_token)
@@ -498,7 +499,9 @@ class AverMarket():
             AVER_MARKET_AUTHORITY, quote_token
         )
 
-        return self.aver_client.program.instruction["sweep_fees"](
+        program = await self.aver_client.get_program_from_program_id(self.program_id)
+
+        return program.instruction["sweep_fees"](
             ctx=Context(
                 accounts={
                     "market": self.market_pubkey,
@@ -528,7 +531,7 @@ class AverMarket():
         if(fee_payer == None):
             fee_payer = self.aver_client.owner
 
-        ix = self.make_sweep_fees_instruction()
+        ix = await self.make_sweep_fees_instruction()
 
         return await sign_and_send_transaction_instructions(
             self.aver_client,
@@ -536,6 +539,26 @@ class AverMarket():
             fee_payer,
             [ix],
             send_options
+        )
+
+    
+    async def update_market_state(self, client: AverClient, account_owner: Keypair, program_id: PublicKey, opts: TxOpts = None):
+        program = await client.get_program_from_program_id(program_id)
+        ix = program.instruction['update_market_state'](
+            ctx=Context(accounts={
+                "payer": account_owner.public_key,
+                "market_authority": self.market_state.market_authority,
+                "market": self.market_pubkey,
+                "system_program": SYS_PROGRAM_ID 
+            })
+        )
+
+        return await sign_and_send_transaction_instructions(
+            client,
+            [],
+            account_owner,
+            [ix],
+            opts
         )
 
     def list_all_pubkeys(self):
