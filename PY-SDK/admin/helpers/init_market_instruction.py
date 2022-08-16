@@ -5,7 +5,6 @@ from typing import NamedTuple
 from solana.publickey import PublicKey
 from solana.keypair import Keypair
 from solana.rpc.commitment import Processed
-from pyaver.constants import AVER_PROGRAM_ID
 from solana.system_program import SYS_PROGRAM_ID
 # from constants import DEFAULT_QUOTE_TOKEN_DEVNET
 # from constants import AVER_PROGRAM_ID_DEVNET_2 as AVER_PROGRAM_ID_DEVNET

@@ -24,9 +24,10 @@ src/pyaver/slab.py
 src/pyaver/user_host_lifetime.py
 src/pyaver/user_market.py
 src/pyaver/utils.py
+src/pyaver/version_checks.py
 src/pyaver.egg-info/PKG-INFO
 src/pyaver.egg-info/SOURCES.txt
 src/pyaver.egg-info/dependency_links.txt
 src/pyaver.egg-info/requires.txt
 src/pyaver.egg-info/top_level.txt
-src/pyaver/idl/idl.json
+src/pyaver/idl/6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ.json

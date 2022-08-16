@@ -7,9 +7,8 @@ from helpers.aver_client_setup_tests import aver_client_setup_tests
 from helpers.create_market_tests import create_init_market_smoke_tests
 from helpers.user_smoke_flow_tests import user_flow_smoke_tests
 from pyaver.aver_client import AverClient
-from helpers.update_account_states import update_market_state
 from pyaver.market import AverMarket
-from pyaver.constants import get_solana_endpoint, AVER_PROGRAM_ID
+from pyaver.constants import get_solana_endpoint
 from solana.rpc.types import TxOpts
 from solana.rpc.commitment import Confirmed
 import base58 
@@ -26,7 +25,6 @@ import base58
 #####
 
 #To run all code from an entirely new set of keypairs and markets, set this to True
-program_id = AVER_PROGRAM_ID
 program_id = PublicKey('DfMQPAuAeECP7iSCwTKjbpzyx6X1HZT6rz872iYWA8St')
 
 #Set to TRUE if Public Key is on V1.1 - This will try to read and upgrade an old market and then read it again
@@ -57,7 +55,7 @@ class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
             'confirmed',
             timeout=30
         )
-        client = await AverClient.load(connection, owner, opts, SolanaNetwork.DEVNET, program_id)
+        client = await AverClient.load(connection, owner, opts, SolanaNetwork.DEVNET, [program_id])
 
         self.owner = owner
         self.client = client
@@ -88,8 +86,8 @@ class V1_1_Market_Test(unittest.IsolatedAsyncioTestCase):
             print('-'*10)
 
             print('UPGRADING MARKET BEGIN')
-            sig = await update_market_state(market, self.client, self.owner, program_id)
-            con = await self.client.provider.connection.confirm_transaction(sig, Confirmed)
+            sig = await market.update_market_state(self.client, self.owner, program_id)
+            con = await self.client.provider.connection.confirm_transaction(sig['result'], Confirmed)
             print('MARKET UPGRADED')
             print('LOADING OLD MARKET')
             market = await AverMarket.load(self.client, self.market.public_key)
