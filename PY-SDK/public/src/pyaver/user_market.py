@@ -17,7 +17,7 @@ from .utils import get_version_of_account_type_in_program, sign_and_send_transac
 from solana.rpc.types import TxOpts
 from solana.rpc.commitment import Finalized
 from .data_classes import UserHostLifetimeState, UserMarketState, UserBalanceState
-from .constants import AVER_HOST_ACCOUNT, AVER_PROGRAM_IDS, AVER_VERSION, CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
+from .constants import AVER_HOST_ACCOUNT, AVER_PROGRAM_IDS, CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
 from .enums import AccountTypes, OrderType, SelfTradeBehavior, Side, SizeFormat
 import math
 

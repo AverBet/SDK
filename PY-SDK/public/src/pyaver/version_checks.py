@@ -43,7 +43,7 @@ def check_idl_has_same_instructions_as_sdk(program: Program):
     Args:
         program (Program): AnchorPy Program
     """
-    file_idl = load_idl_from_json(program.program_id.to_base58())
+    file_idl = load_idl_from_json(program.program_id.__str__())
     if(file_idl is None):
         return
     file_instructions = file_idl['instructions']
@@ -52,6 +52,8 @@ def check_idl_has_same_instructions_as_sdk(program: Program):
     for i in USER_FACING_INSTRUCTIONS_TO_CHECK_IN_IDL:
         file_instruction = next((x for x in file_instructions if camel_to_snake(x['name']) == i), None)
         program_instruction = next((x for x in program.idl.instructions if x.name == i), None)
+        print(i)
+        print(i, program_instruction.name)
         get_differences_between_idl_and_program_instruction(file_instruction, program_instruction, True)
 
 
