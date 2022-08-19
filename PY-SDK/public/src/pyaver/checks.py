@@ -37,7 +37,7 @@ def check_price_error(limit_price: float, side: Side):
             raise Exception(f'The price provided for a SELL order must be strictly less than 1 USDC (1,000,000). Limit price provided: {limit_price}')
 
 def check_outcome_outside_space(outcome_id: int, market: AverMarket):
-    if(not outcome_id in range(0, market.market_state.number_of_outcomes - 1)):
+    if(not outcome_id in range(0, market.market_state.number_of_outcomes)):
         raise Exception(f'The outcome index provided is not within the outcome space for this market. Outcome index provided: {outcome_id}; Outcome indices in this market: 0 to {(market.market_state.number_of_outcomes-1)}')
 
 def check_incorrect_order_type_for_market_order(limit_price: float, order_type: OrderType, side: Side, market: AverMarket):
