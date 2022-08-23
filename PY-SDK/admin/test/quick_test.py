@@ -11,7 +11,7 @@ from solana.publickey import PublicKey
 class TestSdkV2(unittest.IsolatedAsyncioTestCase):
   async def asyncSetUp(self) -> None:
     # constants we can adjust
-    self.second_program_id = PublicKey('DfMQPAuAeECP7iSCwTKjbpzyx6X1HZT6rz872iYWA8St')
+    self.second_program_id = PublicKey('81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT')
     owner = Keypair.from_secret_key(base58.b58decode('2S1DDiUZuqFNPHx2uzX9pphxynV1CgpLXnT9QrwPoWwXaGrqAP88XNEh9NK7JbFByJFDsER7PQgsNyacJyCGsH8S'))
 
     # setup the client
@@ -37,10 +37,6 @@ class TestSdkV2(unittest.IsolatedAsyncioTestCase):
   # def client(self, value):
   #   self.__class__.client = value
 
-  async def add_program_test(self):
-    await self.client.add_program(self.second_program_id)
-    print("Successfully added new program")
-
   async def get_program_from_program_id_test(self):
     second_program = await self.client.get_program_from_program_id(self.second_program_id)
     
@@ -50,7 +46,6 @@ class TestSdkV2(unittest.IsolatedAsyncioTestCase):
   # run all the tests in order we want
   async def test_run_all(self):
     # aver client tests
-    await self.add_program_test()
     await self.get_program_from_program_id_test()
 
     # aver market tests

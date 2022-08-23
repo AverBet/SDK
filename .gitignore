@@ -6,3 +6,5 @@ TS-SDK/public/dist
 *./ignore.py
 ignore.py
 venv/
+__pycache__/
+*.pyc

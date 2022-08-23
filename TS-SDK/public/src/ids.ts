@@ -3,7 +3,7 @@ import { SolanaNetwork } from "./types";
 
 // Devnet and Mainnet constants
 export const AVER_PROGRAM_IDS = [
-  new PublicKey("81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT"),
+  new PublicKey("6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ"),
 ];
 
 export const AVER_TOKEN = new PublicKey(

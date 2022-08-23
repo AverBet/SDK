@@ -8,7 +8,7 @@ jest.setTimeout(100000)
 
 describe('run all tests', () => {
   // constants we can adjust
-  const secondProgramId = new PublicKey('DfMQPAuAeECP7iSCwTKjbpzyx6X1HZT6rz872iYWA8St')
+  const secondProgramId = new PublicKey('81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT')
   const owner = Keypair.fromSecretKey(base58_to_binary('2S1DDiUZuqFNPHx2uzX9pphxynV1CgpLXnT9QrwPoWwXaGrqAP88XNEh9NK7JbFByJFDsER7PQgsNyacJyCGsH8S'))
   
   // values that will be set by the tests
@@ -18,8 +18,10 @@ describe('run all tests', () => {
     const network = SolanaNetwork.Devnet
     const solanaEndpoint = getSolanaEndpoint(network)
     const connection = new Connection(solanaEndpoint, "confirmed")
-    client = await AverClient.load(connection, owner)
-    console.log(`Successfully loaded client with owner: ${client.owner.publicKey.toBase58()}`)
+    client = await AverClient.load(connection, owner, undefined, )
   })
-  
+
+  test('successfully get program, if not add a program', async () => {
+    await client.getProgramFromProgramId(secondProgramId)
+  })
 })
