@@ -4,7 +4,7 @@ import { bs58 } from "@project-serum/anchor/dist/cjs/utils/bytes"
 import { Connection, Keypair, ConfirmOptions, PublicKey } from "@solana/web3.js"
 import axios from "axios"
 import { AverClient } from "./aver-client"
-import { AVER_PROGRAM_ID, getAverApiEndpoint, getSolanaEndpoint } from "./ids"
+import { AVER_PROGRAM_IDS, getAverApiEndpoint, getSolanaEndpoint } from "./ids"
 import { Market } from "./market"
 import {
   MarketStatus,
@@ -55,7 +55,7 @@ async function main() {
     SolanaNetwork.Devnet,
     ownerKeypair,
     opts,
-    AVER_PROGRAM_ID
+    AVER_PROGRAM_IDS
   )
 
   // ----------------------------------------------------

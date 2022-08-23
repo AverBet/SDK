@@ -53,7 +53,7 @@ export const signAndSendTransactionInstructions = async (
     try {
       return await client.connection.sendTransaction(tx, signers, sendOptions)
     } catch (e) {
-      errorThrown = parseError(e, client.program)
+      errorThrown = parseError(e, client.programs[0])
 
       // if its a program error, throw it
       if (errorThrown instanceof ProgramError) {
@@ -229,9 +229,11 @@ export function parseWithVersion(
   const version = bytes && bytes.data ? bytes.data[8] : null
   if (version == null) throw new Error(`Error parsing ${account_type}`)
 
+  const latestVersion = getVersionOfAccountTypeInProgram(account_type, program)
+
   //Checks if this is reading the correct version OR if it is not possible to read an old version
   if (
-    version === AVER_VERSION ||
+    version === latestVersion ||
     !program.account[`${account_type}V${version}`]
   ) {
     const firstLetterUppercase = `${account_type}`[0].toUpperCase()
@@ -248,9 +250,8 @@ export function parseWithVersion(
       "PLEASE CALL THE UPDATE INSTRUCTION FOR THE CORRESPONDING ACCOUNT TYPE TO RECTIFY, IF POSSIBLE"
     )
     //We need to replace the discriminator on the bytes data to prevent anchor errors
-    const account_discriminator = accountDiscriminator(account_type, version)
+    const account_discriminator = accountDiscriminator(account_type, version, latestVersion)
     account_discriminator.map((v, i, a) => {
-      //@ts-expect-error
       bytes.data[i] = v
       return 1
     })
@@ -271,11 +272,29 @@ export function parseWithVersion(
  */
 function accountDiscriminator(
   account_type: AccountType,
-  version: number
+  version: number,
+  latestVersion: number
 ): Buffer {
+  const name = version == latestVersion ? account_type : `${account_type}V${version}`
   return Buffer.from(
     sha256.digest(
-      `account:${camelcase(`${account_type}V${version}`, { pascalCase: true })}`
+      `account:${camelcase(`${name}`, { pascalCase: true })}`
     )
   ).slice(0, 8)
+}
+
+
+// Latest version according to the program
+function getVersionOfAccountTypeInProgram(accountType: AccountType, program: Program){
+  let version = 0
+  while (true){
+    const account = program.account[`${accountType}V${version}`]
+    if(account == null){
+      break
+    } else {
+      version = version + 1
+    }
+  }
+
+  return version
 }

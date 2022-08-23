@@ -3,7 +3,7 @@ from .enums import SolanaNetwork
 
 
 ##### SHARED DEVNET AND MAINNET CONSTANTS
-AVER_PROGRAM_IDS = [PublicKey('6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ')]
+AVER_PROGRAM_IDS = [PublicKey('81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT')]
 AVER_TOKEN = PublicKey('AVERsCxn9wr9YZ4WVavPbjm13hrLTPAkdnu1QqK9ZL1y')
 AVER_MARKET_AUTHORITY = PublicKey('EEg375Q8wEsPTyaQ4jG4hmNsMojmMHs6gB58iVWUXSwF')
 AVER_HOST_ACCOUNT = PublicKey('5xhmqK1Dh48TiqvHxoZi6WWWKL6THtsUjh3GoiVEbbR8')
@@ -12,7 +12,6 @@ AVER_COMMUNITY_REWARDS_NFT = PublicKey(
 )
 
 ##### DEVNET ONLY CONSTANTS
-AVER_API_ENDPOINT_DEVNET = 'https://dev.api.aver.exchange'
 SOLANA_ENDPOINT_DEVNET = 'https://api.devnet.solana.com' 
 USDC_DEVNET = PublicKey('BWvbxUTAxevm1NG8RHe1LhKmca9nz5ym2xqafTxr6ybj')
 
@@ -41,8 +40,7 @@ AVER_MAINNET_LAUNCH_NFT_DEVNET = PublicKey(
 
 
 ##### MAINNET ONLY CONSTANTS
-AVER_API_ENDPOINT_MAINNET = 'https://api.aver.exchange'
-SOLANA_ENDPOINT_MAINET = 'https://api.mainnet-beta.solana.com/'
+SOLANA_ENDPOINT_MAINNET = 'https://api.mainnet-beta.solana.com/'
 USDC_MAINNET = PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') # (USDC)
 
 AVER_MARKET_AUTHORITY_VAULT_MAINNET = PublicKey(
@@ -87,18 +85,6 @@ USER_FACING_INSTRUCTIONS_TO_CHECK_IN_IDL = [
   ]
 
 
-###### HELPER FUNCTIONS
-def get_aver_api_endpoint(solanaNetwork: SolanaNetwork):
-  """
-  Returns URL for Aver API based on solana network
-
-  Args:
-      solanaNetwork (SolanaNetwork): Solana network
-
-  Returns:
-      string: URL 
-  """
-  return AVER_API_ENDPOINT_DEVNET if solanaNetwork == SolanaNetwork.DEVNET else AVER_API_ENDPOINT_MAINNET
 def get_solana_endpoint(solanaNetwork: SolanaNetwork):
   """
   Returns URL for solana endpoint based on solana network

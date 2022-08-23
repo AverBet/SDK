@@ -314,7 +314,7 @@ class UserMarket():
 
         program = await aver_client.get_program_from_program_id(program_id)
 
-        check_if_instruction_is_out_of_date_with_idl('place_order', program)
+        # check_if_instruction_is_out_of_date_with_idl('place_order', program)
 
         #Logic to return correct instruction based on ProgramID
         if(program_id.to_base58() == ''):

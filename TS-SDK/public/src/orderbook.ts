@@ -1,7 +1,7 @@
 import { Slab, Price, Side, LeafNode } from "@bonfida/aaob"
 import { BN } from "@project-serum/anchor"
 import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
-import { AVER_PROGRAM_ID, CALLBACK_INFO_LEN } from "./ids"
+import { AVER_PROGRAM_IDS, CALLBACK_INFO_LEN } from "./ids"
 import { PriceAndSide, SlabOrder } from "./types"
 import { chunkAndFetchMultiple, throwIfNull } from "./utils"
 
@@ -311,7 +311,7 @@ export class Orderbook {
   static async deriveOrderbookPubkeyAndBump(
     market: PublicKey,
     outcomeId: number,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [
@@ -336,7 +336,7 @@ export class Orderbook {
   static async deriveEventQueuePubkeyAndBump(
     market: PublicKey,
     outcomeId: number,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [
@@ -361,7 +361,7 @@ export class Orderbook {
   static async deriveBidsPubkeyAndBump(
     market: PublicKey,
     outcomeId: number,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [Buffer.from("bids", "utf-8"), market.toBuffer(), Buffer.of(outcomeId)],
@@ -382,7 +382,7 @@ export class Orderbook {
   static async deriveAsksPubkeyAndBump(
     market: PublicKey,
     outcomeId: number,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [Buffer.from("asks", "utf-8"), market.toBuffer(), Buffer.of(outcomeId)],

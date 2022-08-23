@@ -25,6 +25,7 @@
     "base58-js": "^1.0.0",
     "bn.js": "^5.2.0",
     "borsh": "^0.7.0",
+    "camelcase": "^6.3.0",
     "lodash.chunk": "^4.2.0"
   },
   "devDependencies": {

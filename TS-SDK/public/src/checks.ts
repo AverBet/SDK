@@ -11,6 +11,8 @@ import {
 import { UserHostLifetime } from "./user-host-lifetime"
 import { roundPriceToNearestTickSize } from "./utils"
 import * as fs from "fs"
+import path from 'path'
+import {PublicKey} from '@solana/web3.js'
 
 export function checkSufficientLamportBalance(
   user_balance_state: UserBalanceState
@@ -269,6 +271,14 @@ export function checkOutcomeHasOrders(
   throw Error(`No open orders found for outcome ${outcome_id} in this market.`)
 }
 
+export function loadIdlFromJson(programId: PublicKey) {
+  const filePath = path.join(__dirname, 'idl', `${programId.toBase58()}.json`)
+  const data = fs.readFileSync(filePath, "utf-8")
+  const fileIdl = JSON.parse(data)
+
+  return fileIdl
+}
+
 /**
  * Checks the idl json file's instructions against the instructions in the program
  *
@@ -277,8 +287,7 @@ export function checkOutcomeHasOrders(
  * @param program -  AnchorPy Program
  */
 export function checkIdlHasSameInstructionsAsSdk(program: Program) {
-  const data = fs.readFileSync("./idl.json", "utf-8")
-  const fileIdl = JSON.parse(data)
+  const fileIdl = loadIdlFromJson(program.programId)
   const fileInstructions = fileIdl["instructions"]
 
   program.idl.instructions.map((i) => {

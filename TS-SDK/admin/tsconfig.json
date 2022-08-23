@@ -15,7 +15,7 @@
     "allowSyntheticDefaultImports": true,
     "target": "es2019",
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": "../",
     "declaration": true,
     "noImplicitAny": false,
     "moduleResolution": "node",
@@ -26,6 +26,6 @@
     },
     "resolveJsonModule": true,
   },
-  "include": ["src/*", "src/.ts", "index.ts"],
-  "exclude": ["src/**/*.test.ts", "**/node_modules", "dist"]
+  "include": ["src/*", "src/.ts", "index.ts", "v2_tests/*"],
+  // "exclude": ["src/**/*.test.ts", "**/node_modules", "dist"]
 }
