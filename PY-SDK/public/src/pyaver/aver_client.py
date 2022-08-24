@@ -1,3 +1,4 @@
+from requests import get
 from asyncio import gather
 import base64
 import datetime
@@ -287,10 +288,12 @@ class AverClient():
         return datetime.datetime.utcfromtimestamp(parsed_data['unix_timestamp'])
         
 
+    # DEPRECATED
+    async def check_health(self):
+        url = "https://dev.api.aver.exchange" + '/health?format=json'
+        aver_health_response = get(url)
 
+        solana_health_response = await self.provider.connection.get_version()
 
-
-
-
-
+        return {'api': aver_health_response.json(), 'solana': solana_health_response}
 

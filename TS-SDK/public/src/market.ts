@@ -128,47 +128,48 @@ export class Market {
    * @returns {Promise<Market>} - AverMarket object
    */
   static async load(averClient: AverClient, pubkey: PublicKey) {
-    // get programId of market
-    const programId = (await averClient.connection.getAccountInfo(pubkey)).owner
-    const program = await averClient.getProgramFromProgramId(programId)
-    const [marketStorePubkey, marketStoreBump] =
-      await Market.deriveMarketStorePubkeyAndBump(pubkey)
+    return (await Market.loadMultiple(averClient, [pubkey]))[0]
+    // // get programId of market
+    // const programId = (await averClient.connection.getAccountInfo(pubkey)).owner
+    // const program = await averClient.getProgramFromProgramId(programId)
+    // const [marketStorePubkey, marketStoreBump] =
+    //   await Market.deriveMarketStorePubkeyAndBump(pubkey)
 
-    const marketResultAndMarketStoreResult = await Promise.all([
-      program.account["market"].fetch(pubkey.toBase58()),
-      program.account["marketStore"].fetchNullable(
-        marketStorePubkey.toBase58()
-      ),
-    ])
-    const marketState = Market.parseMarketState(
-      marketResultAndMarketStoreResult[0]
-    )
+    // const marketResultAndMarketStoreResult = await Promise.all([
+    //   program.account["market"].fetch(pubkey.toBase58()),
+    //   program.account["marketStore"].fetchNullable(
+    //     marketStorePubkey.toBase58()
+    //   ),
+    // ])
+    // const marketState = Market.parseMarketState(
+    //   marketResultAndMarketStoreResult[0]
+    // )
 
-    // market store and orderbooks do not exist for closed markets
-    const marketStoreResult = marketResultAndMarketStoreResult[1]
+    // // market store and orderbooks do not exist for closed markets
+    // const marketStoreResult = marketResultAndMarketStoreResult[1]
 
-    if (!marketStoreResult) {
-      return new Market(averClient, pubkey, marketState, programId)
-    }
+    // if (!marketStoreResult) {
+    //   return new Market(averClient, pubkey, marketState, programId)
+    // }
 
-    const marketStoreState = Market.parseMarketStoreState(marketStoreResult)
+    // const marketStoreState = Market.parseMarketStoreState(marketStoreResult)
 
-    const orderbooks = await Market.getOrderbooksFromOrderbookAccounts(
-      program.provider.connection,
-      marketStoreState.orderbookAccounts,
-      Array.from({ length: marketState.numberOfOutcomes }).map(
-        () => marketState.decimals
-      )
-    )
+    // const orderbooks = await Market.getOrderbooksFromOrderbookAccounts(
+    //   program.provider.connection,
+    //   marketStoreState.orderbookAccounts,
+    //   Array.from({ length: marketState.numberOfOutcomes }).map(
+    //     () => marketState.decimals
+    //   )
+    // )
 
-    return new Market(
-      averClient,
-      pubkey,
-      marketState,
-      programId,
-      marketStoreState,
-      orderbooks
-    )
+    // return new Market(
+    //   averClient,
+    //   pubkey,
+    //   marketState,
+    //   programId,
+    //   marketStoreState,
+    //   orderbooks
+    // )
   }
 
   /**
@@ -188,7 +189,7 @@ export class Market {
     pubkeys: PublicKey[]
   ): Promise<(Market | null)[]> {
     // get programId of market
-    const programIds = (await averClient.connection.getMultipleAccountsInfo(pubkeys)).map(m => m.owner)
+    const programIds = (await averClient.connection.getMultipleAccountsInfo(pubkeys)).map((m: any) => m.owner)
     const programs = await Promise.all(programIds.map(p => averClient.getProgramFromProgramId(p)))
 
     const marketStorePubkeys = (
@@ -729,6 +730,10 @@ export class Market {
 
   get programId() {
     return this._programId
+  }
+
+  get inPlayQueue() {
+    return this._marketState.inPlayQueue
   }
 
   /**

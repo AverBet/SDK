@@ -41,8 +41,10 @@ class MarketState():
     sub_category: int
     series: int
     event: int
-    rounding_format: int   
-    inplay_start_time: int = None
+    rounding_format: int
+    vault_authority: PublicKey
+    in_play_queue: PublicKey
+    in_play_start_time: int = None
    
    
 

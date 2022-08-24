@@ -49,12 +49,12 @@ export class AverClient {
   /**
    * The token mint of the default quote token for markets on this network (i.e. USDC)
    */
-  private _quoteToken: PublicKey
+  private _quoteTokenMint: PublicKey
 
-  /**
+   /**
    * The default payer for transactions on-chain, unless one is specified
    */
-  private _owner: Keypair
+  private _keypair: Keypair
 
   /**
    * Initialises AverClient object. Do not use this function; use AverClient.load() instead
@@ -72,8 +72,8 @@ export class AverClient {
     this._programs = programs
     this._provider = programs[0].provider
     this._solanaNetwork = solanaNetwork
-    this._quoteToken = getQuoteToken(solanaNetwork)
-    this._owner = owner
+    this._quoteTokenMint = getQuoteToken(solanaNetwork)
+    this._keypair = owner
   }
 
   /**
@@ -86,11 +86,11 @@ export class AverClient {
    * @param {PublicKey} programIds - Program public key. Defaults to AVER_PROGRAM_IDS.
    * @returns {AverClient} - The Aver Client object
    */
-   static async load(
+   static async loadAverClient(
     connection: Connection,
+    solanaNetwork: SolanaNetwork = SolanaNetwork.Devnet,
     owner: null | Keypair,
     opts?: ConfirmOptions,
-    solanaNetwork: SolanaNetwork = SolanaNetwork.Devnet,
     programIds: PublicKey[] = AVER_PROGRAM_IDS
   ) {
     let wallet: Wallet;
@@ -132,12 +132,16 @@ export class AverClient {
     return this._solanaNetwork
   }
 
-  get owner() {
-    return this._owner
+  get quoteTokenMint() {
+    return this._quoteTokenMint
   }
 
-  get quoteToken() {
-    return this._quoteToken
+  get keypair() {
+    return this._keypair
+  }
+
+  get owner() {
+    return this._keypair.publicKey
   }
 
   static async loadProgram(provider: Provider, programId: PublicKey) {
@@ -177,9 +181,9 @@ export class AverClient {
    * @returns {Promise<TransactionInstruction>} - Instruction to create an associated token account
    */
   async createTokenAtaInstruction(
-    mint: PublicKey = this.quoteToken,
-    owner: PublicKey = this.owner.publicKey,
-    payer: PublicKey = this.owner.publicKey
+    mint: PublicKey = this.quoteTokenMint,
+    owner: PublicKey = this.owner,
+    payer: PublicKey = this.owner
   ) {
     const ataAddress = await getAssociatedTokenAddress(
       mint,
@@ -210,8 +214,8 @@ export class AverClient {
    */
   async getOrCreateTokenAta(
     payer: Signer,
-    mint: PublicKey = this.quoteToken,
-    owner: PublicKey = this.owner.publicKey
+    mint: PublicKey = this.quoteTokenMint,
+    owner: PublicKey = this.owner
   ) {
     return getOrCreateAssociatedTokenAccount(
       this._connection,
@@ -237,7 +241,7 @@ export class AverClient {
       throw new Error("Cannot airdrop on mainnet")
     }
 
-    return this._connection.requestAirdrop(owner.publicKey, amount)
+    return this._connection.requestAirdrop(owner, amount)
   }
 
   /**
@@ -266,8 +270,8 @@ export class AverClient {
    * @returns {Promise<RpcResponseAndContext<TokenAmount>>} - Token balance
    */
   async requestTokenBalance(
-    mint: PublicKey = this.quoteToken,
-    owner: PublicKey = this.owner.publicKey
+    mint: PublicKey = this.quoteTokenMint,
+    owner: PublicKey = this.owner
   ) {
     const ata = await getAssociatedTokenAddress(mint, owner)
     return (await this.requestAtaBalance(ata)).value
@@ -297,4 +301,49 @@ export class AverClient {
     const time = await this.connection.getBlockTime(slot)
     return time ? time * 1000 : null
   }
+
+  /**
+   * 
+   * @returns DEPCREATED
+   */
+  async checkHealth() {
+    const url = "https://dev.api.aver.exchange" + "/health" + "?format=json"
+    let averHealthResponse = await axios
+      .get(url)
+      .then((res) => res.status.toString().startsWith("2"))
+      .catch((_e) => false)
+    let solanaHealthResponse = await this.connection
+      .getVersion()
+      .then((res) => !!res["solana-core"])
+      .catch((_e) => false)
+
+    return {
+      api: averHealthResponse,
+      solana: solanaHealthResponse,
+    }
+  }
+
+    /**
+   * DEPCREATED
+   */
+  async requestTokenAirdrop(
+    amount: number = 1_000_000_000,
+    mint: PublicKey = this.quoteTokenMint,
+    owner: PublicKey = this.owner
+  ) {
+    if (this.solanaNetwork == SolanaNetwork.Mainnet) {
+      throw new Error("Cannot airdrop on mainnet")
+    }
+
+    const url = "https://dev.api.aver.exchange" + "/airdrop"
+
+    const params = {
+      wallet: owner.toBase58(),
+      mint: mint,
+      amount: amount,
+    }
+
+    return axios.post(url, params)
+  }
+
 }

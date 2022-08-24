@@ -367,7 +367,7 @@ export class UserMarket {
 
     // TODO check if instruction is out of date with IDL?
 
-    return program.instruction["initUserMarket"](numberOfOrders, umaBump, {
+    return program.instruction["initUserMarket"](numberOfOrders, {
       accounts: {
         user: umaOwner,
         userHostLifetime: userHostLifetime,
@@ -853,6 +853,7 @@ export class UserMarket {
           splTokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
           vaultAuthority: this.market.vaultAuthority,
+          inPlayQueue: this.market.inPlayQueue
         },
       }
     )
@@ -1067,6 +1068,7 @@ export class UserMarket {
           quoteVault: this.market.quoteVault,
           vaultAuthority: this.market.vaultAuthority,
           splTokenProgram: TOKEN_PROGRAM_ID,
+          inPlayQueue: this.market.inPlayQueue
         },
       }
     )
@@ -1172,6 +1174,7 @@ export class UserMarket {
           quoteVault: this.market.quoteVault,
           vaultAuthority: this.market.vaultAuthority,
           splTokenProgram: TOKEN_PROGRAM_ID,
+          inPlayQueue: this.market.inPlayQueue
         },
         remainingAccounts: chunkedRemainingAccounts[i],
       })
@@ -1516,7 +1519,7 @@ export class UserMarket {
     if (this._userHostLifetime.version < AVER_VERSION) {
       //UPGRADE VERSION WHEN AVAILALBLE
       //Reload
-      console.log("UPGRADING UHL VERSION")
+      console.log("UPGRADING UHL VERSION FROM", this._userHostLifetime.version, " TO ", AVER_VERSION)
       await this.refresh()
     }
   }

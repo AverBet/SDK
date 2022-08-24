@@ -175,8 +175,7 @@ class UserHostLifetime():
         #Just use the first program as they will all have init_user_host_lifetime
         #TODO - review
         program = await aver_client.get_program_from_program_id(program_id)
-        return program.instruction['init_user_host_lifetime']( 
-            bump,
+        return program.instruction['init_user_host_lifetime'](
             ctx=Context(
                 accounts={
                 "user": owner.public_key,

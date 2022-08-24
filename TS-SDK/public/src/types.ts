@@ -80,6 +80,9 @@ export type MarketState = {
   series: number
   event: number
   roundingFormat: number
+  vault_authority: PublicKey
+  inPlayQueue: PublicKey
+  inPlayStartTime?: number
 }
 
 export type MarketStoreState = {

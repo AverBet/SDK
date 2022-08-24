@@ -34,3 +34,6 @@ Aver only markets: `python3 -m pyaver_admin.services.consume_crank.crank_aver_ma
 From inside `src` run
 All markets: `python3 -m pyaver_admin.services.settle_crank.settle_all_markets`
 Aver only markets: `python3 -m pyaver_admin.services.settle_crank.settle_aver_markets`
+
+# TODO
+Admin SDK does not support multiple program IDs.

@@ -13,7 +13,7 @@ export const AVER_MARKET_AUTHORITY = new PublicKey(
   "EEg375Q8wEsPTyaQ4jG4hmNsMojmMHs6gB58iVWUXSwF"
 );
 export const AVER_HOST_ACCOUNT = new PublicKey(
-  "5xhmqK1Dh48TiqvHxoZi6WWWKL6THtsUjh3GoiVEbbR8"
+  "J1ZzERyKs7QzSgPz665tQ8dwLxfFbw8fe7SZZk2iWWh1"
 );
 export const AVER_COMMUNITY_REWARDS_NFT = new PublicKey(
   "AVERojzZ8649E1oLPvcgG2SSbVECxs8PcG5JkpuK2Dvq"

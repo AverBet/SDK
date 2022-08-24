@@ -323,7 +323,6 @@ class UserMarket():
         else:
             return program.instruction['init_user_market'](
                 number_of_orders,
-                uma_bump, 
                 ctx=Context(
                     accounts={
                         "user": owner,
@@ -569,10 +568,12 @@ class UserMarket():
                         "user": self.user_market_state.user,
                         "user_quote_token_ata": user_quote_token_ata,
                         "quote_vault": self.market.market_state.quote_vault,
+                        "vault_authority": self.market.market_state.vault_authority,
                         "orderbook": orderbook_account.orderbook,
                         "bids": orderbook_account.bids,
                         "asks": orderbook_account.asks,
                         "event_queue": orderbook_account.event_queue,
+                        "in_play_queue": self.market.market_state.in_play_queue,
                         "spl_token_program": TOKEN_PROGRAM_ID,
                         "system_program": SYS_PROGRAM_ID,
                         "vault_authority": self.market.market_state.vault_authority
@@ -728,6 +729,7 @@ class UserMarket():
                     "quote_vault": self.market.market_state.quote_vault,
                     "vault_authority": self.market.market_state.vault_authority,
                     "spl_token_program": TOKEN_PROGRAM_ID,
+                    "in_play_queue": self.market.market_state.in_play_queue
                 })
             )
         
@@ -882,6 +884,7 @@ class UserMarket():
                                 "quote_vault": self.market.market_state.quote_vault,
                                 "vault_authority": self.market.market_state.vault_authority,
                                 "spl_token_program": TOKEN_PROGRAM_ID,
+                                "in_play_queue": self.market.market_state.in_play_queue
                             },
                         remaining_accounts = chunked_remaining_accounts[i],
                         )
@@ -981,7 +984,7 @@ class UserMarket():
                         "user_quote_token_ata": user_quote_token_ata,
                         "quote_vault": self.market.market_state.quote_vault,
                         "vault_authority": self.market.market_state.vault_authority,
-                        "spl_token_program": TOKEN_PROGRAM_ID,
+                        "spl_token_program": TOKEN_PROGRAM_ID
                     },
                 )
             )

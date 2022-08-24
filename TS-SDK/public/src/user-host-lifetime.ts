@@ -161,7 +161,7 @@ export class UserHostLifetime {
       pubkey: referrer,
     } as AccountMeta
 
-    return program.instruction["initUserHostLifetime"](bump, {
+    return program.instruction["initUserHostLifetime"]({
       accounts: {
         user: userHostLifetimeOwner,
         userHostLifetime: userHostLifetime,

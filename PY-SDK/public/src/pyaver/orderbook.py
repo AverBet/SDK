@@ -4,7 +4,7 @@ from .utils import load_bytes_data, load_multiple_bytes_data
 from .data_classes import Price, SlabOrder
 from .slab import Slab
 from solana.rpc.async_api import AsyncClient
-
+from solana.utils.helpers import to_uint8_bytes
 
 class Orderbook:
     """
@@ -281,6 +281,29 @@ class Orderbook:
             price=1-p.price, 
             size=p.size
             )
+
+    def derive_orderbook(market: PublicKey, outcome_id: int, program_id):
+        return PublicKey.find_program_address(
+            [bytes('orderbook', 'utf-8'), bytes(market), to_uint8_bytes(outcome_id)], program_id
+        )
+
+
+    def derive_event_queue(market: PublicKey, outcome_id: int, program_id):
+        return PublicKey.find_program_address(
+            [bytes('event-queue', 'utf-8'), bytes(market), to_uint8_bytes(outcome_id)], program_id
+        )
+
+
+    def derive_bids(market: PublicKey, outcome_id: int, program_id):
+        return PublicKey.find_program_address(
+            [bytes('bids', 'utf-8'), bytes(market), to_uint8_bytes(outcome_id)], program_id
+        )
+
+
+    def derive_asks(market: PublicKey, outcome_id: int, program_id):
+        return PublicKey.find_program_address(
+            [bytes('asks', 'utf-8'), bytes(market), to_uint8_bytes(outcome_id)], program_id
+        )
 
     def get_bids_L3(self):
         """
