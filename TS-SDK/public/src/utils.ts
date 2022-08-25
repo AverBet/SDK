@@ -171,39 +171,51 @@ export const getBestDiscountToken = async (
   const zeroFeesToken = getAverLaunchZeroFeesToken(averClient.solanaNetwork)
   const averToken = AVER_TOKEN
 
-  const zeroFeesTokenAccount =
-    await averClient.connection.getParsedTokenAccountsByOwner(owner, {
-      mint: zeroFeesToken,
-    })
-  if (
-    zeroFeesTokenAccount.value.length > 0 &&
-    zeroFeesTokenAccount.value[0].account.data.parsed.info.tokenAmount
-      .uiAmount > 0
-  ) {
-    return zeroFeesTokenAccount.value[0].pubkey
+  try {
+    const zeroFeesTokenAccount =
+      await averClient.connection.getParsedTokenAccountsByOwner(owner, {
+        mint: zeroFeesToken,
+      })
+    if (
+      zeroFeesTokenAccount.value.length > 0 &&
+      zeroFeesTokenAccount.value[0].account.data.parsed.info.tokenAmount
+        .uiAmount > 0
+    ) {
+      return zeroFeesTokenAccount.value[0].pubkey
+    }
+  } catch (e) {
+    console.log("Zero fees token mint does not exist on the network / program ID")
   }
 
-  const communityRewardsTokenAccount =
-    await averClient.connection.getParsedTokenAccountsByOwner(owner, {
-      mint: AVER_COMMUNITY_REWARDS_NFT,
-    })
-  if (
-    communityRewardsTokenAccount.value.length > 0 &&
-    communityRewardsTokenAccount.value[0].account.data.parsed.info.tokenAmount
-      .uiAmount > 0
-  ) {
-    return communityRewardsTokenAccount.value[0].pubkey
+  try {
+    const communityRewardsTokenAccount =
+      await averClient.connection.getParsedTokenAccountsByOwner(owner, {
+        mint: AVER_COMMUNITY_REWARDS_NFT,
+      })
+    if (
+      communityRewardsTokenAccount.value.length > 0 &&
+      communityRewardsTokenAccount.value[0].account.data.parsed.info.tokenAmount
+        .uiAmount > 0
+    ) {
+      return communityRewardsTokenAccount.value[0].pubkey
+    }
+  } catch (e) {
+    console.log("Community rewards token mint does not exist on the network / program ID")
   }
 
-  const averTokenAccount =
-    await averClient.connection.getParsedTokenAccountsByOwner(owner, {
-      mint: averToken,
-    })
-  if (
-    averTokenAccount.value.length > 0 &&
-    averTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount > 0
-  ) {
-    return averTokenAccount.value[0].pubkey
+  try {
+    const averTokenAccount =
+      await averClient.connection.getParsedTokenAccountsByOwner(owner, {
+        mint: averToken,
+      })
+    if (
+      averTokenAccount.value.length > 0 &&
+      averTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount > 0
+    ) {
+      return averTokenAccount.value[0].pubkey
+    }
+  } catch (e) {
+    console.log("Aver token mint does not exist on the network / program ID")
   }
 
   return SystemProgram.programId

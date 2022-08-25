@@ -3,7 +3,7 @@ import { SolanaNetwork } from "./types";
 
 // Devnet and Mainnet constants
 export const AVER_PROGRAM_IDS = [
-  new PublicKey("6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ"),
+  new PublicKey("81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT"),
 ];
 
 export const AVER_TOKEN = new PublicKey(
@@ -24,9 +24,6 @@ export const AVER_API_ENDPOINT_DEVNET = "https://dev.api.aver.exchange";
 export const SOLANA_ENDPOINT_DEVNET = "https://api.devnet.solana.com";
 export const USDC_DEVNET = new PublicKey(
   "BWvbxUTAxevm1NG8RHe1LhKmca9nz5ym2xqafTxr6ybj"
-);
-export const AVER_HOST_ACCOUNT_DEVNET = new PublicKey(
-  "2eGTu9d4hdGvwvFDGG34a3JRLFiQ2Ar92LjJpb4vyQFw"
 );
 
 // ATA for market authority with USDC

@@ -11,7 +11,7 @@ import {
 import { UserHostLifetime } from "./user-host-lifetime"
 import { roundPriceToNearestTickSize } from "./utils"
 import * as fs from "fs"
-import path from 'path'
+// import path from 'path'
 import {PublicKey} from '@solana/web3.js'
 
 export function checkSufficientLamportBalance(
@@ -272,7 +272,7 @@ export function checkOutcomeHasOrders(
 }
 
 export function loadIdlFromJson(programId: PublicKey) {
-  const filePath = path.join(__dirname, 'idl', `${programId.toBase58()}.json`)
+  const filePath = __dirname +  '/idl' + `/${programId.toBase58()}.json`
   const data = fs.readFileSync(filePath, "utf-8")
   const fileIdl = JSON.parse(data)
 
@@ -287,6 +287,11 @@ export function loadIdlFromJson(programId: PublicKey) {
  * @param program -  AnchorPy Program
  */
 export function checkIdlHasSameInstructionsAsSdk(program: Program) {
+  // do not do read file or do checks for browser
+  if (typeof window !== 'undefined') {
+    return true
+  }
+
   const fileIdl = loadIdlFromJson(program.programId)
   const fileInstructions = fileIdl["instructions"]
 

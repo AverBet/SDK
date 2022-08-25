@@ -92,6 +92,8 @@ class UmaOrder():
     order_id: int
     outcome_id: int
     base_qty: int
+    is_pre_event: bool
+    aaob_order_id: int
 
 @dataclass
 class UserMarketState():

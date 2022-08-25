@@ -8,6 +8,7 @@ import {
   Signer,
 } from "@solana/web3.js"
 import { Program, Provider, Wallet } from "@project-serum/anchor"
+import NodeWallet from "@project-serum/anchor/dist/cjs/nodewallet"
 import {
   getOrCreateAssociatedTokenAccount,
   createAssociatedTokenAccountInstruction,
@@ -57,6 +58,11 @@ export class AverClient {
   private _keypair: Keypair
 
   /**
+   * 
+   */
+  private _owner: PublicKey
+
+  /**
    * Initialises AverClient object. Do not use this function; use AverClient.load() instead
    *
    * @param {Program} programs - List of Aver program AnchorPy
@@ -66,14 +72,16 @@ export class AverClient {
   private constructor(
     programs: Program[],
     solanaNetwork: SolanaNetwork,
-    owner: Keypair
+    owner: PublicKey,
+    keypair?: Keypair
   ) {
     this._connection = programs[0].provider.connection
     this._programs = programs
     this._provider = programs[0].provider
     this._solanaNetwork = solanaNetwork
     this._quoteTokenMint = getQuoteToken(solanaNetwork)
-    this._keypair = owner
+    this._keypair = keypair
+    this._owner = owner
   }
 
   /**
@@ -89,21 +97,29 @@ export class AverClient {
    static async loadAverClient(
     connection: Connection,
     solanaNetwork: SolanaNetwork = SolanaNetwork.Devnet,
-    owner: null | Keypair,
+    owner: null | PublicKey | Keypair,
     opts?: ConfirmOptions,
     programIds: PublicKey[] = AVER_PROGRAM_IDS
   ) {
-    let wallet: Wallet;
+    let wallet: NodeWallet;
     let keypair: Keypair
+    let pubkey: PublicKey = null
 
     if (owner instanceof Keypair) {
       // create a wallet with the keypair
-      wallet = new Wallet(owner);
+      wallet = new NodeWallet(owner);
       keypair = owner
+      pubkey = owner.publicKey
+    } else if (owner instanceof PublicKey) {
+      // create a dummy wallet
+      keypair = new Keypair()
+      wallet = new NodeWallet(keypair);
+      pubkey = owner
     } else {
       // create a dummy wallet
       keypair = new Keypair()
-      wallet = new Wallet(keypair);
+      wallet = new NodeWallet(keypair);
+      pubkey = keypair.publicKey
     }
 
     const provider = new Provider(
@@ -117,7 +133,7 @@ export class AverClient {
     );
 
     const programs = await Promise.all(programIds.map(programId => AverClient.loadProgram(provider, programId)))
-    return new AverClient(programs, solanaNetwork, keypair)
+    return new AverClient(programs, solanaNetwork, pubkey, keypair)
   }
 
   get connection() {
@@ -126,6 +142,13 @@ export class AverClient {
 
   get programs() {
     return this._programs
+  }
+
+  /**
+   * DEPRECATE
+   */
+  get program() {
+    return this._programs[0]
   }
 
   get solanaNetwork() {
@@ -141,7 +164,7 @@ export class AverClient {
   }
 
   get owner() {
-    return this._keypair.publicKey
+    return this._owner
   }
 
   static async loadProgram(provider: Provider, programId: PublicKey) {
@@ -274,7 +297,7 @@ export class AverClient {
     owner: PublicKey = this.owner
   ) {
     const ata = await getAssociatedTokenAddress(mint, owner)
-    return (await this.requestAtaBalance(ata)).value
+    return (await this.requestAtaBalance(ata))?.value
   }
 
   /**
@@ -327,7 +350,7 @@ export class AverClient {
    * DEPCREATED
    */
   async requestTokenAirdrop(
-    amount: number = 1_000_000_000,
+    amount = 1_000_000_000,
     mint: PublicKey = this.quoteTokenMint,
     owner: PublicKey = this.owner
   ) {

@@ -99,7 +99,7 @@ export class UserHostLifetime {
    * @param {AverClient} averClient - AverClient object
    * @param {PublicKey[]} pubkeys - UserHostLifetime public keys
    *
-   * @returns {Promise<UserHostLifetime[]>} UserHostLifetime objects
+   * @returns {Promise<UserHostLifetime[] | undefined>} UserHostLifetime objects
    */
   static async loadMultiple(averClient: AverClient, pubkeys: PublicKey[]) {
     const program = averClient.programs[0]
@@ -112,7 +112,7 @@ export class UserHostLifetime {
     )
 
     return userHostLifetimeStates.map((s, i) => {
-      if (!s) throw new Error("User Host Lifetime account is null")
+      if (!s) return undefined
       return new UserHostLifetime(averClient, pubkeys[i], s)
     })
   }

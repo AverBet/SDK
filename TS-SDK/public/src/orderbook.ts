@@ -63,7 +63,7 @@ export class Orderbook {
     slabBidsPubkey: PublicKey,
     slabAsksPubkey: PublicKey,
     decimals: number,
-    isInverted: boolean = false
+    isInverted = false
   ) {
     this._pubkey = pubkey
     this._decimals = decimals
@@ -187,7 +187,7 @@ export class Orderbook {
     bids: PublicKey,
     asks: PublicKey,
     decimals: number,
-    isInverted: boolean = false
+    isInverted = false
   ) {
     const slabBids = await Orderbook.loadSlab(connection, bids)
     const slabAsks = await Orderbook.loadSlab(connection, asks)

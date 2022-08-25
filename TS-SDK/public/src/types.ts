@@ -178,6 +178,8 @@ export type UmaOrder = {
   orderId: BN
   outcomeId: number
   baseQty: BN
+  isPreEvent: boolean
+  aaobOrderId: BN
 }
 
 /**

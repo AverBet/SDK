@@ -359,7 +359,7 @@ export class Market {
     slabs: (Slab | null)[]
     userMarketStates: (UserMarketState | null)[]
     userBalanceStates: UserBalanceState[]
-    userHostLifetimes: UserHostLifetime[]
+    userHostLifetimes: (UserHostLifetime | null)[]
   }> {
     const connection = averClient.connection
 
@@ -431,12 +431,12 @@ export class Market {
     const userHostLifetimes = accountsData
       .slice(-userHostLifetimePubkeys.length)
       .map(
-        (info, i) =>
+        (info, i) => !!info ? 
           new UserHostLifetime(
             averClient,
             userHostLifetimePubkeys[i],
             UserHostLifetime.parseHostState(info.data)
-          )
+          ) : null
       )
 
     const userBalanceStates: UserBalanceState[] = lamportBalances.map(

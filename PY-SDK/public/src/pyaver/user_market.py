@@ -714,8 +714,10 @@ class UserMarket():
             return ''
         else:
             return program.instruction['cancel_order'](
-                order_id, 
-                orderbook_account_index, 
+                {
+                    "order_id": order_id, 
+                    "outcome_id": orderbook_account_index
+                },
                 ctx=Context(accounts={
                     "orderbook": orderbook_account.orderbook,
                     "event_queue": orderbook_account.event_queue,
