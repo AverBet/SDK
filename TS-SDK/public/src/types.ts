@@ -24,6 +24,7 @@ export enum MarketStatus {
   HaltedPreEvent,
   HaltedInPlay,
   TradingCeased,
+  InPlayTransition,
   CeasedCrankedClosed,
   Resolved,
   Voided,

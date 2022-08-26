@@ -236,7 +236,7 @@ export function parseWithVersion(
   account_type: AccountType,
   bytes: AccountInfo<Buffer | null>
 ) {
-  if (!bytes.data) throw new Error("Buffer not found")
+  if (!bytes?.data) throw new Error("Buffer not found")
   //Version is 9th byte
   const version = bytes && bytes.data ? bytes.data[8] : null
   if (version == null) throw new Error(`Error parsing ${account_type}`)

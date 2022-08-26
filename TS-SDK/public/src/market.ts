@@ -484,13 +484,13 @@ export class Market {
     averClient: AverClient,
     marketStoresData: AccountInfo<Buffer | null>[]
   ): Promise<(MarketStoreState | null)[]> {
-    const programs = await Promise.all(marketStoresData.map(m => averClient.getProgramFromProgramId(m.owner)))
-    return marketStoresData.map((marketStoreData, i) =>
+    const programs = await Promise.all(marketStoresData.map(m => m ? averClient.getProgramFromProgramId(m.owner) : null))
+    return marketStoresData.map((marketStoreData, i) => marketStoreData ?
       parseWithVersion(
         programs[i],
         AccountType.MARKET_STORE,
         marketStoreData
-      )
+      ) : null
     )
   }
 
