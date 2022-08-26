@@ -27,6 +27,7 @@ import {
 } from "./types"
 import {
   getBestDiscountToken,
+  getVersionOfAccountTypeInProgram,
   parseWithVersion,
   signAndSendTransactionInstructions,
 } from "./utils"
@@ -544,12 +545,12 @@ export class UserMarket {
     averClient: AverClient,
     userMarketStoresData: AccountInfo<Buffer | null>[]
   ): (UserMarketState | null)[] {
-    return userMarketStoresData.map((marketStoreData) =>
+    return userMarketStoresData.map((marketStoreData) => marketStoreData ?
       parseWithVersion(
         averClient.programs[0], // TODO find correct program
         AccountType.USER_MARKET,
         marketStoreData
-      )
+      ) : null
     )
   }
 
@@ -933,10 +934,9 @@ export class UserMarket {
     manualMaxRetry?: number,
     orderType: OrderType = OrderType.Limit,
     selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide,
-    averPreFlightCheck: boolean = true
+    averPreFlightCheck = true
   ) {
-    await this.checkIfUhlLatestVersion()
-    await this.checkIfUmaLatestVersion()
+    await this.updateAllAccountsIfRequired(owner, sendOptions, manualMaxRetry)
 
     const ix = await this.makePlaceOrderInstruction(
       outcomeIndex,
@@ -1039,10 +1039,9 @@ export class UserMarket {
     outcomeIndex: number,
     sendOptions?: SendOptions,
     manualMaxRetry?: number,
-    averPreFlightCheck: boolean = true
+    averPreFlightCheck = true
   ) {
-    await this.checkIfUhlLatestVersion()
-    await this.checkIfUmaLatestVersion()
+    await this.updateAllAccountsIfRequired(feePayer, sendOptions, manualMaxRetry)
 
     const ix = await this.makeCancelOrderInstruction(
       orderId,
@@ -1074,7 +1073,7 @@ export class UserMarket {
    */
   async makeCancelAllOrdersInstructions(
     outcomeIdsToCancel: number[],
-    averPreFlightCheck: boolean = false
+    averPreFlightCheck = false
   ) {
     if (averPreFlightCheck) {
       checkSufficientLamportBalance(this._userBalanceState)
@@ -1144,10 +1143,9 @@ export class UserMarket {
     outcomeIdsToCancel: number[],
     sendOptions?: SendOptions,
     manualMaxRetry?: number,
-    averPreFlightCheck: boolean = true
+    averPreFlightCheck = true
   ) {
-    await this.checkIfUhlLatestVersion()
-    await this.checkIfUmaLatestVersion()
+    await this.updateAllAccountsIfRequired(feePayer, sendOptions, manualMaxRetry)
 
     const ixs = await this.makeCancelAllOrdersInstructions(
       outcomeIdsToCancel,
@@ -1291,8 +1289,7 @@ export class UserMarket {
     if (!owner.publicKey.equals(this.user))
       throw new Error("Owner must be same as user market owner")
 
-    await this.checkIfUhlLatestVersion()
-    await this.checkIfUmaLatestVersion()
+    await this.updateAllAccountsIfRequired(owner, sendOptions, manualMaxRetry)
 
     const ix = await this.makeNeutralizePositionInstruction(outcomeId)
 
@@ -1349,8 +1346,7 @@ export class UserMarket {
     if (!owner.publicKey.equals(this.user))
       throw new Error("Owner must be same as user market owner")
 
-    await this.checkIfUhlLatestVersion()
-    await this.checkIfUmaLatestVersion()
+    await this.updateAllAccountsIfRequired(owner, sendOptions, manualMaxRetry)
 
     const ix = await this.makeUpdateUserMarketOrders(newSize)
 
@@ -1358,6 +1354,36 @@ export class UserMarket {
       this._averClient,
       [],
       owner,
+      [ix],
+      sendOptions,
+      manualMaxRetry
+    )
+  }
+
+  async makeUpdateUserMarketStateInstruction() {
+    const program = await this._averClient.getProgramFromProgramId(this.market.programId)
+    return program.instruction["updateUserMarketState"](
+      {
+        accounts: {
+          user: this.user,
+          userMarket: this.pubkey,
+          systemProgram: SystemProgram.programId,
+        },
+      }
+    )
+  }
+
+  async updateMarketState(
+    payer: Keypair = this._averClient.keypair,
+    sendOptions?: SendOptions,
+    manualMaxRetry?: number
+  ) {
+    const ix = await this.makeUpdateUserMarketStateInstruction()
+
+    return signAndSendTransactionInstructions(
+      this._averClient,
+      [],
+      payer,
       [ix],
       sendOptions,
       manualMaxRetry
@@ -1452,20 +1478,49 @@ export class UserMarket {
   }
 
   async checkIfUmaLatestVersion() {
-    if (this._userMarketState.version < AVER_VERSION) {
-      //UPGRADE VERSION WHEN AVAILALBLE
-      //Reload
-      console.log("UPGRADING UMA VERSION")
-      await this.refresh()
+    const program = await this._averClient.getProgramFromProgramId(this.market.programId)
+    if (this._userMarketState.version < getVersionOfAccountTypeInProgram(AccountType.USER_MARKET, program)) {
+      console.log("UMA needs to be upgraded")
+      return false
     }
+    return true
   }
 
-  async checkIfUhlLatestVersion() {
-    if (this._userHostLifetime.version < AVER_VERSION) {
-      //UPGRADE VERSION WHEN AVAILALBLE
-      //Reload
-      console.log("UPGRADING UHL VERSION FROM", this._userHostLifetime.version, " TO ", AVER_VERSION)
-      await this.refresh()
+  async makeUpdateAllAccountsIfRequiredInstructions(payer: PublicKey = this.user) {
+    const ixs = []
+    let ix: TransactionInstruction
+    if (!(await this.market.checkIfMarketLatestVersion())) {
+      ix = await this.market.makeUpdateMarketStateInstruction(payer)
+      ixs.push(ix)
     }
+    if (!(await this.userHostLifetime.checkIfUhlLatestVersion())) {
+      ix = await this.userHostLifetime.makeUpdateUserHostLifetimeStateInstruction()
+      ixs.push(ix)
+    }
+    if (!(await this.checkIfUmaLatestVersion())) {
+      ix = await this.makeUpdateUserMarketStateInstruction()
+      ixs.push(ix)
+    }
+
+    return ixs
+  }
+
+  async updateAllAccountsIfRequired(
+    payer: Keypair = this._averClient.keypair,
+    sendOptions?: SendOptions,
+    manualMaxRetry?: number
+  ) {
+    const ixs = await this.makeUpdateAllAccountsIfRequiredInstructions(payer.publicKey)
+    if (ixs.length > 0) {
+      return signAndSendTransactionInstructions(
+        this._averClient,
+        [],
+        payer,
+        ixs,
+        sendOptions,
+        manualMaxRetry
+      )
+    }
+    return true
   }
 }

@@ -10,7 +10,7 @@ from spl.token.instructions import get_associated_token_address
 from solana.keypair import Keypair
 from .enums import AccountTypes, Fill, MarketStatus
 from .constants import AVER_MARKET_AUTHORITY, AVER_PROGRAM_IDS
-from .utils import fetch_multiple_with_version, fetch_with_version, load_multiple_bytes_data, parse_bytes_data, parse_with_version, sign_and_send_transaction_instructions, parse_market_store, parse_market_state
+from .utils import fetch_multiple_with_version, fetch_with_version, get_version_of_account_type_in_program, load_multiple_bytes_data, parse_bytes_data, parse_with_version, sign_and_send_transaction_instructions, parse_market_store, parse_market_state
 from .data_classes import MarketState, MarketStoreState, OrderbookAccountsState
 from .orderbook import Orderbook
 from .slab import Slab
@@ -543,25 +543,38 @@ class AverMarket():
             send_options
         )
 
-    
-    async def update_market_state(self, client: AverClient, account_owner: Keypair, program_id: PublicKey, opts: TxOpts = None):
-        program = await client.get_program_from_program_id(program_id)
-        ix = program.instruction['update_market_state'](
+    async def make_update_market_state_instruction(self, fee_payer: PublicKey):
+        program = await self.aver_client.get_program_from_program_id(self.program_id)
+        return program.instruction['update_market_state'](
             ctx=Context(accounts={
-                "payer": account_owner.public_key,
+                "payer": fee_payer,
                 "market_authority": self.market_state.market_authority,
                 "market": self.market_pubkey,
                 "system_program": SYS_PROGRAM_ID 
             })
         )
 
+    
+    async def update_market_state(self, fee_payer: Keypair = None, send_options: TxOpts = None):
+        if(fee_payer == None):
+            fee_payer = self.aver_client.owner
+
+        ix = await self.make_update_market_state_instruction(fee_payer)
+
         return await sign_and_send_transaction_instructions(
-            client,
+            self.aver_client,
             [],
-            account_owner,
+            fee_payer,
             [ix],
-            opts
+            send_options
         )
+
+    async def check_if_market_latest_version(self):
+        program = await self.aver_client.get_program_from_program_id(self.program_id)
+        if(self.market_state.version < get_version_of_account_type_in_program(AccountTypes.MARKET, program)):
+            print("Market needs to be upgraded")
+            return False
+        return True
 
     def list_all_pubkeys(self):
         """

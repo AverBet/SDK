@@ -1,4 +1,5 @@
 from copy import deepcopy
+from tkinter.tix import Tree
 from pydash import chunk
 from .market import AverMarket
 from solana.publickey import PublicKey
@@ -69,6 +70,7 @@ class UserMarket():
         self.market = market
         self.user_balance_state = user_balance_state
         self.user_host_lifetime = user_host_lifetime
+        self.program_id = market.program_id
 
     @staticmethod
     async def load(
@@ -626,12 +628,7 @@ class UserMarket():
         if(program_id is None):
             program_id = self.market.program_id
         
-        await self.check_if_uma_latest_version()
-        await self.check_if_uhl_latest_version()
-        is_market_latest_version = await self.check_if_market_latest_version()
-
-        if(not is_market_latest_version):
-            await self.market.update_market_state(self.market, self.aver_client.owner, self.market.program_id)
+        await self.update_all_accounts_if_required(owner)
 
         user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
             self.user_market_state.user,
@@ -769,12 +766,7 @@ class UserMarket():
         if(program_id is None):
             program_id = self.market.program_id
         
-        await self.check_if_uma_latest_version()
-        await self.check_if_uhl_latest_version()
-        is_market_latest_version = await self.check_if_market_latest_version()
-
-        if(not is_market_latest_version):
-            await self.market.update_market_state(self.market, self.aver_client.owner, self.market.program_id)
+        await self.update_all_accounts_if_required(fee_payer)
 
         ix = await self.make_cancel_order_instruction(
             order_id,
@@ -926,12 +918,7 @@ class UserMarket():
         if(program_id is None):
             program_id = self.market.program_id
 
-        await self.check_if_uma_latest_version()
-        await self.check_if_uhl_latest_version()
-        is_market_latest_version = await self.check_if_market_latest_version()
-
-        if(not is_market_latest_version):
-            await self.market.update_market_state(self.market, self.aver_client.owner, self.market.program_id)
+        await self.update_all_accounts_if_required(fee_payer)
 
         ixs = await self.make_cancel_all_orders_instruction(outcome_ids_to_cancel, active_pre_flight_check, program_id)
 
@@ -1011,12 +998,7 @@ class UserMarket():
         Returns:
             TransactionInstruction: TransactionInstruction object
         """
-        await self.check_if_uma_latest_version()
-        await self.check_if_uhl_latest_version()
-        is_market_latest_version = await self.check_if_market_latest_version()
-
-        if(not is_market_latest_version):
-            await self.market.update_market_state(self.market, self.aver_client.owner, self.market.program_id)
+        await self.update_all_accounts_if_required(owner)
 
         user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
             self.user_market_state.user,
@@ -1122,12 +1104,7 @@ class UserMarket():
         if(program_id is None):
             program_id = self.market.program_id
 
-        await self.check_if_uma_latest_version()
-        await self.check_if_uhl_latest_version()
-        is_market_latest_version = await self.check_if_market_latest_version()
-
-        if(not is_market_latest_version):
-            await self.market.update_market_state(self.market, self.aver_client.owner, self.market.program_id)
+        await self.update_all_accounts_if_required(owner)
         
         ix = self.make_neutralize_positions_instruction(outcome_id, program_id)
 
@@ -1208,17 +1185,12 @@ class UserMarket():
         if(program_id is None):
             program_id = self.market.program_id
 
-        await self.check_if_uma_latest_version()
-        await self.check_if_uhl_latest_version()
-        is_market_latest_version = await self.check_if_market_latest_version()
+        await self.update_all_accounts_if_required(owner)
 
         ix = await self.make_update_user_market_orders_instruction(new_size, program_id)
 
         if(not owner.public_key == self.user_market_state.user):
             raise Exception('Owner must be same as UMA owner')
-
-        if(not is_market_latest_version):
-            await self.market.update_market_state(self.market, self.aver_client.owner, self.market.program_id)
 
         return await sign_and_send_transaction_instructions(
             self.aver_client,
@@ -1228,27 +1200,66 @@ class UserMarket():
             send_options
         )
 
+    async def make_update_user_market_state_instruction(self):
+        program = await self.aver_client.get_program_from_program_id(self.program_id)
+        return program.instruction['update_user_market_state'](
+            ctx=Context(accounts={
+                "user": self.user_market_state.user,
+                "user_market": self.pubkey,
+                "system_program": SYS_PROGRAM_ID 
+            })
+        )
+
+    async def update_user_market_state(self, fee_payer: Keypair = None, send_options: TxOpts = None):
+        if(fee_payer == None):
+            fee_payer = self.aver_client.owner
+
+        ix = await self.make_update_user_market_state_instruction()
+
+        return await sign_and_send_transaction_instructions(
+            self.aver_client,
+            [],
+            fee_payer,
+            [ix],
+            send_options
+        )
+
+    async def make_update_all_accounts_if_required_instructions(self, fee_payer: PublicKey):
+        ixs = []
+        if not await self.market.check_if_market_latest_version():
+            ix = await self.market.make_update_market_state_instruction(fee_payer)
+            ixs.append(ix)
+        if not await self.user_host_lifetime.check_if_uhl_latest_version():
+            ix = await self.user_host_lifetime.make_update_user_host_lifetime_state_instruction()
+            ixs.append(ix)
+        if not await self.check_if_uma_latest_version():
+            ix = await self.make_update_user_market_state_instruction()
+            ixs.append(ix)
+        
+        return ixs
+
+    async def update_all_accounts_if_required(self, fee_payer: Keypair = None, send_options: TxOpts = None):
+        if(fee_payer == None):
+            fee_payer = self.aver_client.owner
+
+        ixs = self.make_update_all_accounts_if_required_instructions
+        if len(ixs) > 0:
+            return await sign_and_send_transaction_instructions(
+                self.aver_client,
+                [],
+                fee_payer,
+                ixs,
+                send_options
+            )
+        else:
+            return True
+
+    
+
     async def check_if_uma_latest_version(self):
         program = await self.aver_client.get_program_from_program_id(self.market.program_id)
         if(self.user_market_state.version < get_version_of_account_type_in_program(AccountTypes.USER_MARKET, program)):
-            #UPGRADE VERSION WHEN AVAILALBLE
-            #Reload
-            print('UPGRADING UMA VERSION')
-            self = await self.load_by_uma(self.aver_client, self.pubkey, self.market, self.user_host_lifetime.pubkey)
-        
-    async def check_if_uhl_latest_version(self):
-        program = await self.aver_client.get_program_from_program_id(self.market.program_id)
-        if(self.user_host_lifetime.user_host_lifetime_state.version < get_version_of_account_type_in_program(AccountTypes.USER_HOST_LIFETIME, program)):
-            #UPGRADE VERSION WHEN AVAILALBLE
-            #Reload
-            print('UPGRADING UHL VERSION')
-            self = await self.load_by_uma(self.aver_client, self.pubkey, self.market, self.user_host_lifetime.pubkey)
-    
-    async def check_if_market_latest_version(self):
-        program = await self.aver_client.get_program_from_program_id(self.market.program_id)
-        if(self.market.market_state.version < get_version_of_account_type_in_program(AccountTypes.MARKET, program)):
-            #UPGRADE VERSION WHEN AVAILALBLE
-            print('UPGRADING MARKET VERSION')
+            print("User market account needs to be upgraded")
             return False
         return True
 
