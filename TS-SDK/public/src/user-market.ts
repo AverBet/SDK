@@ -270,13 +270,12 @@ export class UserMarket {
     // TODO each market might have a different program
     const program = await averClient.getProgramFromProgramId(AVER_PROGRAM_IDS[0])
 
-    const userMarketResult = await program.account["userMarket"].fetchMultiple(
-      pubkeys
-    )
+    const userMarketResult = await averClient.connection.getMultipleAccountsInfo(pubkeys)
+
+    const userMarketStates = UserMarket.deserializeMultipleUserMarketStoreData(averClient, userMarketResult)
+
+    // TODO parse with version for UHL as well
     const uhlAccounts = await UserHostLifetime.loadMultiple(averClient, uhls)
-    const userMarketStates = userMarketResult.map((umr) =>
-      umr ? UserMarket.parseUserMarketState(umr) : null
-    )
 
     const userPubkeys = userMarketStates.map(
       (umr) => umr?.user || new Keypair().publicKey

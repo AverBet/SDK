@@ -2,7 +2,7 @@ import { Slab, Price, Side, LeafNode } from "@bonfida/aaob"
 import { BN } from "@project-serum/anchor"
 import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
 import { AVER_PROGRAM_IDS, CALLBACK_INFO_LEN } from "./ids"
-import { PriceAndSide, SlabOrder } from "./types"
+import { PriceAndSide, SlabOrder, UmaOrder } from "./types"
 import { chunkAndFetchMultiple, throwIfNull } from "./utils"
 
 /**
@@ -560,10 +560,12 @@ export class Orderbook {
   /**
    * Gets Price object by orderId
    *
-   * @param {BN} orderId - Order ID
+   * @param {UmaOrder} order - the order
    * @returns {PriceAndSide | undefined} - PriceAndSide object
    */
-  getPriceByOrderId(orderId: BN): PriceAndSide | undefined {
+  getPriceByOrder(order: UmaOrder): PriceAndSide | undefined {
+    const orderId = order.aaobOrderId || order.orderId
+
     for (const node of this._slabBids.items()) {
       if (orderId.eq(node.key)) {
         let bidPriceRaw = {
@@ -575,7 +577,7 @@ export class Orderbook {
           ? Orderbook.invertPrice(bidPriceRaw)
           : bidPriceRaw
 
-        let bidPrice = {
+        const bidPrice = {
           ...this.convertPrice(bidPriceRaw),
         }
 
@@ -594,7 +596,7 @@ export class Orderbook {
           ? Orderbook.invertPrice(askPriceRaw)
           : askPriceRaw
 
-        let askPrice = {
+        const askPrice = {
           ...this.convertPrice(askPriceRaw),
         }
 

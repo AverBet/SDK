@@ -12,7 +12,7 @@ from spl.token.constants import TOKEN_PROGRAM_ID
 from anchorpy import Context
 from .user_host_lifetime import UserHostLifetime
 from .aver_client import AverClient
-from .utils import get_version_of_account_type_in_program, sign_and_send_transaction_instructions, load_multiple_account_states, parse_user_market_state
+from .utils import get_version_of_account_type_in_program, load_multiple_bytes_data, sign_and_send_transaction_instructions, load_multiple_account_states, parse_user_market_state
 from solana.rpc.types import TxOpts
 from solana.rpc.commitment import Finalized
 from .data_classes import UserHostLifetimeState, UserMarketState, UserBalanceState
@@ -192,7 +192,10 @@ class UserMarket():
         """
         #Just use the first program to load. This should not matter for the purpose of parsing IDLs
         #TODO - review
-        res: list[UserMarketState] = await aver_client.programs[0].account['UserMarket'].fetch_multiple(pubkeys)
+        # res: list[UserMarketState] = await aver_client.programs[0].account['UserMarket'].fetch_multiple(pubkeys)
+        account_buffers = await load_multiple_bytes_data(aver_client.connection, pubkeys, [], False)
+        res: list[UserMarketState] = UserMarket.parse_multiple_user_market_state(account_buffers, aver_client)
+        # TODO parse with version
         uhls = await UserHostLifetime.load_multiple(aver_client, uhls)
 
         user_pubkeys = [u.user for u in res]
