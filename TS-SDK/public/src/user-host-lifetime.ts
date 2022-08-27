@@ -17,6 +17,7 @@ import { AVER_PROGRAM_IDS, AVER_HOST_ACCOUNT } from "./ids"
 import { AccountType, FeeTier, UserHostLifetimeState } from "./types"
 import {
   getBestDiscountToken,
+  getVersionOfAccountTypeInProgram,
   parseWithVersion,
   signAndSendTransactionInstructions,
 } from "./utils"
@@ -47,6 +48,12 @@ export class UserHostLifetime {
   private _averClient: AverClient
 
   /**
+   * @private
+   * Program ID of the UHL
+   */
+  private _programId: PublicKey
+
+  /**
    * Initialise an UserHostLifetime object. Do not use this function; use load() instead
    *
    * @param {AverClient} averClient - AverClient object
@@ -56,11 +63,13 @@ export class UserHostLifetime {
   constructor(
     averClient: AverClient,
     pubkey: PublicKey,
-    userHostLifetimeState: UserHostLifetimeState
+    userHostLifetimeState: UserHostLifetimeState,
+    programId: PublicKey
   ) {
     this._averClient = averClient
     this._pubkey = pubkey
     this._userHostLifetimeState = userHostLifetimeState
+    this._programId = programId
   }
 
   /**
@@ -77,6 +86,7 @@ export class UserHostLifetime {
    * @returns {Promise<UserHostLifetime>} UserHostLifetime object
    */
   static async load(averClient: AverClient, pubkey: PublicKey) {
+    // TODO get program correctly
     const program = averClient.programs[0]
     const userHostLifetimeResult = await program.account[
       "userHostLifetime"
@@ -85,7 +95,7 @@ export class UserHostLifetime {
       userHostLifetimeResult
     )
 
-    return new UserHostLifetime(averClient, pubkey, userHostLifetimeState)
+    return new UserHostLifetime(averClient, pubkey, userHostLifetimeState, program.programId)
   }
 
   /**
@@ -113,7 +123,7 @@ export class UserHostLifetime {
 
     return userHostLifetimeStates.map((s, i) => {
       if (!s) return undefined
-      return new UserHostLifetime(averClient, pubkeys[i], s)
+      return new UserHostLifetime(averClient, pubkeys[i], s, program.programId)
     })
   }
 
@@ -269,7 +279,8 @@ export class UserHostLifetime {
       return new UserHostLifetime(
         averClient,
         userHostLifetime,
-        userHostLifetimeState
+        userHostLifetimeState,
+        program.programId
       )
     }
 
@@ -430,6 +441,38 @@ export class UserHostLifetime {
 
   get version() {
     return this._userHostLifetimeState.version
+  }
+
+  async makeUpdateUserHostLifetimeStateInstruction() {
+    const program = await this._averClient.getProgramFromProgramId(this._programId)
+    // TODO
+    return null
+  }
+
+  async updateUserHostLifetimeState(
+    payer: Keypair = this._averClient.keypair,
+    sendOptions?: SendOptions,
+    manualMaxRetry?: number
+  ) {
+    const ix = await this.makeUpdateUserHostLifetimeStateInstruction()
+
+    return signAndSendTransactionInstructions(
+      this._averClient,
+      [],
+      payer,
+      [ix],
+      sendOptions,
+      manualMaxRetry
+    )
+  }
+
+  async checkIfUhlLatestVersion() {
+    const program = await this._averClient.getProgramFromProgramId(this._programId)
+    if (this.version < getVersionOfAccountTypeInProgram(AccountType.USER_HOST_LIFETIME, program)) {
+      console.log("UHL needs to be upgraded")
+      return false
+    }
+    return true
   }
 
   /**

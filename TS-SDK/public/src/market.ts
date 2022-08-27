@@ -15,6 +15,8 @@ import {
   Keypair,
   PublicKey,
   AccountMeta,
+  SystemProgram,
+  SendOptions,
 } from "@solana/web3.js"
 import { AverClient } from "./aver-client"
 import { loadAllEventQueues, prepareUserAccountsList } from "./event-queue"
@@ -36,7 +38,7 @@ import {
 } from "./types"
 import { UserHostLifetime } from "./user-host-lifetime"
 import { UserMarket } from "./user-market"
-import { chunkAndFetchMultiple, parseWithVersion } from "./utils"
+import { chunkAndFetchMultiple, getVersionOfAccountTypeInProgram, parseWithVersion, signAndSendTransactionInstructions } from "./utils"
 import { Program } from "@project-serum/anchor"
 
 export class Market {
@@ -892,6 +894,44 @@ export class Market {
       return MarketStatus.ActiveInPlay
 
     return this.marketStatus
+  }
+
+  async makeUpdateMarketStateInstruction(feePayer: PublicKey) {
+    const program = await this._averClient.getProgramFromProgramId(this.programId)
+    return program.instruction['updateMarketState'](
+      {
+        accounts: {
+          payer: feePayer,
+          marketAuthority: this.marketAuthority,
+          market: this.pubkey,
+          systemProgram: SystemProgram.programId
+        }
+      })
+  }
+
+  async updateMarketState(
+    feePayer: Keypair = this._averClient.keypair,
+    sendOptions?: SendOptions,
+    manualMaxRetry?: number) {
+    const ix = await this.makeUpdateMarketStateInstruction(feePayer.publicKey)
+
+    return signAndSendTransactionInstructions(
+      this._averClient,
+      [],
+      feePayer,
+      [ix],
+      sendOptions,
+      manualMaxRetry
+    )
+  }
+
+  async checkIfMarketLatestVersion() {
+    const program = await this._averClient.getProgramFromProgramId(this.programId)
+    if (this._marketState.version < getVersionOfAccountTypeInProgram(AccountType.MARKET, program)) {
+      console.log("UMA needs to be upgraded")
+      return false
+    }
+    return true
   }
 
   /**

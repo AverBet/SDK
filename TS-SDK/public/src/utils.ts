@@ -297,7 +297,7 @@ function accountDiscriminator(
 
 
 // Latest version according to the program
-function getVersionOfAccountTypeInProgram(accountType: AccountType, program: Program){
+export function getVersionOfAccountTypeInProgram(accountType: AccountType, program: Program){
   let version = 0
   while (true){
     const account = program.account[`${accountType}V${version}`]
