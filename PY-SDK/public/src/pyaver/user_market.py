@@ -239,7 +239,7 @@ class UserMarket():
         """
         user_markets: list[UserMarket] = []
         for i, pubkey in enumerate(pubkeys):
-            user_market = UserMarket(aver_client, pubkey, user_market_states[i], aver_markets[i], user_balance_states[i], UserHostLifetime(user_host_lifetime_pubkeys[i],user_host_lifetime_states[i]))
+            user_market = UserMarket(aver_client, pubkey, user_market_states[i], aver_markets[i], user_balance_states[i], UserHostLifetime(aver_client, user_host_lifetime_pubkeys[i],user_host_lifetime_states[i]))
             user_markets.append(user_market)
         return user_markets
     
@@ -1242,7 +1242,7 @@ class UserMarket():
         if(fee_payer == None):
             fee_payer = self.aver_client.owner
 
-        ixs = self.make_update_all_accounts_if_required_instructions
+        ixs = await self.make_update_all_accounts_if_required_instructions(fee_payer)
         if len(ixs) > 0:
             return await sign_and_send_transaction_instructions(
                 self.aver_client,
