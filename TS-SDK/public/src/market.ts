@@ -437,7 +437,8 @@ export class Market {
           new UserHostLifetime(
             averClient,
             userHostLifetimePubkeys[i],
-            UserHostLifetime.parseHostState(info.data)
+            UserHostLifetime.parseHostState(info.data),
+            info.owner
           ) : null
       )
 
@@ -897,7 +898,7 @@ export class Market {
   }
 
   async makeUpdateMarketStateInstruction(feePayer: PublicKey) {
-    const program = await this._averClient.getProgramFromProgramId(this.programId)
+    const program = await this._averClient.getProgramFromProgramId(this._programId)
     return program.instruction['updateMarketState'](
       {
         accounts: {
@@ -926,7 +927,7 @@ export class Market {
   }
 
   async checkIfMarketLatestVersion() {
-    const program = await this._averClient.getProgramFromProgramId(this.programId)
+    const program = await this._averClient.getProgramFromProgramId(this._programId)
     if (this._marketState.version < getVersionOfAccountTypeInProgram(AccountType.MARKET, program)) {
       console.log("UMA needs to be upgraded")
       return false

@@ -28,7 +28,7 @@ class UserHostLifetime():
     UserHostLifetimeState object
     """
 
-    def __init__(self, aver_client: AverClient, pubkey: PublicKey, user_host_lifetime_state: UserHostLifetimeState, program_id: PublicKey):
+    def __init__(self, aver_client: AverClient, pubkey: PublicKey, user_host_lifetime_state: UserHostLifetimeState, program_id: PublicKey = AVER_PROGRAM_IDS[0]):
         """
         Initialise an UserHostLifetime object. Do not use this function; use UserHostLifetime.load() instead
 

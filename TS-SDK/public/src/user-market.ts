@@ -1489,15 +1489,18 @@ export class UserMarket {
   async makeUpdateAllAccountsIfRequiredInstructions(payer: PublicKey = this.user) {
     const ixs = []
     let ix: TransactionInstruction
-    if (!(await this.market.checkIfMarketLatestVersion())) {
+    const isMarketLatestVersion = await this.market.checkIfMarketLatestVersion()
+    if (!isMarketLatestVersion) {
       ix = await this.market.makeUpdateMarketStateInstruction(payer)
       ixs.push(ix)
     }
-    if (!(await this.userHostLifetime.checkIfUhlLatestVersion())) {
+    const isUhlLatestVersion = await this.userHostLifetime.checkIfUhlLatestVersion()
+    if (!isUhlLatestVersion) {
       ix = await this.userHostLifetime.makeUpdateUserHostLifetimeStateInstruction()
       ixs.push(ix)
     }
-    if (!(await this.checkIfUmaLatestVersion())) {
+    const isUmaLatestVersion = await this.checkIfUmaLatestVersion()
+    if (!isUmaLatestVersion) {
       ix = await this.makeUpdateUserMarketStateInstruction()
       ixs.push(ix)
     }

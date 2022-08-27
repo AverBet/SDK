@@ -64,7 +64,7 @@ export class UserHostLifetime {
     averClient: AverClient,
     pubkey: PublicKey,
     userHostLifetimeState: UserHostLifetimeState,
-    programId: PublicKey
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     this._averClient = averClient
     this._pubkey = pubkey
