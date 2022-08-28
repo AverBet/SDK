@@ -905,6 +905,7 @@ export class Market {
           payer: feePayer,
           marketAuthority: this.marketAuthority,
           market: this.pubkey,
+          marketStore: this.marketStore,
           systemProgram: SystemProgram.programId
         }
       })
