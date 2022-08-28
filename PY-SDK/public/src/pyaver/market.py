@@ -549,6 +549,7 @@ class AverMarket():
             ctx=Context(accounts={
                 "payer": fee_payer,
                 "market_authority": self.market_state.market_authority,
+                "market_store": self.market_state.market_store,
                 "market": self.market_pubkey,
                 "system_program": SYS_PROGRAM_ID 
             })
@@ -559,7 +560,7 @@ class AverMarket():
         if(fee_payer == None):
             fee_payer = self.aver_client.owner
 
-        ix = await self.make_update_market_state_instruction(fee_payer)
+        ix = await self.make_update_market_state_instruction(fee_payer.public_key)
 
         return await sign_and_send_transaction_instructions(
             self.aver_client,

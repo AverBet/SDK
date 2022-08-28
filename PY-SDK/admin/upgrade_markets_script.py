@@ -1,6 +1,7 @@
 import requests
 import base58
 from solana.keypair import Keypair
+from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
 import asyncio
 from ..public.src.pyaver.aver_client import AverClient
@@ -17,14 +18,15 @@ async def upgrade_markets():
   connection = AsyncClient(endpoint, "confirmed")
   client = await AverClient.load(connection, owner)
   markets_response = requests.get(api_endpoint + "v2/markets").json()
-  # print(markets_response[0])
   market_pubkeys = [market_response["pubkey"] for market_response in markets_response if market_response["internal_status"] == "active"]
+  # market_pubkeys = [PublicKey('cyS6DMfVhM2xwo6LP5G5hbGDsmKby3unjKo3T1Uh2qf')]
   aver_markets = await AverMarket.load_multiple(client, market_pubkeys)
   
   for market in aver_markets:
     try:
-      await market.update_market_state(client, owner, client.programs[0].program_id)
+      sig = await market.update_market_state(owner)
       print(f"Successfully upgraded market: {market.market_pubkey}")
+      print(sig)
     except Exception as e:
       print(f"Error: could not upgrade market {market.market_pubkey}")
       print(e)
