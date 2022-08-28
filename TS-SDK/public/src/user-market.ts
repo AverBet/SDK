@@ -827,6 +827,8 @@ export class UserMarket {
     )
 
     const program = await this._averClient.getProgramFromProgramId(this.market.programId)
+    const inPlayQueue = !this.market.inPlayQueue || this.market.inPlayQueue.equals(SystemProgram.programId) ?
+      new Keypair().publicKey : this.market.inPlayQueue
 
     return program.instruction["placeOrder"](
       {
@@ -854,7 +856,7 @@ export class UserMarket {
           splTokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
           vaultAuthority: this.market.vaultAuthority,
-          inPlayQueue: this.market.inPlayQueue
+          inPlayQueue: inPlayQueue
         },
       }
     )
@@ -989,15 +991,17 @@ export class UserMarket {
     // account for binary markets where there is only one order book
     outcomeIndex =
       this.market.numberOfOutcomes == 2 && outcomeIndex == 1 ? 0 : outcomeIndex
-    // @ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
     const orderbookAccount = this.market.orderbookAccounts[outcomeIndex]
 
     const program = await this._averClient.getProgramFromProgramId(this.market.programId)
+    const inPlayQueue = !this.market.inPlayQueue || this.market.inPlayQueue.equals(SystemProgram.programId) ?
+      new Keypair().publicKey : this.market.inPlayQueue
 
     return program.instruction["cancelOrder"](
       {
         orderId,
         outcomeId: outcomeIndex
+        // aaobOrderId: !!orderId ? 
       },
       {
         accounts: {
@@ -1013,7 +1017,7 @@ export class UserMarket {
           quoteVault: this.market.quoteVault,
           vaultAuthority: this.market.vaultAuthority,
           splTokenProgram: TOKEN_PROGRAM_ID,
-          inPlayQueue: this.market.inPlayQueue
+          inPlayQueue: inPlayQueue
         },
       }
     )
@@ -1106,6 +1110,8 @@ export class UserMarket {
     const chunkedRemainingAccounts = chunk(remainingAccounts, 4 * chunkSize)
 
     const program = await this._averClient.getProgramFromProgramId(this.market.programId)
+    const inPlayQueue = !this.market.inPlayQueue || this.market.inPlayQueue.equals(SystemProgram.programId) ?
+      new Keypair().publicKey : this.market.inPlayQueue
 
     return chunkedOutcomeIds.map((ids, i) =>
       program.instruction["cancelAllOrders"](ids, {
@@ -1118,7 +1124,7 @@ export class UserMarket {
           quoteVault: this.market.quoteVault,
           vaultAuthority: this.market.vaultAuthority,
           splTokenProgram: TOKEN_PROGRAM_ID,
-          inPlayQueue: this.market.inPlayQueue
+          inPlayQueue: inPlayQueue
         },
         remainingAccounts: chunkedRemainingAccounts[i],
       })

@@ -546,7 +546,10 @@ class UserMarket():
         orderbook_account_index = outcome_id if not is_binary_market_second_outcome else 0
         orderbook_account = self.market.market_store_state.orderbook_accounts[orderbook_account_index]
 
-        
+        if self.market.market_state.in_play_queue == None or self.market.market_state.in_play_queue == SYS_PROGRAM_ID:
+            in_play_queue = Keypair().public_key
+        else:
+            in_play_queue = self.market.market_state.in_play_queue
 
         #Logic to return correct instruction based on ProgramID
         if(program_id.to_base58() == ''):
@@ -578,7 +581,7 @@ class UserMarket():
                         "bids": orderbook_account.bids,
                         "asks": orderbook_account.asks,
                         "event_queue": orderbook_account.event_queue,
-                        "in_play_queue": self.market.market_state.in_play_queue,
+                        "in_play_queue": in_play_queue,
                         "spl_token_program": TOKEN_PROGRAM_ID,
                         "system_program": SYS_PROGRAM_ID,
                         "vault_authority": self.market.market_state.vault_authority
@@ -706,7 +709,10 @@ class UserMarket():
         orderbook_account_index = outcome_id if not is_binary_market_second_outcome else 0
         orderbook_account = self.market.market_store_state.orderbook_accounts[orderbook_account_index]
 
-       
+        if self.market.market_state.in_play_queue == None or self.market.market_state.in_play_queue == SYS_PROGRAM_ID:
+            in_play_queue = Keypair().public_key
+        else:
+            in_play_queue = self.market.market_state.in_play_queue
 
         #Logic to return correct instruction based on ProgramID
         if(program_id.to_base58() == ''):
@@ -731,7 +737,7 @@ class UserMarket():
                     "quote_vault": self.market.market_state.quote_vault,
                     "vault_authority": self.market.market_state.vault_authority,
                     "spl_token_program": TOKEN_PROGRAM_ID,
-                    "in_play_queue": self.market.market_state.in_play_queue
+                    "in_play_queue": in_play_queue
                 })
             )
         
@@ -860,7 +866,10 @@ class UserMarket():
 
         ixs = []
 
-        
+        if self.market.market_state.in_play_queue == None or self.market.market_state.in_play_queue == SYS_PROGRAM_ID:
+            in_play_queue = Keypair().public_key
+        else:
+            in_play_queue = self.market.market_state.in_play_queue
 
         for i, outcome_ids in enumerate(chunked_outcome_ids):
             #Logic to return correct instruction based on ProgramID
@@ -881,7 +890,7 @@ class UserMarket():
                                 "quote_vault": self.market.market_state.quote_vault,
                                 "vault_authority": self.market.market_state.vault_authority,
                                 "spl_token_program": TOKEN_PROGRAM_ID,
-                                "in_play_queue": self.market.market_state.in_play_queue
+                                "in_play_queue": in_play_queue
                             },
                         remaining_accounts = chunked_remaining_accounts[i],
                         )
