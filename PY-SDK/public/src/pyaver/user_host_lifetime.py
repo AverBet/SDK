@@ -58,7 +58,7 @@ class UserHostLifetime():
         """
         # TODO get by program ID
         user_host_lifetime_result = await aver_client.programs[0].account['UserHostLifetime'].fetch(pubkey)
-        return UserHostLifetime(pubkey, aver_client, user_host_lifetime_result, aver_client.programs[0])
+        return UserHostLifetime(aver_client, pubkey, user_host_lifetime_result, aver_client.programs[0].program_id)
 
     @staticmethod
     async def load_multiple(aver_client: AverClient, pubkeys: list[PublicKey]):
