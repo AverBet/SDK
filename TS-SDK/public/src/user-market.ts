@@ -22,6 +22,7 @@ import {
   OrderType,
   Side,
   SizeFormat,
+  UmaOrder,
   UserBalanceState,
   UserMarketState,
 } from "./types"
@@ -977,6 +978,9 @@ export class UserMarket {
     outcomeIndex: number,
     averPreFlightCheck = false
   ) {
+    // if the order is from 1.0 but we migrated to 1.2, we need to pass in this value
+    const aaobOrderId = this.orders.find(o => o.aaobOrderId.eq(orderId))?.aaobOrderId || null
+
     if (averPreFlightCheck) {
       checkSufficientLamportBalance(this._userBalanceState)
       checkCancelOrderMarketStatus(this._market.marketStatus)
@@ -1000,8 +1004,8 @@ export class UserMarket {
     return program.instruction["cancelOrder"](
       {
         orderId,
-        outcomeId: outcomeIndex
-        // aaobOrderId: !!orderId ? 
+        outcomeId: outcomeIndex,
+        aaobOrderId
       },
       {
         accounts: {

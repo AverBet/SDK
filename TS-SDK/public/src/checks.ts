@@ -248,7 +248,7 @@ export function checkOrderExists(
   user_market_state: UserMarketState,
   order_id: number
 ) {
-  for (let o of user_market_state.orders) {
+  for (const o of user_market_state.orders) {
     if (o.orderId - order_id === 0) return
   }
 

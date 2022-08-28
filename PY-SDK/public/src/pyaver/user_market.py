@@ -714,6 +714,9 @@ class UserMarket():
         else:
             in_play_queue = self.market.market_state.in_play_queue
 
+        # if the order is from 1.0 but we migrated to 1.2, we need to pass in this value
+        aaob_order_id = next((order.aaob_order_id for order in self.user_market_state.orders if order.aaob_order_id == order_id), None)
+
         #Logic to return correct instruction based on ProgramID
         if(program_id.to_base58() == ''):
             #return program.instruction()...
@@ -722,7 +725,8 @@ class UserMarket():
             return program.instruction['cancel_order'](
                 {
                     "order_id": order_id, 
-                    "outcome_id": orderbook_account_index
+                    "outcome_id": orderbook_account_index,
+                    "aaob_order_id": aaob_order_id
                 },
                 ctx=Context(accounts={
                     "orderbook": orderbook_account.orderbook,
