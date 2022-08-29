@@ -19,7 +19,7 @@ async def upgrade_markets():
   client = await AverClient.load(connection, owner)
   markets_response = requests.get(api_endpoint + "v2/markets").json()
   market_pubkeys = [market_response["pubkey"] for market_response in markets_response if market_response["internal_status"] == "active"]
-  # market_pubkeys = [PublicKey('cyS6DMfVhM2xwo6LP5G5hbGDsmKby3unjKo3T1Uh2qf')]
+  market_pubkeys = [PublicKey('DgFey4CXYqwy51LwBWhDEAc2chJMzhxyzz7AyLC3MJcj')]
   aver_markets = await AverMarket.load_multiple(client, market_pubkeys)
   
   for market in aver_markets:

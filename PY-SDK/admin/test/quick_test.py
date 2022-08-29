@@ -118,12 +118,17 @@ class TestSdkV2(unittest.IsolatedAsyncioTestCase):
     print(f"Successfully loaded UMA {uma.pubkey}")
 
   async def place_order_test(self):
-    await self.user_market.place_order(self.client.owner, 0, Side.BUY, 0.5, 5, SizeFormat.STAKE)
-    print(f"Successfully placed order")
+    sig = await self.user_market.place_order(self.client.owner, 0, Side.BUY, 0.5, 5, SizeFormat.STAKE)
+    print(f"Successfully placed order {sig}")
 
   async def cancel_all_orders_test(self):
-    await self.user_market.cancel_all_orders([0])
-    print(f"Successfully cancelled all orders")
+    sig = await self.user_market.cancel_all_orders([0])
+    print(f"Successfully cancelled all orders {sig}")
+
+  async def cancel_specific_order(self, order_id = None):
+    order_id = order_id if order_id else self.user_market.user_market_state.orders[0].order_id
+    sig = await self.user_market.cancel_order(order_id, 0)
+    print(f"Successfully cancelled the order: {sig}")
 
 
   # run all the tests in order we want
@@ -134,12 +139,13 @@ class TestSdkV2(unittest.IsolatedAsyncioTestCase):
     # aver market tests
     # await self.create_market_test(2)
     # await self.supplement_init_market_test(2)
-    await self.load_market_test(PublicKey('BufZRp1YonHVR8ZYXheRqqhnL1sAXZpoiMcPNnposBth'))
+    await self.load_market_test(PublicKey('9YfunACpVFCv6fLjpa2Mjqr835t543cYsK45xfgX6pJ4'))
     
     # UMA tests
     await self.create_uma_test()
     await self.place_order_test()
-    await self.cancel_all_orders_test()
+    # await self.cancel_all_orders_test()
+    await self.cancel_specific_order()
 
 
 # Executing the tests in the above test case class
