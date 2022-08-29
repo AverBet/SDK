@@ -978,8 +978,15 @@ export class UserMarket {
     outcomeIndex: number,
     averPreFlightCheck = false
   ) {
+    let aaobOrderId = null
+    // if uma is still v0 but this is part of an ix which upgrades the UMA
+    if (this._userMarketState.version == 0) {
+      aaobOrderId = orderId
+      orderId = new BN(0)
     // if the order is from 1.0 but we migrated to 1.2, we need to pass in this value
-    const aaobOrderId = this.orders.find(o => o.aaobOrderId.eq(orderId))?.aaobOrderId || null
+    } else {
+      aaobOrderId = this.orders.find(o => o.aaobOrderId.eq(orderId))?.aaobOrderId || null
+    }
 
     if (averPreFlightCheck) {
       checkSufficientLamportBalance(this._userBalanceState)

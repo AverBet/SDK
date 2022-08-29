@@ -714,8 +714,12 @@ class UserMarket():
         else:
             in_play_queue = self.market.market_state.in_play_queue
 
-        # if the order is from 1.0 but we migrated to 1.2, we need to pass in this value
-        aaob_order_id = next((order.aaob_order_id for order in self.user_market_state.orders if order.aaob_order_id == order_id), None)
+        if self.user_market_state.version == 0:
+            aaob_order_id = order_id
+            order_id = 0
+        else:
+            # if the order is from 1.0 but we migrated to 1.2, we need to pass in this value
+            aaob_order_id = next((order.aaob_order_id for order in self.user_market_state.orders if order.aaob_order_id == order_id), None)
 
         #Logic to return correct instruction based on ProgramID
         if(program_id.to_base58() == ''):
