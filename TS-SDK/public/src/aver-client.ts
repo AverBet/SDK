@@ -7,7 +7,7 @@ import {
   PublicKey,
   Signer,
 } from "@solana/web3.js"
-import { Program, Provider, Wallet } from "@project-serum/anchor"
+import { Program, Provider } from "@project-serum/anchor"
 import NodeWallet from "@project-serum/anchor/dist/cjs/nodewallet"
 import {
   getOrCreateAssociatedTokenAccount,
@@ -52,13 +52,13 @@ export class AverClient {
    */
   private _quoteTokenMint: PublicKey
 
-   /**
+  /**
    * The default payer for transactions on-chain, unless one is specified
    */
   private _keypair: Keypair
 
   /**
-   * 
+   *
    */
   private _owner: PublicKey
 
@@ -94,31 +94,31 @@ export class AverClient {
    * @param {PublicKey} programIds - Program public key. Defaults to AVER_PROGRAM_IDS.
    * @returns {AverClient} - The Aver Client object
    */
-   static async loadAverClient(
+  static async loadAverClient(
     connection: Connection,
     solanaNetwork: SolanaNetwork = SolanaNetwork.Devnet,
     owner: null | PublicKey | Keypair,
     opts?: ConfirmOptions,
     programIds: PublicKey[] = AVER_PROGRAM_IDS
   ) {
-    let wallet: NodeWallet;
+    let wallet: NodeWallet
     let keypair: Keypair
     let pubkey: PublicKey = null
 
     if (owner instanceof Keypair) {
       // create a wallet with the keypair
-      wallet = new NodeWallet(owner);
+      wallet = new NodeWallet(owner)
       keypair = owner
       pubkey = owner.publicKey
     } else if (owner instanceof PublicKey) {
       // create a dummy wallet
       keypair = new Keypair()
-      wallet = new NodeWallet(keypair);
+      wallet = new NodeWallet(keypair)
       pubkey = owner
     } else {
       // create a dummy wallet
       keypair = new Keypair()
-      wallet = new NodeWallet(keypair);
+      wallet = new NodeWallet(keypair)
       pubkey = keypair.publicKey
     }
 
@@ -130,9 +130,11 @@ export class AverClient {
         preflightCommitment: connection.commitment,
         skipPreflight: false,
       }
-    );
+    )
 
-    const programs = await Promise.all(programIds.map(programId => AverClient.loadProgram(provider, programId)))
+    const programs = await Promise.all(
+      programIds.map((programId) => AverClient.loadProgram(provider, programId))
+    )
     return new AverClient(programs, solanaNetwork, pubkey, keypair)
   }
 
@@ -167,6 +169,13 @@ export class AverClient {
     return this._owner
   }
 
+  /**
+   * Loads Aver Program
+   *
+   * @param {Provider} provider - Provider
+   * @param {PublicKey} programId - Program public key
+   * @returns {Program} Program
+   */
   static async loadProgram(provider: Provider, programId: PublicKey) {
     const idl = await Program.fetchIdl(programId, provider)
     if (idl) {
@@ -178,13 +187,25 @@ export class AverClient {
     }
   }
 
-  async addProgram(programId: PublicKey){
+  /**
+   * Loads and adds a program to the list of programs
+   *
+   * @param {PublicKey} programId - Program public key
+   * @returns {Program} - Program
+   */
+  async addProgram(programId: PublicKey) {
     const program = await AverClient.loadProgram(this._provider, programId)
     this._programs.push(program)
     return program
   }
 
-  async getProgramFromProgramId(programId: PublicKey){
+  /**
+   * Checks if a program is already loaded and returns it. If not, it loads it, saves it and returns it.
+   *
+   * @param {PublicKey} programId - Program public key
+   * @returns {Program} - Program
+   */
+  async getProgramFromProgramId(programId: PublicKey) {
     for (const program of this._programs) {
       if (program.programId.equals(programId)) {
         return program
@@ -326,7 +347,7 @@ export class AverClient {
   }
 
   /**
-   * 
+   *
    * @returns DEPCREATED
    */
   async checkHealth() {
@@ -346,7 +367,7 @@ export class AverClient {
     }
   }
 
-    /**
+  /**
    * DEPCREATED
    */
   async requestTokenAirdrop(
@@ -368,5 +389,4 @@ export class AverClient {
 
     return axios.post(url, params)
   }
-
 }
