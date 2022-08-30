@@ -1217,10 +1217,12 @@ class UserMarket():
             send_options
         )
 
-    async def make_update_user_market_state_instruction(self):
+    async def make_update_user_market_state_instruction(self, fee_payer = None):
         program = await self.aver_client.get_program_from_program_id(self.program_id)
+        fee_payer = fee_payer if fee_payer else self.aver_client.owner.public_key
         return program.instruction['update_user_market_state'](
             ctx=Context(accounts={
+                "payer": fee_payer,
                 "user": self.user_market_state.user,
                 "user_market": self.pubkey,
                 "system_program": SYS_PROGRAM_ID 
@@ -1231,7 +1233,7 @@ class UserMarket():
         if(fee_payer == None):
             fee_payer = self.aver_client.owner
 
-        ix = await self.make_update_user_market_state_instruction()
+        ix = await self.make_update_user_market_state_instruction(fee_payer.public_key)
 
         return await sign_and_send_transaction_instructions(
             self.aver_client,
@@ -1250,7 +1252,7 @@ class UserMarket():
             ix = await self.user_host_lifetime.make_update_user_host_lifetime_state_instruction()
             ixs.append(ix)
         if not await self.check_if_uma_latest_version():
-            ix = await self.make_update_user_market_state_instruction()
+            ix = await self.make_update_user_market_state_instruction(fee_payer)
             ixs.append(ix)
         
         return ixs
