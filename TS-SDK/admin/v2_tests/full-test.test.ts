@@ -1,12 +1,7 @@
 import { PublicKey, Keypair, Connection } from "@solana/web3.js"
 import { base58_to_binary } from "base58-js"
-import {
-  MarketStatus,
-  Side,
-  SizeFormat,
-  SolanaNetwork,
-} from "../../public/src/types"
-import { getSolanaEndpoint } from "../../public/src/ids"
+import { MarketStatus, SolanaNetwork } from "../../public/src/types"
+import { getQuoteToken, getSolanaEndpoint } from "../../public/src/ids"
 import { AverClient } from "../../public/src/aver-client"
 import { Market } from "../../public/src/market"
 import { UserMarket } from "../../public/src/user-market"
@@ -46,7 +41,7 @@ const args: InitMarketArgs = {
 describe("run all tests", () => {
   // constants we can adjust
   const firstProgramId = new PublicKey(
-    "81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT"
+    "DfMQPAuAeECP7iSCwTKjbpzyx6X1HZT6rz872iYWA8St"
   )
 
   const secondProgramId = new PublicKey(
@@ -73,7 +68,7 @@ describe("run all tests", () => {
       network,
       owner,
       undefined,
-      []
+      [firstProgramId, secondProgramId]
     )
   })
 
@@ -85,7 +80,10 @@ describe("run all tests", () => {
     console.log("System clock time: ", system_clock)
     const lamport_balance = await client.requestLamportBalance(client.owner)
     console.log("Lamport balance: ", lamport_balance)
-    const token_balance = await client.requestTokenBalance()
+    const token_balance = await client.requestTokenBalance(
+      getQuoteToken(SolanaNetwork.Devnet),
+      owner.publicKey
+    )
     console.log("Token balance: ", token_balance)
     console.log("-".repeat(10))
   })
@@ -113,19 +111,19 @@ describe("run all tests", () => {
     console.log("-".repeat(10))
   })
 
-  test("get or create UMA", async () => {
-    userMarket = await UserMarket.getOrCreateUserMarketAccount(
-      client,
-      owner,
-      market
-    )
-  })
+  //   test("get or create UMA", async () => {
+  //     userMarket = await UserMarket.getOrCreateUserMarketAccount(
+  //       client,
+  //       owner,
+  //       market
+  //     )
+  //   })
 
-  test("place order", async () => {
-    await userMarket.placeOrder(owner, 0, Side.Bid, 0.6, 5, SizeFormat.Stake)
-  })
+  //   test("place order", async () => {
+  //     await userMarket.placeOrder(owner, 0, Side.Bid, 0.6, 5, SizeFormat.Stake)
+  //   })
 
-  test("cancel all orders", async () => {
-    await userMarket.cancelAllOrders(owner, [0])
-  })
+  //   test("cancel all orders", async () => {
+  //     await userMarket.cancelAllOrders(owner, [0])
+  //   })
 })

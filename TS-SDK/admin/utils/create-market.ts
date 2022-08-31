@@ -9,6 +9,7 @@ import { AverClient } from "../../public/src/aver-client"
 import { AVER_PROGRAM_IDS, USDC_DEVNET } from "../../public/src/ids"
 import { BN } from "@project-serum/anchor"
 import { signAndSendTransactionInstructions } from "../../public/src/utils"
+import { Orderbook } from "../../public/src/orderbook"
 
 export async function createMarket(
   numberOfOutcomes: number,
@@ -18,7 +19,7 @@ export async function createMarket(
 ) {
   console.log("Begin market creation")
   const market = new Keypair()
-  const marketAuthority = new Keypair()
+  const marketAuthority = owner
 
   const [marketStorePubkey, marketStoreBump] =
     await Market.deriveMarketStorePubkeyAndBump(market.publicKey)
