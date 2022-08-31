@@ -1,12 +1,47 @@
 import { PublicKey, Keypair, Connection } from "@solana/web3.js"
 import { base58_to_binary } from "base58-js"
-import { Side, SizeFormat, SolanaNetwork } from "../../public/src/types"
+import {
+  MarketStatus,
+  Side,
+  SizeFormat,
+  SolanaNetwork,
+} from "../../public/src/types"
 import { getSolanaEndpoint } from "../../public/src/ids"
 import { AverClient } from "../../public/src/aver-client"
 import { Market } from "../../public/src/market"
 import { UserMarket } from "../../public/src/user-market"
+import { BN } from "@project-serum/anchor"
+import { createMarket, InitMarketArgs } from "../utils/create-market"
 
 jest.setTimeout(100000)
+
+const args: InitMarketArgs = {
+  numberOfOutcomes: 0,
+  numberOfWinners: 1,
+  vaultBump: 0,
+  marketStoreBump: 0,
+  permissionedMarketFlag: false,
+  minOrderbookBaseSize: new BN(1),
+  minNewOrderBaseSize: new BN(1),
+  minNewOrderQuoteSize: new BN(1),
+  maxQuoteTokensIn: new BN(100000000000000),
+  maxQuoteTokensInPermissionCapped: new BN(100000000000000),
+  crankerReward: new BN(0),
+  feeTierCollectionBpsRates: [
+    new BN(20),
+    new BN(18),
+    new BN(16),
+    new BN(14),
+    new BN(12),
+    new BN(10),
+    new BN(0),
+  ],
+  marketName: "Test market",
+  goingInPlayFlag: true,
+  activeImmediately: true,
+  tradingCeaseTime: new BN(1682447605),
+  inplayStartTime: new BN(1682447605),
+}
 
 describe("run all tests", () => {
   // constants we can adjust
@@ -25,6 +60,7 @@ describe("run all tests", () => {
 
   // values that will be set by the tests
   let client: AverClient
+  let marketPubkey: PublicKey
   let market: Market
   let userMarket: UserMarket
 
@@ -54,15 +90,27 @@ describe("run all tests", () => {
     console.log("-".repeat(10))
   })
 
-  //   test("successfully get program, if not add a program", async () => {
-  //     await client.getProgramFromProgramId(secondProgramId)
-  //   })
+  test("create aver market", async () => {
+    console.log("-".repeat(10))
+    console.log("CREATING AVER MARKET")
+    marketPubkey = (await createMarket(2, client, owner, args)).publicKey
+    console.log("-".repeat(10))
+  })
 
-  test("successfully load aver market", async () => {
-    market = (await Market.load(
-      client,
-      new PublicKey("BufZRp1YonHVR8ZYXheRqqhnL1sAXZpoiMcPNnposBth")
-    )) as Market
+  function checkMarketIsAsExpected(market: Market) {
+    console.log("TESTING MARKET CREATED AND LOADED CORRECTLY")
+    expect(args.crankerReward).toBe(market.crankerReward)
+    expect(args.goingInPlayFlag).toBe(market.goingInPlayFlag)
+    expect(market.marketStatus).toBe(MarketStatus.ActivePreEvent)
+    expect(args.maxQuoteTokensIn).toBe(market.maxQuoteTokensIn)
+    expect(args.permissionedMarketFlag).toBe(market.permissionedMarketFlag)
+  }
+
+  test("successfully load and test aver market", async () => {
+    console.log("-".repeat(10))
+    market = (await Market.load(client, marketPubkey)) as Market
+    checkMarketIsAsExpected(market)
+    console.log("-".repeat(10))
   })
 
   test("get or create UMA", async () => {
