@@ -1,4 +1,5 @@
 // TODO add checks to get correct versino of instruction based on program ID
+//@ts-nocheck
 import { Idl, IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl"
 import {
   IdlTypes,
@@ -38,7 +39,7 @@ import {
   AVER_PROGRAM_IDS,
   AVER_HOST_ACCOUNT,
   CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE,
-  AVER_VERSION
+  AVER_VERSION,
 } from "./ids"
 import { UserHostLifetime } from "./user-host-lifetime"
 import { chunk } from "lodash"
@@ -143,7 +144,7 @@ export class UserMarket {
     averClient: AverClient,
     market: Market,
     owner?: PublicKey,
-    host: PublicKey = AVER_HOST_ACCOUNT,
+    host: PublicKey = AVER_HOST_ACCOUNT
   ) {
     const umaOwner = owner || averClient.owner
 
@@ -153,7 +154,11 @@ export class UserMarket {
       host,
       market.programId
     )
-    const [uhl, _] = await UserHostLifetime.derivePubkeyAndBump(umaOwner, host, market.programId)
+    const [uhl, _] = await UserHostLifetime.derivePubkeyAndBump(
+      umaOwner,
+      host,
+      market.programId
+    )
     return UserMarket.loadByUma(averClient, uma, market, uhl)
   }
 
@@ -227,13 +232,18 @@ export class UserMarket {
     averClient: AverClient,
     markets: Market[],
     owners?: PublicKey[],
-    host: PublicKey = AVER_HOST_ACCOUNT,
+    host: PublicKey = AVER_HOST_ACCOUNT
   ) {
     const umaOwners = owners || Array(markets.length).fill(averClient.owner)
 
     const umasAndBumps = await Promise.all(
       markets.map((m, i) =>
-        UserMarket.derivePubkeyAndBump(umaOwners[i], m.pubkey, host, m.programId)
+        UserMarket.derivePubkeyAndBump(
+          umaOwners[i],
+          m.pubkey,
+          host,
+          m.programId
+        )
       )
     )
     const umasPubkeys = umasAndBumps.map((u) => u[0])
@@ -270,11 +280,17 @@ export class UserMarket {
     uhls: PublicKey[]
   ) {
     // TODO each market might have a different program
-    const program = await averClient.getProgramFromProgramId(AVER_PROGRAM_IDS[0])
+    const program = await averClient.getProgramFromProgramId(
+      AVER_PROGRAM_IDS[0]
+    )
 
-    const userMarketResult = await averClient.connection.getMultipleAccountsInfo(pubkeys)
+    const userMarketResult =
+      await averClient.connection.getMultipleAccountsInfo(pubkeys)
 
-    const userMarketStates = UserMarket.deserializeMultipleUserMarketStoreData(averClient, userMarketResult)
+    const userMarketStates = UserMarket.deserializeMultipleUserMarketStoreData(
+      averClient,
+      userMarketResult
+    )
 
     // TODO parse with version for UHL as well
     const uhlAccounts = await UserHostLifetime.loadMultiple(averClient, uhls)
@@ -341,7 +357,7 @@ export class UserMarket {
     market: Market,
     owner?: PublicKey,
     host: PublicKey = AVER_HOST_ACCOUNT,
-    numberOfOrders: number = market.numberOfOutcomes * 5,
+    numberOfOrders: number = market.numberOfOutcomes * 5
   ): Promise<TransactionInstruction> {
     const umaOwner = owner || averClient.owner
     const programId = market.programId
@@ -408,7 +424,7 @@ export class UserMarket {
     sendOptions?: SendOptions,
     manualMaxRetry?: number,
     host: PublicKey = AVER_HOST_ACCOUNT,
-    numberOfOrders: number = market.numberOfOutcomes * 5,
+    numberOfOrders: number = market.numberOfOutcomes * 5
   ) {
     const createUserMarketAccountIx =
       await this.makeCreateUserMarketAccountInstruction(
@@ -416,7 +432,7 @@ export class UserMarket {
         market,
         owner.publicKey,
         host,
-        numberOfOrders,
+        numberOfOrders
       )
 
     return signAndSendTransactionInstructions(
@@ -452,7 +468,7 @@ export class UserMarket {
     quoteTokenMint: PublicKey = averClient.quoteTokenMint,
     host: PublicKey = AVER_HOST_ACCOUNT,
     numberOfOrders: number = market.numberOfOutcomes * 5,
-    referrer: PublicKey = SystemProgram.programId,
+    referrer: PublicKey = SystemProgram.programId
   ) {
     // check if account already exists for user
     const userMarket = (
@@ -464,9 +480,9 @@ export class UserMarket {
       )
     )[0]
     const program = await averClient.getProgramFromProgramId(market.programId)
-    const userMarketResult = await program.account[
-      "userMarket"
-    ].fetchNullable(userMarket)
+    const userMarketResult = await program.account["userMarket"].fetchNullable(
+      userMarket
+    )
 
     if (userMarketResult) {
       const userMarketState = UserMarket.parseUserMarketState(userMarketResult)
@@ -546,12 +562,14 @@ export class UserMarket {
     averClient: AverClient,
     userMarketStoresData: AccountInfo<Buffer | null>[]
   ): (UserMarketState | null)[] {
-    return userMarketStoresData.map((marketStoreData) => marketStoreData ?
-      parseWithVersion(
-        averClient.programs[0], // TODO find correct program
-        AccountType.USER_MARKET,
-        marketStoreData
-      ) : null
+    return userMarketStoresData.map((marketStoreData) =>
+      marketStoreData
+        ? parseWithVersion(
+            averClient.programs[0], // TODO find correct program
+            AccountType.USER_MARKET,
+            marketStoreData
+          )
+        : null
     )
   }
 
@@ -597,7 +615,7 @@ export class UserMarket {
       multipleAccountStates.marketStates,
       multipleAccountStates.marketStoreStates,
       multipleAccountStates.slabs,
-      markets.map(m => m.programId)
+      markets.map((m) => m.programId)
     )
 
     return multipleAccountStates.userMarketStates.map((userMarketState, i) =>
@@ -827,9 +845,14 @@ export class UserMarket {
       this.user
     )
 
-    const program = await this._averClient.getProgramFromProgramId(this.market.programId)
-    const inPlayQueue = !this.market.inPlayQueue || this.market.inPlayQueue.equals(SystemProgram.programId) ?
-      new Keypair().publicKey : this.market.inPlayQueue
+    const program = await this._averClient.getProgramFromProgramId(
+      this.market.programId
+    )
+    const inPlayQueue =
+      !this.market.inPlayQueue ||
+      this.market.inPlayQueue.equals(SystemProgram.programId)
+        ? new Keypair().publicKey
+        : this.market.inPlayQueue
 
     return program.instruction["placeOrder"](
       {
@@ -857,7 +880,7 @@ export class UserMarket {
           splTokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
           vaultAuthority: this.market.vaultAuthority,
-          inPlayQueue: inPlayQueue
+          inPlayQueue: inPlayQueue,
         },
       }
     )
@@ -894,7 +917,14 @@ export class UserMarket {
     orderType: OrderType = OrderType.Limit,
     selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide
   ) {
-    const dummyUma = new UserMarket(averClient, umaPubkey,{ user: user, userHostLifetime: userHostLifetime }, market, null, { pubkey: userHostLifetime })
+    const dummyUma = new UserMarket(
+      averClient,
+      umaPubkey,
+      { user: user, userHostLifetime: userHostLifetime },
+      market,
+      null,
+      { pubkey: userHostLifetime }
+    )
     return dummyUma.makePlaceOrderInstruction(
       outcomeIndex,
       side,
@@ -983,9 +1013,10 @@ export class UserMarket {
     if (this._userMarketState.version == 0) {
       aaobOrderId = orderId
       orderId = new BN(0)
-    // if the order is from 1.0 but we migrated to 1.2, we need to pass in this value
+      // if the order is from 1.0 but we migrated to 1.2, we need to pass in this value
     } else {
-      aaobOrderId = this.orders.find(o => o.aaobOrderId.eq(orderId))?.aaobOrderId || null
+      aaobOrderId =
+        this.orders.find((o) => o.aaobOrderId.eq(orderId))?.aaobOrderId || null
     }
 
     if (averPreFlightCheck) {
@@ -1004,15 +1035,20 @@ export class UserMarket {
       this.market.numberOfOutcomes == 2 && outcomeIndex == 1 ? 0 : outcomeIndex
     const orderbookAccount = this.market.orderbookAccounts[outcomeIndex]
 
-    const program = await this._averClient.getProgramFromProgramId(this.market.programId)
-    const inPlayQueue = !this.market.inPlayQueue || this.market.inPlayQueue.equals(SystemProgram.programId) ?
-      new Keypair().publicKey : this.market.inPlayQueue
+    const program = await this._averClient.getProgramFromProgramId(
+      this.market.programId
+    )
+    const inPlayQueue =
+      !this.market.inPlayQueue ||
+      this.market.inPlayQueue.equals(SystemProgram.programId)
+        ? new Keypair().publicKey
+        : this.market.inPlayQueue
 
     return program.instruction["cancelOrder"](
       {
         orderId,
         outcomeId: outcomeIndex,
-        aaobOrderId
+        aaobOrderId,
       },
       {
         accounts: {
@@ -1028,7 +1064,7 @@ export class UserMarket {
           quoteVault: this.market.quoteVault,
           vaultAuthority: this.market.vaultAuthority,
           splTokenProgram: TOKEN_PROGRAM_ID,
-          inPlayQueue: inPlayQueue
+          inPlayQueue: inPlayQueue,
         },
       }
     )
@@ -1056,7 +1092,11 @@ export class UserMarket {
     manualMaxRetry?: number,
     averPreFlightCheck = true
   ) {
-    await this.updateAllAccountsIfRequired(feePayer, sendOptions, manualMaxRetry)
+    await this.updateAllAccountsIfRequired(
+      feePayer,
+      sendOptions,
+      manualMaxRetry
+    )
 
     const ix = await this.makeCancelOrderInstruction(
       orderId,
@@ -1120,9 +1160,14 @@ export class UserMarket {
     const chunkedOutcomeIds = chunk(outcomeIdsToCancel, chunkSize)
     const chunkedRemainingAccounts = chunk(remainingAccounts, 4 * chunkSize)
 
-    const program = await this._averClient.getProgramFromProgramId(this.market.programId)
-    const inPlayQueue = !this.market.inPlayQueue || this.market.inPlayQueue.equals(SystemProgram.programId) ?
-      new Keypair().publicKey : this.market.inPlayQueue
+    const program = await this._averClient.getProgramFromProgramId(
+      this.market.programId
+    )
+    const inPlayQueue =
+      !this.market.inPlayQueue ||
+      this.market.inPlayQueue.equals(SystemProgram.programId)
+        ? new Keypair().publicKey
+        : this.market.inPlayQueue
 
     return chunkedOutcomeIds.map((ids, i) =>
       program.instruction["cancelAllOrders"](ids, {
@@ -1135,7 +1180,7 @@ export class UserMarket {
           quoteVault: this.market.quoteVault,
           vaultAuthority: this.market.vaultAuthority,
           splTokenProgram: TOKEN_PROGRAM_ID,
-          inPlayQueue: inPlayQueue
+          inPlayQueue: inPlayQueue,
         },
         remainingAccounts: chunkedRemainingAccounts[i],
       })
@@ -1162,7 +1207,11 @@ export class UserMarket {
     manualMaxRetry?: number,
     averPreFlightCheck = true
   ) {
-    await this.updateAllAccountsIfRequired(feePayer, sendOptions, manualMaxRetry)
+    await this.updateAllAccountsIfRequired(
+      feePayer,
+      sendOptions,
+      manualMaxRetry
+    )
 
     const ixs = await this.makeCancelAllOrdersInstructions(
       outcomeIdsToCancel,
@@ -1259,30 +1308,29 @@ export class UserMarket {
       this.market.quoteTokenMint,
       this.user
     )
-    const program = await this._averClient.getProgramFromProgramId(this.market.programId)
-    return program.instruction["neutralizeOutcomePosition"](
-      outcomeId,
-      {
-        accounts: {
-          user: this.user,
-          userHostLifetime: this.userHostLifetime.pubkey,
-          userMarket: this.pubkey,
-          userQuoteTokenAta: quoteTokenAta,
-          market: this.market.pubkey,
-          quoteVault: this.market.quoteVault,
-          marketStore: this.market.marketStore,
-          orderbook: this.market.orderbookAccounts?.[outcomeId]
-            .orderbook as PublicKey,
-          bids: this.market.orderbookAccounts?.[outcomeId].bids as PublicKey,
-          asks: this.market.orderbookAccounts?.[outcomeId].asks as PublicKey,
-          eventQueue: this.market.orderbookAccounts?.[outcomeId]
-            .eventQueue as PublicKey,
-          splTokenProgram: TOKEN_PROGRAM_ID,
-          systemProgram: SystemProgram.programId,
-          vaultAuthority: this.market.vaultAuthority,
-        },
-      }
+    const program = await this._averClient.getProgramFromProgramId(
+      this.market.programId
     )
+    return program.instruction["neutralizeOutcomePosition"](outcomeId, {
+      accounts: {
+        user: this.user,
+        userHostLifetime: this.userHostLifetime.pubkey,
+        userMarket: this.pubkey,
+        userQuoteTokenAta: quoteTokenAta,
+        market: this.market.pubkey,
+        quoteVault: this.market.quoteVault,
+        marketStore: this.market.marketStore,
+        orderbook: this.market.orderbookAccounts?.[outcomeId]
+          .orderbook as PublicKey,
+        bids: this.market.orderbookAccounts?.[outcomeId].bids as PublicKey,
+        asks: this.market.orderbookAccounts?.[outcomeId].asks as PublicKey,
+        eventQueue: this.market.orderbookAccounts?.[outcomeId]
+          .eventQueue as PublicKey,
+        splTokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        vaultAuthority: this.market.vaultAuthority,
+      },
+    })
   }
 
   /**
@@ -1329,18 +1377,17 @@ export class UserMarket {
    * @returns {Promise<TransactionInstruction>} TransactionInstruction object
    */
   async makeUpdateUserMarketOrders(newSize: number) {
-    const program = await this._averClient.getProgramFromProgramId(this.market.programId)
-    return program.instruction["updateUserMarketOrders"](
-      newSize,
-      {
-        accounts: {
-          payer: this.user,
-          user: this.user,
-          userMarket: this.pubkey,
-          systemProgram: SystemProgram.programId,
-        },
-      }
+    const program = await this._averClient.getProgramFromProgramId(
+      this.market.programId
     )
+    return program.instruction["updateUserMarketOrders"](newSize, {
+      accounts: {
+        payer: this.user,
+        user: this.user,
+        userMarket: this.pubkey,
+        systemProgram: SystemProgram.programId,
+      },
+    })
   }
 
   /**
@@ -1379,16 +1426,16 @@ export class UserMarket {
   }
 
   async makeUpdateUserMarketStateInstruction(payer: PublicKey = this.user) {
-    const program = await this._averClient.getProgramFromProgramId(this.market.programId)
-    return program.instruction["updateUserMarketState"](
-      {
-        accounts: {
-          user: payer,
-          userMarket: this.pubkey,
-          systemProgram: SystemProgram.programId,
-        },
-      }
+    const program = await this._averClient.getProgramFromProgramId(
+      this.market.programId
     )
+    return program.instruction["updateUserMarketState"]({
+      accounts: {
+        user: payer,
+        userMarket: this.pubkey,
+        systemProgram: SystemProgram.programId,
+      },
+    })
   }
 
   async updateUserMarketState(
@@ -1415,10 +1462,10 @@ export class UserMarket {
    * @returns
    */
   async loadUserMarketListener(callback: (userMarket: UserMarket) => void) {
-    const program = await this._averClient.getProgramFromProgramId(this.market.programId)
-    const ee = program.account["userMarket"].subscribe(
-      this.pubkey
+    const program = await this._averClient.getProgramFromProgramId(
+      this.market.programId
     )
+    const ee = program.account["userMarket"].subscribe(this.pubkey)
     ee.on("change", callback)
     return ee
   }
@@ -1496,15 +1543,22 @@ export class UserMarket {
   }
 
   async checkIfUmaLatestVersion() {
-    const program = await this._averClient.getProgramFromProgramId(this.market.programId)
-    if (this._userMarketState.version < getVersionOfAccountTypeInProgram(AccountType.USER_MARKET, program)) {
+    const program = await this._averClient.getProgramFromProgramId(
+      this.market.programId
+    )
+    if (
+      this._userMarketState.version <
+      getVersionOfAccountTypeInProgram(AccountType.USER_MARKET, program)
+    ) {
       console.log("UMA needs to be upgraded")
       return false
     }
     return true
   }
 
-  async makeUpdateAllAccountsIfRequiredInstructions(payer: PublicKey = this.user) {
+  async makeUpdateAllAccountsIfRequiredInstructions(
+    payer: PublicKey = this.user
+  ) {
     const ixs = []
     let ix: TransactionInstruction
     const isMarketLatestVersion = await this.market.checkIfMarketLatestVersion()
@@ -1512,9 +1566,11 @@ export class UserMarket {
       ix = await this.market.makeUpdateMarketStateInstruction(payer)
       ixs.push(ix)
     }
-    const isUhlLatestVersion = await this.userHostLifetime.checkIfUhlLatestVersion()
+    const isUhlLatestVersion =
+      await this.userHostLifetime.checkIfUhlLatestVersion()
     if (!isUhlLatestVersion) {
-      ix = await this.userHostLifetime.makeUpdateUserHostLifetimeStateInstruction()
+      ix =
+        await this.userHostLifetime.makeUpdateUserHostLifetimeStateInstruction()
       ixs.push(ix)
     }
     const isUmaLatestVersion = await this.checkIfUmaLatestVersion()
@@ -1531,7 +1587,9 @@ export class UserMarket {
     sendOptions?: SendOptions,
     manualMaxRetry?: number
   ) {
-    const ixs = await this.makeUpdateAllAccountsIfRequiredInstructions(payer.publicKey)
+    const ixs = await this.makeUpdateAllAccountsIfRequiredInstructions(
+      payer.publicKey
+    )
     if (ixs.length > 0) {
       return signAndSendTransactionInstructions(
         this._averClient,

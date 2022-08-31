@@ -95,7 +95,12 @@ export class UserHostLifetime {
       userHostLifetimeResult
     )
 
-    return new UserHostLifetime(averClient, pubkey, userHostLifetimeState, program.programId)
+    return new UserHostLifetime(
+      averClient,
+      pubkey,
+      userHostLifetimeState,
+      program.programId
+    )
   }
 
   /**
@@ -201,7 +206,7 @@ export class UserHostLifetime {
    */
   static async createUserHostLifetime(
     averClient: AverClient,
-    owner: Keypair = averClient.keypair,
+    owner: Keypair | undefined = averClient.keypair,
     userQuoteTokenAta: PublicKey,
     sendOptions?: SendOptions,
     manualMaxRetry?: number,
@@ -209,6 +214,8 @@ export class UserHostLifetime {
     referrer: PublicKey = SystemProgram.programId,
     programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
+    if (!owner) throw new Error("Owner keypair not given")
+
     const ix = await UserHostLifetime.makeCreateUserHostLifetimeInstruction(
       averClient,
       userQuoteTokenAta,
@@ -243,13 +250,14 @@ export class UserHostLifetime {
    */
   static async getOrCreateUserHostLifetime(
     averClient: AverClient,
-    owner: Keypair = averClient.keypair,
+    owner: Keypair | undefined = averClient.keypair,
     sendOptions?: SendOptions,
     quoteTokenMint: PublicKey = averClient.quoteTokenMint,
     host: PublicKey = AVER_HOST_ACCOUNT,
     referrer: PublicKey = SystemProgram.programId,
     programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
+    if (!owner) throw new Error("Owner keypair not given")
     const userHostLifetime = (
       await UserHostLifetime.derivePubkeyAndBump(
         owner.publicKey,
@@ -261,7 +269,7 @@ export class UserHostLifetime {
     // check if account exists first, and if so return it
     const userHostLifetimeResultUnparsed =
       await averClient.connection.getAccountInfo(userHostLifetime)
-    
+
     const program = await averClient.getProgramFromProgramId(programId)
 
     const userHostLifetimeResult = userHostLifetimeResultUnparsed?.data
@@ -444,16 +452,20 @@ export class UserHostLifetime {
   }
 
   async makeUpdateUserHostLifetimeStateInstruction() {
-    const program = await this._averClient.getProgramFromProgramId(this._programId)
+    const program = await this._averClient.getProgramFromProgramId(
+      this._programId
+    )
     // TODO
-    return null
+    //@ts-ignore
+    return new TransactionInstruction(undefined)
   }
 
   async updateUserHostLifetimeState(
-    payer: Keypair = this._averClient.keypair,
+    payer: Keypair | undefined = this._averClient.keypair,
     sendOptions?: SendOptions,
     manualMaxRetry?: number
   ) {
+    if (!payer) throw new Error("Payer keypair not given")
     const ix = await this.makeUpdateUserHostLifetimeStateInstruction()
 
     return signAndSendTransactionInstructions(
@@ -467,8 +479,13 @@ export class UserHostLifetime {
   }
 
   async checkIfUhlLatestVersion() {
-    const program = await this._averClient.getProgramFromProgramId(this._programId)
-    if (this.version < getVersionOfAccountTypeInProgram(AccountType.USER_HOST_LIFETIME, program)) {
+    const program = await this._averClient.getProgramFromProgramId(
+      this._programId
+    )
+    if (
+      this.version <
+      getVersionOfAccountTypeInProgram(AccountType.USER_HOST_LIFETIME, program)
+    ) {
       console.log("UHL needs to be upgraded")
       return false
     }

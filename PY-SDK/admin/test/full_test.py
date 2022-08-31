@@ -8,6 +8,7 @@ import base58
 from ...public.src.pyaver.aver_client import AverClient
 from ...public.src.pyaver.constants import *
 from ...public.src.pyaver.user_market import UserMarket
+from solana.rpc.commitment import Confirmed
 from ...public.src.pyaver.market import AverMarket
 from ...public.src.pyaver.enums import MarketStatus, Side, SizeFormat
 from solana.rpc.async_api import AsyncClient
@@ -95,9 +96,9 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
       market_authority=self.client.owner,
       payer=self.client.owner,
     )
-    self.init_market_args.number_of_outcomes = number_of_outcomes
+    self.init_market_args = self.init_market_args._replace(number_of_outcomes=number_of_outcomes)
     sig = await init_market_tx(self.client, self.init_market_args, accs)
-    await self.client.connection.confirm_transaction(sig, "Confirmed")
+    await self.client.connection.confirm_transaction(sig, Confirmed)
     self.market = market
     print(f"Market created: {market.public_key}")
 
@@ -115,7 +116,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
         outcome_id=0,
         outcome_names=["one", "two"])
       sig = await supplement_init_market_tx(self.client, args, accs)
-      await self.client.connection.confirm_transaction(sig, "Confirmed")
+      await self.client.connection.confirm_transaction(sig, Confirmed)
       print(f"Successfully finished supplement init market")
     else:
         coroutines = []
@@ -178,14 +179,14 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
 
     # aver market tests
     await self.create_market(2)
-    loaded_market = await self.load_market_test(self.market.public_key)
-    self.check_market_is_as_expected(loaded_market)
+    await self.load_market_test(self.market.public_key)
+    self.check_market_is_as_expected(self.aver_market)
     
     # UMA tests
-    await self.create_uma_test()
-    await self.place_order_test()
-    # await self.cancel_all_orders_test()
-    await self.cancel_specific_order()
+    # await self.create_uma_test()
+    # await self.place_order_test()
+    # # await self.cancel_all_orders_test()
+    # await self.cancel_specific_order()
 
 
 # Executing the tests in the above test case class

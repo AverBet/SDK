@@ -12,7 +12,7 @@ import { UserHostLifetime } from "./user-host-lifetime"
 import { roundPriceToNearestTickSize } from "./utils"
 import * as fs from "fs"
 // import path from 'path'
-import {PublicKey} from '@solana/web3.js'
+import { PublicKey } from "@solana/web3.js"
 
 export function checkSufficientLamportBalance(
   user_balance_state: UserBalanceState
@@ -272,7 +272,7 @@ export function checkOutcomeHasOrders(
 }
 
 export function loadIdlFromJson(programId: PublicKey) {
-  const filePath = __dirname +  '/idl' + `/${programId.toBase58()}.json`
+  const filePath = __dirname + "/idl" + `/${programId.toBase58()}.json`
   const data = fs.readFileSync(filePath, "utf-8")
   const fileIdl = JSON.parse(data)
 
@@ -288,11 +288,18 @@ export function loadIdlFromJson(programId: PublicKey) {
  */
 export function checkIdlHasSameInstructionsAsSdk(program: Program) {
   // do not do read file or do checks for browser
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     return true
   }
-
-  const fileIdl = loadIdlFromJson(program.programId)
+  let fileIdl: any = undefined
+  try {
+    fileIdl = loadIdlFromJson(program.programId)
+  } catch {
+    console.log(
+      "IDL not found. This means your SDK version is likely out of date"
+    )
+    return
+  }
   const fileInstructions = fileIdl["instructions"]
 
   program.idl.instructions.map((i) => {

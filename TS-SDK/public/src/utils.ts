@@ -184,7 +184,9 @@ export const getBestDiscountToken = async (
       return zeroFeesTokenAccount.value[0].pubkey
     }
   } catch (e) {
-    console.log("Zero fees token mint does not exist on the network / program ID")
+    console.log(
+      "Zero fees token mint does not exist on the network / program ID"
+    )
   }
 
   try {
@@ -200,7 +202,9 @@ export const getBestDiscountToken = async (
       return communityRewardsTokenAccount.value[0].pubkey
     }
   } catch (e) {
-    console.log("Community rewards token mint does not exist on the network / program ID")
+    console.log(
+      "Community rewards token mint does not exist on the network / program ID"
+    )
   }
 
   try {
@@ -210,7 +214,8 @@ export const getBestDiscountToken = async (
       })
     if (
       averTokenAccount.value.length > 0 &&
-      averTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount > 0
+      averTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount >
+        0
     ) {
       return averTokenAccount.value[0].pubkey
     }
@@ -262,8 +267,13 @@ export function parseWithVersion(
       "PLEASE CALL THE UPDATE INSTRUCTION FOR THE CORRESPONDING ACCOUNT TYPE TO RECTIFY, IF POSSIBLE"
     )
     //We need to replace the discriminator on the bytes data to prevent anchor errors
-    const account_discriminator = accountDiscriminator(account_type, version, latestVersion)
+    const account_discriminator = accountDiscriminator(
+      account_type,
+      version,
+      latestVersion
+    )
     account_discriminator.map((v, i, a) => {
+      //@ts-ignore
       bytes.data[i] = v
       return 1
     })
@@ -287,21 +297,22 @@ function accountDiscriminator(
   version: number,
   latestVersion: number
 ): Buffer {
-  const name = version == latestVersion ? account_type : `${account_type}V${version}`
+  const name =
+    version == latestVersion ? account_type : `${account_type}V${version}`
   return Buffer.from(
-    sha256.digest(
-      `account:${camelcase(`${name}`, { pascalCase: true })}`
-    )
+    sha256.digest(`account:${camelcase(`${name}`, { pascalCase: true })}`)
   ).slice(0, 8)
 }
 
-
 // Latest version according to the program
-export function getVersionOfAccountTypeInProgram(accountType: AccountType, program: Program){
+export function getVersionOfAccountTypeInProgram(
+  accountType: AccountType,
+  program: Program
+) {
   let version = 0
-  while (true){
+  while (true) {
     const account = program.account[`${accountType}V${version}`]
-    if(account == null){
+    if (account == null) {
       break
     } else {
       version = version + 1

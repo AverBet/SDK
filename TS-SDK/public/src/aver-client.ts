@@ -80,6 +80,7 @@ export class AverClient {
     this._provider = programs[0].provider
     this._solanaNetwork = solanaNetwork
     this._quoteTokenMint = getQuoteToken(solanaNetwork)
+    //@ts-ignore
     this._keypair = keypair
     this._owner = owner
   }
@@ -103,7 +104,7 @@ export class AverClient {
   ) {
     let wallet: NodeWallet
     let keypair: Keypair
-    let pubkey: PublicKey = null
+    let pubkey: PublicKey | undefined = undefined
 
     if (owner instanceof Keypair) {
       // create a wallet with the keypair

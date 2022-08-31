@@ -463,6 +463,7 @@ export class Market {
     return marketStoresData.map((marketStoreData, i) =>
       marketStoreData
         ? parseWithVersion(
+            //@ts-ignore
             programs[i],
             AccountType.MARKET_STORE,
             marketStoreData
@@ -773,6 +774,7 @@ export class Market {
     decimals: number[]
   ): Promise<Orderbook[]> {
     const allBidsAndAsksAccounts = orderbookAccounts
+      //@ts-ignore
       .map((o) => [o.bids, o.asks])
       .flat()
     const allSlabs = await Orderbook.loadMultipleSlabs(
@@ -783,6 +785,7 @@ export class Market {
     return orderbookAccounts.map(
       (o, i) =>
         new Orderbook(
+          //@ts-ignore
           o?.orderbook,
           allSlabs[i * 2],
           allSlabs[i * 2 + 1],
@@ -844,12 +847,14 @@ export class Market {
       }
       if (numberOfOutcomes === 2 && allOrderbooks.length >= 1) {
         //We check for this error above
+        //@ts-ignore
         orderbooks.push(allOrderbooks.shift())
       } else if (
         numberOfOutcomes !== 2 &&
         allOrderbooks.length >= numberOfOutcomes
       ) {
         Array.from({ length: numberOfOutcomes }).map(() => {
+          //@ts-ignore
           orderbooks.push(allOrderbooks.shift())
         })
       } else {
@@ -889,10 +894,11 @@ export class Market {
   }
 
   async updateMarketState(
-    feePayer: Keypair = this._averClient.keypair,
+    feePayer: Keypair | undefined = this._averClient.keypair,
     sendOptions?: SendOptions,
     manualMaxRetry?: number
   ) {
+    if (!feePayer) throw new Error("No fee payer given")
     const ix = await this.makeUpdateMarketStateInstruction(feePayer.publicKey)
 
     return signAndSendTransactionInstructions(
