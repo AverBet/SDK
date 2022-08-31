@@ -38,8 +38,12 @@ import {
 } from "./types"
 import { UserHostLifetime } from "./user-host-lifetime"
 import { UserMarket } from "./user-market"
-import { chunkAndFetchMultiple, getVersionOfAccountTypeInProgram, parseWithVersion, signAndSendTransactionInstructions } from "./utils"
-import { Program } from "@project-serum/anchor"
+import {
+  chunkAndFetchMultiple,
+  getVersionOfAccountTypeInProgram,
+  parseWithVersion,
+  signAndSendTransactionInstructions,
+} from "./utils"
 
 export class Market {
   /**
@@ -131,47 +135,6 @@ export class Market {
    */
   static async load(averClient: AverClient, pubkey: PublicKey) {
     return (await Market.loadMultiple(averClient, [pubkey]))[0]
-    // // get programId of market
-    // const programId = (await averClient.connection.getAccountInfo(pubkey)).owner
-    // const program = await averClient.getProgramFromProgramId(programId)
-    // const [marketStorePubkey, marketStoreBump] =
-    //   await Market.deriveMarketStorePubkeyAndBump(pubkey)
-
-    // const marketResultAndMarketStoreResult = await Promise.all([
-    //   program.account["market"].fetch(pubkey.toBase58()),
-    //   program.account["marketStore"].fetchNullable(
-    //     marketStorePubkey.toBase58()
-    //   ),
-    // ])
-    // const marketState = Market.parseMarketState(
-    //   marketResultAndMarketStoreResult[0]
-    // )
-
-    // // market store and orderbooks do not exist for closed markets
-    // const marketStoreResult = marketResultAndMarketStoreResult[1]
-
-    // if (!marketStoreResult) {
-    //   return new Market(averClient, pubkey, marketState, programId)
-    // }
-
-    // const marketStoreState = Market.parseMarketStoreState(marketStoreResult)
-
-    // const orderbooks = await Market.getOrderbooksFromOrderbookAccounts(
-    //   program.provider.connection,
-    //   marketStoreState.orderbookAccounts,
-    //   Array.from({ length: marketState.numberOfOutcomes }).map(
-    //     () => marketState.decimals
-    //   )
-    // )
-
-    // return new Market(
-    //   averClient,
-    //   pubkey,
-    //   marketState,
-    //   programId,
-    //   marketStoreState,
-    //   orderbooks
-    // )
   }
 
   /**
@@ -191,8 +154,12 @@ export class Market {
     pubkeys: PublicKey[]
   ): Promise<(Market | null)[]> {
     // get programId of market
-    const programIds = (await averClient.connection.getMultipleAccountsInfo(pubkeys)).map((m: any) => m.owner)
-    const programs = await Promise.all(programIds.map(p => averClient.getProgramFromProgramId(p)))
+    const programIds = (
+      await averClient.connection.getMultipleAccountsInfo(pubkeys)
+    ).map((m: any) => m.owner)
+    const programs = await Promise.all(
+      programIds.map((p) => averClient.getProgramFromProgramId(p))
+    )
 
     const marketStorePubkeys = (
       await Market.deriveMarketStorePubkeysAndBump(pubkeys, programIds)
@@ -214,9 +181,7 @@ export class Market {
     const marketStoreStateResults = marketResultsAndMarketStoreResults
       .slice(pubkeys.length, marketResultsAndMarketStoreResults.length)
       .map((v, i) =>
-        v
-          ? parseWithVersion(programs[i], AccountType.MARKET_STORE, v)
-          : null
+        v ? parseWithVersion(programs[i], AccountType.MARKET_STORE, v) : null
       )
 
     const marketStates = marketStateResults.map((marketResult) =>
@@ -284,7 +249,7 @@ export class Market {
       multipleAccountStates.marketStates,
       multipleAccountStates.marketStoreStates,
       multipleAccountStates.slabs,
-      markets.map(m => m._programId)
+      markets.map((m) => m._programId)
     )
   }
 
@@ -432,14 +397,15 @@ export class Market {
 
     const userHostLifetimes = accountsData
       .slice(-userHostLifetimePubkeys.length)
-      .map(
-        (info, i) => !!info ? 
-          new UserHostLifetime(
-            averClient,
-            userHostLifetimePubkeys[i],
-            UserHostLifetime.parseHostState(info.data),
-            info.owner
-          ) : null
+      .map((info, i) =>
+        !!info
+          ? new UserHostLifetime(
+              averClient,
+              userHostLifetimePubkeys[i],
+              UserHostLifetime.parseHostState(info.data),
+              info.owner
+            )
+          : null
       )
 
     const userBalanceStates: UserBalanceState[] = lamportBalances.map(
@@ -470,7 +436,9 @@ export class Market {
     averClient: AverClient,
     marketsData: AccountInfo<Buffer | null>[]
   ): Promise<(MarketState | null)[]> {
-    const programs = await Promise.all(marketsData.map(m => averClient.getProgramFromProgramId(m.owner)))
+    const programs = await Promise.all(
+      marketsData.map((m) => averClient.getProgramFromProgramId(m.owner))
+    )
     return marketsData.map((marketData, i) =>
       parseWithVersion(programs[i], AccountType.MARKET, marketData)
     )
@@ -487,13 +455,19 @@ export class Market {
     averClient: AverClient,
     marketStoresData: AccountInfo<Buffer | null>[]
   ): Promise<(MarketStoreState | null)[]> {
-    const programs = await Promise.all(marketStoresData.map(m => m ? averClient.getProgramFromProgramId(m.owner) : null))
-    return marketStoresData.map((marketStoreData, i) => marketStoreData ?
-      parseWithVersion(
-        programs[i],
-        AccountType.MARKET_STORE,
-        marketStoreData
-      ) : null
+    const programs = await Promise.all(
+      marketStoresData.map((m) =>
+        m ? averClient.getProgramFromProgramId(m.owner) : null
+      )
+    )
+    return marketStoresData.map((marketStoreData, i) =>
+      marketStoreData
+        ? parseWithVersion(
+            programs[i],
+            AccountType.MARKET_STORE,
+            marketStoreData
+          )
+        : null
     )
   }
 
@@ -762,7 +736,9 @@ export class Market {
    * @returns
    */
   async loadMarketListener(callback: (marketState: MarketState) => void) {
-    const program = await this._averClient.getProgramFromProgramId(this._programId)
+    const program = await this._averClient.getProgramFromProgramId(
+      this._programId
+    )
     const ee = program.account["market"].subscribe(this.pubkey)
     ee.on("change", callback)
     return ee
@@ -775,10 +751,10 @@ export class Market {
    * @returns
    */
   async loadMarketStoreListener(callback: (marketState: MarketState) => void) {
-    const program = await this._averClient.getProgramFromProgramId(this._programId)
-    const ee = program.account["marketStore"].subscribe(
-      this.marketStore
+    const program = await this._averClient.getProgramFromProgramId(
+      this._programId
     )
+    const ee = program.account["marketStore"].subscribe(this.marketStore)
     ee.on("change", callback)
     return ee
   }
@@ -898,23 +874,25 @@ export class Market {
   }
 
   async makeUpdateMarketStateInstruction(feePayer: PublicKey) {
-    const program = await this._averClient.getProgramFromProgramId(this._programId)
-    return program.instruction['updateMarketState'](
-      {
-        accounts: {
-          payer: feePayer,
-          marketAuthority: this.marketAuthority,
-          market: this.pubkey,
-          marketStore: this.marketStore,
-          systemProgram: SystemProgram.programId
-        }
-      })
+    const program = await this._averClient.getProgramFromProgramId(
+      this._programId
+    )
+    return program.instruction["updateMarketState"]({
+      accounts: {
+        payer: feePayer,
+        marketAuthority: this.marketAuthority,
+        market: this.pubkey,
+        marketStore: this.marketStore,
+        systemProgram: SystemProgram.programId,
+      },
+    })
   }
 
   async updateMarketState(
     feePayer: Keypair = this._averClient.keypair,
     sendOptions?: SendOptions,
-    manualMaxRetry?: number) {
+    manualMaxRetry?: number
+  ) {
     const ix = await this.makeUpdateMarketStateInstruction(feePayer.publicKey)
 
     return signAndSendTransactionInstructions(
@@ -928,9 +906,14 @@ export class Market {
   }
 
   async checkIfMarketLatestVersion() {
-    const program = await this._averClient.getProgramFromProgramId(this._programId)
-    if (this._marketState.version < getVersionOfAccountTypeInProgram(AccountType.MARKET, program)) {
-      console.log("UMA needs to be upgraded")
+    const program = await this._averClient.getProgramFromProgramId(
+      this._programId
+    )
+    if (
+      this._marketState.version <
+      getVersionOfAccountTypeInProgram(AccountType.MARKET, program)
+    ) {
+      console.log("Market needs to be upgraded")
       return false
     }
     return true
@@ -959,16 +942,17 @@ export class Market {
     if (!max_iterations || max_iterations > MAX_ITERATIONS_FOR_CONSUME_EVENTS)
       max_iterations = MAX_ITERATIONS_FOR_CONSUME_EVENTS
 
-    const program = await this._averClient.getProgramFromProgramId(this._programId)
+    const program = await this._averClient.getProgramFromProgramId(
+      this._programId
+    )
 
     const sortedUserAccounts = user_accounts.sort((a, b) =>
       a.toString().localeCompare(b.toString())
     )
     //@ts-ignore
-    const userMarketAccounts: UserMarketState[] =
-      await program.account["userMarket"].fetchMultiple(
-        sortedUserAccounts
-      )
+    const userMarketAccounts: UserMarketState[] = await program.account[
+      "userMarket"
+    ].fetchMultiple(sortedUserAccounts)
     const userAtas = await Promise.all(
       userMarketAccounts.map((u) =>
         getAssociatedTokenAddress(this.quoteTokenMint, u.user)
@@ -985,20 +969,16 @@ export class Market {
 
     if (!this.orderbookAccounts) throw new Error("No orderbook accounts")
 
-    return await program.rpc["consumeEvents"](
-      max_iterations,
-      outcome_idx,
-      {
-        accounts: {
-          market: this.pubkey,
-          marketStore: this.marketStore,
-          orderbook: this.orderbookAccounts[outcome_idx].orderbook,
-          eventQueue: this.orderbookAccounts[outcome_idx].eventQueue,
-          rewardTarget: reward_target,
-        },
-        remainingAccounts: remainingAccountsUmas.concat(remainingAccountsAtas),
-      }
-    )
+    return await program.rpc["consumeEvents"](max_iterations, outcome_idx, {
+      accounts: {
+        market: this.pubkey,
+        marketStore: this.marketStore,
+        orderbook: this.orderbookAccounts[outcome_idx].orderbook,
+        eventQueue: this.orderbookAccounts[outcome_idx].eventQueue,
+        rewardTarget: reward_target,
+      },
+      remainingAccounts: remainingAccountsUmas.concat(remainingAccountsAtas),
+    })
   }
 
   /**

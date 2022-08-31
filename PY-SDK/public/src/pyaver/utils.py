@@ -323,7 +323,6 @@ async def load_multiple_account_states(
                     continue
                 deserialized_uma_data.append(parse_user_market_state(buffer['data'], aver_client, programs[index]))
         
-
         uhl_states = []
         for index, pubkey in enumerate(uhl_pubkeys):
             buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]

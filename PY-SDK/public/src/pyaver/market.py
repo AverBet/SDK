@@ -10,7 +10,7 @@ from spl.token.instructions import get_associated_token_address
 from solana.keypair import Keypair
 from .enums import AccountTypes, Fill, MarketStatus
 from .constants import AVER_MARKET_AUTHORITY, AVER_PROGRAM_IDS
-from .utils import fetch_multiple_with_version, fetch_with_version, get_version_of_account_type_in_program, load_multiple_bytes_data, parse_bytes_data, parse_with_version, sign_and_send_transaction_instructions, parse_market_store, parse_market_state
+from .utils import get_version_of_account_type_in_program, load_multiple_bytes_data, parse_bytes_data, parse_with_version, sign_and_send_transaction_instructions, parse_market_store, parse_market_state
 from .data_classes import MarketState, MarketStoreState, OrderbookAccountsState
 from .orderbook import Orderbook
 from .slab import Slab
@@ -93,23 +93,6 @@ class AverMarket():
         """
         return (await AverMarket.load_multiple(aver_client, [market_pubkey]))[0]
 
-        # market_state_and_program_id= await AverMarket.load_market_state_and_program_id(aver_client, market_pubkey)
-        # market_state: MarketState = market_state_and_program_id['state']
-        # program_id: PublicKey = market_state_and_program_id['program_id']
-        # market_store_state = None
-        # orderbooks = None
-        # is_market_status_closed = AverMarket.is_market_status_closed(market_state.market_status)
-        # market_store_state: MarketStoreState = await AverMarket.load_market_store_state(aver_client, is_market_status_closed, market_state.market_store)
-
-        # if(not is_market_status_closed):
-        #     orderbooks = await AverMarket.get_orderbooks_from_orderbook_accounts(
-        #         aver_client.provider.connection,
-        #         market_store_state.orderbook_accounts,
-        #         [market_state.decimals] * len(market_store_state.orderbook_accounts)
-        #     )
-
-        # return AverMarket(aver_client, market_pubkey, market_state, program_id, market_store_state, orderbooks)
-
     @staticmethod
     async def load_multiple(aver_client: AverClient, market_pubkeys: list[PublicKey]):
         """
@@ -170,10 +153,7 @@ class AverMarket():
         Returns:
             MarketState: MarketState object
         """
-        response = await aver_client.connection.get_account_info(market_pubkey)
-        program = await aver_client.get_program_from_program_id(PublicKey(response['result']['value']['owner']))
-        state =  parse_with_version(program, AccountTypes.MARKET, parse_bytes_data(response))
-        return {'state': state, 'program_id': program.program_id}
+        return (await AverMarket.load_multiple_market_states_and_program_ids(aver_client, [market_pubkey]))[0]
 
  
     @staticmethod
@@ -198,20 +178,20 @@ class AverMarket():
         return market_states_and_program_ids
         
     
-    @staticmethod
-    async def load_market_state_and_store(aver_client: AverClient, market_pubkey: PublicKey):
-        """
-        @DEPRECATED
-        Loads onchain data for multiple MarketStates and MarketStoreStates at once
+    # @staticmethod
+    # async def load_market_state_and_store(aver_client: AverClient, market_pubkey: PublicKey):
+    #     """
+    #     @DEPRECATED
+    #     Loads onchain data for multiple MarketStates and MarketStoreStates at once
 
-        Args:
-            aver_client (AverClient): AverClient object
-            market_pubkey (PublicKey]: Market public key
+    #     Args:
+    #         aver_client (AverClient): AverClient object
+    #         market_pubkey (PublicKey]: Market public key
 
-        Returns:
-            dict[str, list[MarketState] or list[MarketStoreState]]: Keys are market_states or market_stores
-        """
-        return await AverMarket.load_multiple_market_states_and_stores(aver_client, [market_pubkey])
+    #     Returns:
+    #         dict[str, list[MarketState] or list[MarketStoreState]]: Keys are market_states or market_stores
+    #     """
+    #     return await AverMarket.load_multiple_market_states_and_stores(aver_client, [market_pubkey])
 
     
     # @staticmethod
@@ -333,13 +313,7 @@ class AverMarket():
         Returns:
             MarketStoreState: MarketStoreStateobject
         """
-        #Closed markets do not have orderbooks
-        if(is_market_status_closed):
-            return None
-        response = await aver_client.connection.get_account_info(market_store_pubkey)
-        program = await aver_client.get_program_from_program_id(PublicKey(response['result']['value']['owner']))
-        state = parse_with_version(program, AccountTypes.MARKET_STORE, parse_bytes_data(response))
-        return state
+        return (await AverMarket.load_multiple_market_store_states(aver_client, [market_store_pubkey]))[0]
         
 
 
