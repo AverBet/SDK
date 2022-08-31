@@ -151,6 +151,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
       assert MarketStatus.ACTIVE_PRE_EVENT == market.market_state.market_status
       assert self.init_market_args.max_quote_tokens_in == market.market_state.max_quote_tokens_in
       assert self.init_market_args.permissioned_market_flag == market.market_state.permissioned_market_flag
+      assert self.init_market_args.market_name == market.market_state.market_name
       print('-'*10)
 
   async def create_uma_test(self):

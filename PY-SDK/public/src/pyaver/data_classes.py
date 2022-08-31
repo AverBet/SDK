@@ -43,6 +43,7 @@ class MarketState():
     event: int
     rounding_format: int
     vault_authority: PublicKey
+    market_name: string
     in_play_queue: PublicKey
     in_play_start_time: int = None
    
