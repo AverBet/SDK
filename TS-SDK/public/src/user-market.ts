@@ -1334,6 +1334,7 @@ export class UserMarket {
       newSize,
       {
         accounts: {
+          payer: this.user,
           user: this.user,
           userMarket: this.pubkey,
           systemProgram: SystemProgram.programId,
@@ -1377,12 +1378,12 @@ export class UserMarket {
     )
   }
 
-  async makeUpdateUserMarketStateInstruction() {
+  async makeUpdateUserMarketStateInstruction(payer: PublicKey = this.user) {
     const program = await this._averClient.getProgramFromProgramId(this.market.programId)
     return program.instruction["updateUserMarketState"](
       {
         accounts: {
-          user: this.user,
+          user: payer,
           userMarket: this.pubkey,
           systemProgram: SystemProgram.programId,
         },
@@ -1390,12 +1391,12 @@ export class UserMarket {
     )
   }
 
-  async updateMarketState(
+  async updateUserMarketState(
     payer: Keypair = this._averClient.keypair,
     sendOptions?: SendOptions,
     manualMaxRetry?: number
   ) {
-    const ix = await this.makeUpdateUserMarketStateInstruction()
+    const ix = await this.makeUpdateUserMarketStateInstruction(payer.publicKey)
 
     return signAndSendTransactionInstructions(
       this._averClient,
@@ -1518,7 +1519,7 @@ export class UserMarket {
     }
     const isUmaLatestVersion = await this.checkIfUmaLatestVersion()
     if (!isUmaLatestVersion) {
-      ix = await this.makeUpdateUserMarketStateInstruction()
+      ix = await this.makeUpdateUserMarketStateInstruction(payer)
       ixs.push(ix)
     }
 
