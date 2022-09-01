@@ -1,6 +1,11 @@
 import { PublicKey, Keypair, Connection } from "@solana/web3.js"
 import { base58_to_binary } from "base58-js"
-import { MarketStatus, SolanaNetwork } from "../../public/src/types"
+import {
+  MarketStatus,
+  Side,
+  SizeFormat,
+  SolanaNetwork,
+} from "../../public/src/types"
 import { getQuoteToken, getSolanaEndpoint } from "../../public/src/ids"
 import { AverClient } from "../../public/src/aver-client"
 import { Market } from "../../public/src/market"
@@ -59,6 +64,8 @@ describe("run all tests", () => {
     )
   )
 
+  const umas: UserMarket[] = []
+
   // values that will be set by the tests
   let client: AverClient
   let marketPubkey: PublicKey
@@ -104,10 +111,12 @@ describe("run all tests", () => {
 
   function checkMarketIsAsExpected(market: Market) {
     console.log("TESTING MARKET CREATED AND LOADED CORRECTLY")
-    expect(args.crankerReward).toBe(market.crankerReward)
+    expect(args.crankerReward.toString()).toBe(market.crankerReward.toString())
     expect(args.goingInPlayFlag).toBe(market.goingInPlayFlag)
     expect(market.marketStatus).toBe(MarketStatus.ActivePreEvent)
-    expect(args.maxQuoteTokensIn).toBe(market.maxQuoteTokensIn)
+    expect(args.maxQuoteTokensIn.toString()).toBe(
+      market.maxQuoteTokensIn.toString()
+    )
     expect(args.permissionedMarketFlag).toBe(market.permissionedMarketFlag)
   }
 
@@ -118,19 +127,57 @@ describe("run all tests", () => {
     console.log("-".repeat(10))
   })
 
-  //   test("get or create UMA", async () => {
-  //     userMarket = await UserMarket.getOrCreateUserMarketAccount(
-  //       client,
-  //       owner,
-  //       market
-  //     )
-  //   })
+  test("get or create UMA", async () => {
+    userMarket = await UserMarket.getOrCreateUserMarketAccount(
+      client,
+      owner,
+      market
+    )
+    umas.push(userMarket)
+  })
 
-  //   test("place order", async () => {
-  //     await userMarket.placeOrder(owner, 0, Side.Bid, 0.6, 5, SizeFormat.Stake)
-  //   })
+  test("place and cancel orders", async () => {
+    const uma = umas[0]
+    expect(uma.orders.length).toBe(0)
+    await placeOrder(uma)
+    expect(uma.orders.length).toBe(1)
+    await cancelOrder(uma)
+    expect(uma.orders.length).toBe(0)
+    await placeOrder(uma)
+    await placeOrder(uma)
+    expect(uma.orders.length).toBe(2)
+    await cancelAllOrders(uma)
+    expect(uma.orders.length).toBe(0)
+  })
 
-  //   test("cancel all orders", async () => {
-  //     await userMarket.cancelAllOrders(owner, [0])
-  //   })
+  async function placeOrder(uma: UserMarket) {
+    const sig = await uma.placeOrder(
+      owner,
+      0,
+      Side.Bid,
+      0.6,
+      5,
+      SizeFormat.Stake
+    )
+    await client.connection.confirmTransaction(sig, "confirmed")
+    await uma.refresh()
+  }
+
+  async function cancelOrder(uma: UserMarket) {
+    const sig = await uma.cancelOrder(
+      owner,
+      uma.orders[0].orderId,
+      uma.orders[0].outcomeId
+    )
+    await client.connection.confirmTransaction(sig, "confirmed")
+    await uma.refresh()
+  }
+
+  async function cancelAllOrders(uma: UserMarket) {
+    const sigs = await uma.cancelAllOrders(owner, [0])
+    await Promise.all(
+      sigs.map((sig) => client.connection.confirmTransaction(sig, "confirmed"))
+    )
+    await uma.refresh()
+  }
 })
