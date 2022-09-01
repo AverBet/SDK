@@ -53,6 +53,7 @@ export const signAndSendTransactionInstructions = async (
     try {
       return await client.connection.sendTransaction(tx, signers, sendOptions)
     } catch (e) {
+      console.log(e)
       errorThrown = parseError(e, client.programs[0])
 
       // if its a program error, throw it

@@ -6,8 +6,7 @@ import {
 } from "@solana/web3.js"
 import { Market } from "../../public/src/market"
 import { AverClient } from "../../public/src/aver-client"
-import { AVER_PROGRAM_IDS, USDC_DEVNET } from "../../public/src/ids"
-import { BN } from "@project-serum/anchor"
+import { BN, Program } from "@project-serum/anchor"
 import { signAndSendTransactionInstructions } from "../../public/src/utils"
 import { Orderbook } from "../../public/src/orderbook"
 
@@ -15,43 +14,58 @@ export async function createMarket(
   numberOfOutcomes: number,
   client: AverClient,
   owner: Keypair,
-  args: InitMarketArgs
+  args: InitMarketArgs,
+  programId: PublicKey
 ) {
   console.log("Begin market creation")
   const market = new Keypair()
   const marketAuthority = owner
 
   const [marketStorePubkey, marketStoreBump] =
-    await Market.deriveMarketStorePubkeyAndBump(market.publicKey)
+    await Market.deriveMarketStorePubkeyAndBump(market.publicKey, programId)
   const marketStore = marketStorePubkey
 
   const [vaultAuthority, vaultBump] = await PublicKey.findProgramAddress(
     [market.publicKey.toBuffer()],
-    AVER_PROGRAM_IDS[0]
+    programId
   )
   const vaultQuoteAccount = (
-    await client.getOrCreateTokenAta(owner, USDC_DEVNET, owner.publicKey)
+    await client.getOrCreateTokenAta(
+      owner,
+      client.quoteTokenMint,
+      vaultAuthority
+    )
   ).address
 
-  args.vaultBump = vaultBump
   args.numberOfOutcomes = numberOfOutcomes
-  args.marketStoreBump = marketStoreBump
+  args.vaultBump = vaultBump
+
+  const inPlayQueue = new Keypair()
 
   const accs = {
     payer: owner.publicKey,
     market: market.publicKey,
     marketAuthority: marketAuthority.publicKey,
     marketStore: marketStore,
-    quoteTokenMint: USDC_DEVNET,
+    quoteTokenMint: client.quoteTokenMint,
     vaultAuthority: vaultAuthority,
     quoteVault: vaultQuoteAccount,
     oracleFeed: SystemProgram.programId,
+    inPlayQueue: inPlayQueue.publicKey,
   }
-  const initMarketIx = makeInitMarketInstruction(client, args, accs)
+
+  console.log(accs)
+  console.log(args)
+
+  const program = await client.getProgramFromProgramId(programId)
+
+  console.log(program.programId.toBase58())
+
+  const initMarketIx = makeInitMarketInstruction(args, accs, program)
 
   const sig = await signAndSendTransactionInstructions(
     client,
-    [market, marketAuthority],
+    [market, marketAuthority, inPlayQueue],
     owner,
     [initMarketIx]
   )
@@ -83,9 +97,9 @@ export async function createMarket(
       payer: owner.publicKey,
     }
     const initSupplementMarketIx = await makeSupplementInitMarketInstruction(
-      client,
       args,
-      accs
+      accs,
+      program
     )
 
     supplementIxs.push(initSupplementMarketIx)
@@ -115,11 +129,10 @@ export async function createMarket(
 export type InitMarketArgs = {
   numberOfOutcomes: number
   numberOfWinners: number
-  vaultBump: number
-  marketStoreBump: number
   permissionedMarketFlag: boolean
   minOrderbookBaseSize: BN
   minNewOrderBaseSize: BN
+  vaultBump: number
   minNewOrderQuoteSize: BN
   maxQuoteTokensIn: BN
   maxQuoteTokensInPermissionCapped: BN
@@ -129,7 +142,14 @@ export type InitMarketArgs = {
   goingInPlayFlag: boolean
   activeImmediately: boolean
   tradingCeaseTime: BN
-  inplayStartTime: BN | null
+  inPlayStartTime: BN | null
+  roundingFormat: number
+  category: number
+  subCategory: number
+  series: number
+  event: number
+  maxInPlayCrankOrders: number | null
+  inPlayDelaySeconds: number | null
 }
 
 export type InitMarketAccounts = {
@@ -141,14 +161,15 @@ export type InitMarketAccounts = {
   vaultAuthority: PublicKey
   quoteVault: PublicKey
   oracleFeed: PublicKey
+  inPlayQueue: PublicKey
 }
 
 export const makeInitMarketInstruction = (
-  averClient: AverClient,
   args: InitMarketArgs,
-  accs: InitMarketAccounts
+  accs: InitMarketAccounts,
+  program: Program
 ): TransactionInstruction =>
-  averClient.program.instruction["initMarket"](args, {
+  program.instruction["initMarket"](args, {
     accounts: Object.assign(
       {
         systemProgram: SystemProgram.programId,
@@ -172,24 +193,34 @@ export type SupplementInitMarketAccounts = {
 }
 
 export const makeSupplementInitMarketInstruction = async (
-  averClient: AverClient,
   args: SupplementInitMarketArgs,
-  accs: SupplementInitMarketAccounts
+  accs: SupplementInitMarketAccounts,
+  program: Program
 ) => {
   const [orderbook, orderbookBump] =
-    await Orderbook.deriveOrderbookPubkeyAndBump(accs.market, args.outcomeId)
+    await Orderbook.deriveOrderbookPubkeyAndBump(
+      accs.market,
+      args.outcomeId,
+      program.programId
+    )
 
   const [eventQueue, eventQueueBump] =
-    await Orderbook.deriveEventQueuePubkeyAndBump(accs.market, args.outcomeId)
+    await Orderbook.deriveEventQueuePubkeyAndBump(
+      accs.market,
+      args.outcomeId,
+      program.programId
+    )
 
   const [bids, bidsBump] = await Orderbook.deriveBidsPubkeyAndBump(
     accs.market,
-    args.outcomeId
+    args.outcomeId,
+    program.programId
   )
 
   const [asks, asksBump] = await Orderbook.deriveAsksPubkeyAndBump(
     accs.market,
-    args.outcomeId
+    args.outcomeId,
+    program.programId
   )
 
   const ixAccounts = Object.assign(
@@ -212,7 +243,7 @@ export const makeSupplementInitMarketInstruction = async (
     args
   )
 
-  return averClient.program.instruction["supplementInitMarket"](ixArgs, {
+  return program.instruction["supplementInitMarket"](ixArgs, {
     accounts: ixAccounts,
   })
 }

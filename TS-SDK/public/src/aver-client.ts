@@ -262,11 +262,12 @@ export class AverClient {
     mint: PublicKey = this.quoteTokenMint,
     owner: PublicKey = this.owner
   ) {
-    return getOrCreateAssociatedTokenAccount(
+    return await getOrCreateAssociatedTokenAccount(
       this._connection,
       payer,
       mint,
-      owner
+      owner,
+      true
     )
   }
 

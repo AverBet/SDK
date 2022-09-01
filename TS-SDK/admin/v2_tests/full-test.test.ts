@@ -14,14 +14,13 @@ const args: InitMarketArgs = {
   numberOfOutcomes: 0,
   numberOfWinners: 1,
   vaultBump: 0,
-  marketStoreBump: 0,
   permissionedMarketFlag: false,
-  minOrderbookBaseSize: new BN(1),
-  minNewOrderBaseSize: new BN(1),
-  minNewOrderQuoteSize: new BN(1),
+  minOrderbookBaseSize: new BN(1_000_000),
+  minNewOrderBaseSize: new BN(1_000_000),
+  minNewOrderQuoteSize: new BN(1_000_000),
   maxQuoteTokensIn: new BN(100000000000000),
   maxQuoteTokensInPermissionCapped: new BN(100000000000000),
-  crankerReward: new BN(0),
+  crankerReward: new BN(5000),
   feeTierCollectionBpsRates: [
     new BN(20),
     new BN(18),
@@ -32,20 +31,27 @@ const args: InitMarketArgs = {
     new BN(0),
   ],
   marketName: "Test market",
-  goingInPlayFlag: true,
+  goingInPlayFlag: false,
   activeImmediately: true,
   tradingCeaseTime: new BN(1682447605),
-  inplayStartTime: new BN(1682447605),
+  inPlayStartTime: null,
+  roundingFormat: 0,
+  series: 0,
+  category: 0,
+  subCategory: 0,
+  event: 0,
+  maxInPlayCrankOrders: null,
+  inPlayDelaySeconds: null,
 }
 
 describe("run all tests", () => {
   // constants we can adjust
   const firstProgramId = new PublicKey(
-    "DfMQPAuAeECP7iSCwTKjbpzyx6X1HZT6rz872iYWA8St"
+    "81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT"
   )
 
   const secondProgramId = new PublicKey(
-    "81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT"
+    "6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ"
   )
   const owner = Keypair.fromSecretKey(
     base58_to_binary(
@@ -91,7 +97,8 @@ describe("run all tests", () => {
   test("create aver market", async () => {
     console.log("-".repeat(10))
     console.log("CREATING AVER MARKET")
-    marketPubkey = (await createMarket(2, client, owner, args)).publicKey
+    marketPubkey = (await createMarket(2, client, owner, args, firstProgramId))
+      .publicKey
     console.log("-".repeat(10))
   })
 
