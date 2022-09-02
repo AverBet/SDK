@@ -1,3 +1,4 @@
+import { Program } from "@project-serum/anchor"
 import { Idl, IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl"
 import {
   IdlTypes,
@@ -5,6 +6,7 @@ import {
 } from "@project-serum/anchor/dist/cjs/program/namespace/types"
 import { getOrCreateAssociatedTokenAccount } from "@solana/spl-token"
 import {
+  AccountInfo,
   AccountMeta,
   Keypair,
   PublicKey,
@@ -86,21 +88,7 @@ export class UserHostLifetime {
    * @returns {Promise<UserHostLifetime>} UserHostLifetime object
    */
   static async load(averClient: AverClient, pubkey: PublicKey) {
-    // TODO get program correctly
-    const program = averClient.programs[0]
-    const userHostLifetimeResult = await program.account[
-      "userHostLifetime"
-    ].fetch(pubkey.toBase58())
-    const userHostLifetimeState = UserHostLifetime.parseHostState(
-      userHostLifetimeResult
-    )
-
-    return new UserHostLifetime(
-      averClient,
-      pubkey,
-      userHostLifetimeState,
-      program.programId
-    )
+    return (await UserHostLifetime.loadMultiple(averClient, [pubkey]))[0]
   }
 
   /**
@@ -118,18 +106,41 @@ export class UserHostLifetime {
    */
   static async loadMultiple(averClient: AverClient, pubkeys: PublicKey[]) {
     const program = averClient.programs[0]
-    const userHostLifetimeResult = await program.account[
-      "userHostLifetime"
-    ].fetchMultiple(pubkeys.map((p) => p.toBase58()))
+    const uhld = await averClient.connection.getMultipleAccountsInfo(pubkeys)
 
-    const userHostLifetimeStates = userHostLifetimeResult.map((r) =>
-      r ? UserHostLifetime.parseHostState(r) : null
-    )
+    const userHostLifetimeStates =
+      UserHostLifetime.deserializeMultipleUserHostLifetimesData(
+        averClient,
+        uhld
+      ).map((r) => (r ? UserHostLifetime.parseHostState(r) : null))
 
     return userHostLifetimeStates.map((s, i) => {
       if (!s) return undefined
       return new UserHostLifetime(averClient, pubkeys[i], s, program.programId)
     })
+  }
+
+  /**
+   * Parses onchain data for multiple UserMarketState objects
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {AccountInfo<Buffer | null>[]} userMarketStoresData - Raw bytes coming from onchain
+   *
+   * @returns {(UserMarketState | null)[]} - UserMarketState objects
+   */
+  static deserializeMultipleUserHostLifetimesData(
+    averClient: AverClient,
+    userHostLifetimeStateData: (AccountInfo<Buffer> | null)[]
+  ): (UserHostLifetimeState | null)[] {
+    return userHostLifetimeStateData.map((uhld) =>
+      uhld
+        ? parseWithVersion(
+            averClient.programs[0], // TODO find correct program
+            AccountType.USER_HOST_LIFETIME,
+            uhld
+          )
+        : null
+    )
   }
 
   /**

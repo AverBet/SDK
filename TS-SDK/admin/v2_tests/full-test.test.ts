@@ -118,6 +118,13 @@ describe("run all tests", () => {
       market.maxQuoteTokensIn.toString()
     )
     expect(args.permissionedMarketFlag).toBe(market.permissionedMarketFlag)
+    expect(args.marketName).toBe(market.name)
+    args.feeTierCollectionBpsRates.map((value, i) => {
+      expect(value.toString()).toBe(
+        market.feeTierCollectionBpsRates[i].toString()
+      )
+    })
+    expect(args.numberOfOutcomes).toBe(market.orderbooks?.length)
   }
 
   test("successfully load and test aver market", async () => {
@@ -136,16 +143,25 @@ describe("run all tests", () => {
     umas.push(userMarket)
   })
 
-  test("place and cancel orders", async () => {
+  test("place and cancel orders (binary market)", async () => {
     const uma = umas[0]
     expect(uma.orders.length).toBe(0)
+
     await placeOrder(uma)
     expect(uma.orders.length).toBe(1)
+    expect(uma.market.orderbooks?.length).toBe(2)
+    //@ts-ignore
+    let bids = uma.market.orderbooks[0].getBidsL2(10, true)
+    expect(bids[0].price - 0.6).toBeLessThan(0.000001)
+    expect(bids[0].size - 5).toBeLessThan(0.000001)
+
     await cancelOrder(uma)
     expect(uma.orders.length).toBe(0)
+
     await placeOrder(uma)
     await placeOrder(uma)
     expect(uma.orders.length).toBe(2)
+
     await cancelAllOrders(uma)
     expect(uma.orders.length).toBe(0)
   })
@@ -157,7 +173,7 @@ describe("run all tests", () => {
       Side.Bid,
       0.6,
       5,
-      SizeFormat.Stake
+      SizeFormat.Payout
     )
     await client.connection.confirmTransaction(sig, "confirmed")
     await uma.refresh()

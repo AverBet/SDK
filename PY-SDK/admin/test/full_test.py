@@ -1,4 +1,5 @@
 from asyncio import gather
+import asyncio
 from datetime import datetime
 import math
 from dateutil.relativedelta import relativedelta
@@ -8,12 +9,13 @@ import base58
 from ...public.src.pyaver.aver_client import AverClient
 from ...public.src.pyaver.constants import *
 from ...public.src.pyaver.user_market import UserMarket
-from solana.rpc.commitment import Confirmed
+from solana.rpc.commitment import Confirmed, Finalized
 from ...public.src.pyaver.market import AverMarket
 from ...public.src.pyaver.enums import MarketStatus, Side, SizeFormat
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import *
 from solana.rpc import types
+from ...public.src.pyaver.refresh import refresh_user_market
 from solana.publickey import PublicKey
 from ..instructions.init_market import init_market_tx, InitMarketArgs, InitMarketAccounts
 from ..instructions.supplement_init_market import supplement_init_market_tx, SupplementInitMarketAccounts, SupplementInitMarketArgs
@@ -57,6 +59,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     connection = AsyncClient(solana_endpoint, Confirmed)
     opts = types.TxOpts(False, False, Confirmed)
     self.client = await AverClient.load(connection, owner, opts, network, [first_program_id])
+    self.user_markets: list[UserMarket] = []
 
     print(f"Successfully loaded client with owner: {self.client.owner.public_key}")
 
@@ -98,7 +101,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     )
     self.init_market_args = self.init_market_args._replace(number_of_outcomes=number_of_outcomes)
     sig = await init_market_tx(self.client, self.init_market_args, accs)
-    await self.client.connection.confirm_transaction(sig, Confirmed)
+    await self.client.connection.confirm_transaction(sig, Finalized)
     self.market = market
     print(f"Market created: {market.public_key}")
 
@@ -116,7 +119,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
         outcome_id=0,
         outcome_names=["one", "two"])
       sig = await supplement_init_market_tx(self.client, args, accs)
-      await self.client.connection.confirm_transaction(sig, Confirmed)
+      await self.client.connection.confirm_transaction(sig, Finalized)
       print(f"Successfully finished supplement init market")
     else:
         coroutines = []
@@ -129,7 +132,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
             coroutine = supplement_init_market_tx(self.client, args, accs)
             coroutines.append(coroutine)
         sigs = await gather(*coroutines)
-        await gather(*[self.client.connection.confirm_transaction(sig, "Confirmed") for sig in sigs])
+        await gather(*[self.client.connection.confirm_transaction(sig, Finalized) for sig in sigs])
         print(f"Successfully finished supplement init market")
     print('-'*10)
 
@@ -150,26 +153,39 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
       assert self.init_market_args.going_in_play_flag == market.market_state.going_in_play_flag
       assert MarketStatus.ACTIVE_PRE_EVENT == market.market_state.market_status
       assert self.init_market_args.max_quote_tokens_in == market.market_state.max_quote_tokens_in
+      assert self.init_market_args.max_quote_tokens_in_permission_capped == market.market_state.max_quote_tokens_in_permission_capped
       assert self.init_market_args.permissioned_market_flag == market.market_state.permissioned_market_flag
       assert self.init_market_args.market_name == market.market_state.market_name
+      assert self.init_market_args.trading_cease_time == market.market_state.trading_cease_time
+      for i, fee_tier in enumerate(self.init_market_args.fee_tier_collection_bps_rates):
+          assert fee_tier == market.market_state.fee_tier_collection_bps_rates[i] 
       print('-'*10)
 
-  async def create_uma_test(self):
-    uma = await UserMarket.get_or_create_user_market_account(self.client, self.aver_market, self.client.owner)
-    self.user_market = uma
+  async def create_uma_test(self, owner):
+    print('-'*10)
+    print('CREATING UMA')
+    uma = await UserMarket.get_or_create_user_market_account(self.client, self.aver_market, owner)
+    self.user_markets.append(uma)
     print(f"Successfully loaded UMA {uma.pubkey}")
+    print('-'*10)
 
-  async def place_order_test(self):
-    sig = await self.user_market.place_order(self.client.owner, 0, Side.BUY, 0.5, 5, SizeFormat.STAKE)
+  async def place_order_test(self, uma: UserMarket):
+    sig = await uma.place_order(self.client.owner, 0, Side.BUY, 0.6, 5, SizeFormat.PAYOUT)
+    await self.client.connection.confirm_transaction(sig['result'], Finalized)
+    uma = await refresh_user_market(self.client, uma)
     print(f"Successfully placed order {sig}")
 
-  async def cancel_all_orders_test(self):
-    sig = await self.user_market.cancel_all_orders([0])
-    print(f"Successfully cancelled all orders {sig}")
+  async def cancel_all_orders_test(self, uma: UserMarket):
+    sigs = await uma.cancel_all_orders([0])
+    await gather(*[self.client.connection.confirm_transaction(sig['result'], Finalized) for sig in sigs])
+    uma = await refresh_user_market(self.client, uma)
+    print(f"Successfully cancelled all orders")
 
-  async def cancel_specific_order(self, order_id = None):
-    order_id = order_id if order_id else self.user_market.user_market_state.orders[0].order_id
-    sig = await self.user_market.cancel_order(order_id, 0)
+  async def cancel_specific_order(self, uma: UserMarket, order_id = None):
+    order_id = order_id if order_id else uma.user_market_state.orders[0].order_id
+    sig = await uma.cancel_order(order_id, 0)
+    await self.client.connection.confirm_transaction(sig['result'], Finalized)
+    uma = await refresh_user_market(self.client, uma)
     print(f"Successfully cancelled the order: {sig}")
 
 
@@ -182,12 +198,21 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     await self.create_market(2)
     await self.load_market_test(self.market.public_key)
     self.check_market_is_as_expected(self.aver_market)
-    
+  
     # UMA tests
-    # await self.create_uma_test()
-    # await self.place_order_test()
-    # # await self.cancel_all_orders_test()
-    # await self.cancel_specific_order()
+    await self.create_uma_test(self.client.owner)
+    uma = self.user_markets[0]
+    assert len(uma.user_market_state.orders) == 0
+    await self.place_order_test(uma)
+    assert len(uma.user_market_state.orders) == 1
+    await self.cancel_specific_order(uma)
+    assert len(uma.user_market_state.orders) == 0
+    await self.place_order_test(uma)
+    await self.place_order_test(uma)
+    assert len(uma.user_market_state.orders) == 2
+    await self.cancel_all_orders_test(uma)
+    assert len(uma.user_market_state.orders) == 0
+
 
 
 # Executing the tests in the above test case class

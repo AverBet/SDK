@@ -280,8 +280,8 @@ export class UserMarket {
     uhls: PublicKey[]
   ) {
     // TODO each market might have a different program
-    const program = await averClient.getProgramFromProgramId(
-      AVER_PROGRAM_IDS[0]
+    const programs = await Promise.all(
+      markets.map((m) => averClient.getProgramFromProgramId(m.programId))
     )
 
     const userMarketResult =
@@ -292,7 +292,6 @@ export class UserMarket {
       userMarketResult
     )
 
-    // TODO parse with version for UHL as well
     const uhlAccounts = await UserHostLifetime.loadMultiple(averClient, uhls)
 
     const userPubkeys = userMarketStates.map(
@@ -886,56 +885,56 @@ export class UserMarket {
     )
   }
 
-  //Why are there 2? - TODO make this better
-  /**
-   *
-   * @param outcomeIndex
-   * @param side
-   * @param limitPrice
-   * @param size
-   * @param sizeFormat
-   * @param market
-   * @param user
-   * @param averClient
-   * @param userHostLifetime
-   * @param umaPubkey
-   * @param orderType
-   * @param selfTradeBehavior
-   * @returns
-   */
-  static async makePlaceOrderInstruction(
-    outcomeIndex: number,
-    side: Side,
-    limitPrice: number,
-    size: number,
-    sizeFormat: SizeFormat,
-    market: Market,
-    user: PublicKey,
-    averClient: AverClient,
-    umaPubkey: PublicKey,
-    userHostLifetime: PublicKey,
-    orderType: OrderType = OrderType.Limit,
-    selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide
-  ) {
-    const dummyUma = new UserMarket(
-      averClient,
-      umaPubkey,
-      { user: user, userHostLifetime: userHostLifetime },
-      market,
-      null,
-      { pubkey: userHostLifetime }
-    )
-    return dummyUma.makePlaceOrderInstruction(
-      outcomeIndex,
-      side,
-      limitPrice,
-      size,
-      sizeFormat,
-      orderType,
-      selfTradeBehavior,
-      false
-    )
-  }
+  // //Why are there 2? - TODO make this better
+  // /**
+  //  *
+  //  * @param outcomeIndex
+  //  * @param side
+  //  * @param limitPrice
+  //  * @param size
+  //  * @param sizeFormat
+  //  * @param market
+  //  * @param user
+  //  * @param averClient
+  //  * @param userHostLifetime
+  //  * @param umaPubkey
+  //  * @param orderType
+  //  * @param selfTradeBehavior
+  //  * @returns
+  //  */
+  // static async makePlaceOrderInstruction(
+  //   outcomeIndex: number,
+  //   side: Side,
+  //   limitPrice: number,
+  //   size: number,
+  //   sizeFormat: SizeFormat,
+  //   market: Market,
+  //   user: PublicKey,
+  //   averClient: AverClient,
+  //   umaPubkey: PublicKey,
+  //   userHostLifetime: PublicKey,
+  //   orderType: OrderType = OrderType.Limit,
+  //   selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide
+  // ) {
+  //   const dummyUma = new UserMarket(
+  //     averClient,
+  //     umaPubkey,
+  //     { user: user, userHostLifetime: userHostLifetime },
+  //     market,
+  //     null,
+  //     { pubkey: userHostLifetime }
+  //   )
+  //   return dummyUma.makePlaceOrderInstruction(
+  //     outcomeIndex,
+  //     side,
+  //     limitPrice,
+  //     size,
+  //     sizeFormat,
+  //     orderType,
+  //     selfTradeBehavior,
+  //     false
+  //   )
+  // }
 
   /**
    * Places a new order
