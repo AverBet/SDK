@@ -6,6 +6,7 @@ from dateutil.relativedelta import relativedelta
 import unittest
 from solana.keypair import Keypair
 import base58
+from ...public.src.pyaver.data_classes import UserHostLifetimeState, UserMarketState
 from ...public.src.pyaver.aver_client import AverClient
 from ...public.src.pyaver.constants import *
 from ...public.src.pyaver.user_market import UserMarket
@@ -13,6 +14,7 @@ from solana.rpc.commitment import Confirmed, Finalized
 from ...public.src.pyaver.market import AverMarket
 from ...public.src.pyaver.enums import MarketStatus, Side, SizeFormat
 from solana.rpc.async_api import AsyncClient
+from ..instructions.init_uhl import derive_pubkey_and_bump, create_host_account
 from solana.rpc.commitment import *
 from solana.rpc import types
 from ...public.src.pyaver.refresh import refresh_user_market
@@ -49,17 +51,19 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     #### CLIENT TESTS ####
   async def asyncSetUp(self) -> None:
     # constants we can adjust
-    first_program_id = PublicKey('81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT')
+    self.first_program_id = PublicKey('DfMQPAuAeECP7iSCwTKjbpzyx6X1HZT6rz872iYWA8St')
     self.second_program_id = PublicKey('6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ')
     owner = Keypair.from_secret_key(base58.b58decode('2S1DDiUZuqFNPHx2uzX9pphxynV1CgpLXnT9QrwPoWwXaGrqAP88XNEh9NK7JbFByJFDsER7PQgsNyacJyCGsH8S'))
+    self.owner_2 = Keypair.from_secret_key(base58.b58decode('3onYh3TSCg92X3kD9gD7RCZF1N8JFVSDp39eSkRswsQb5YwWuyMnzuCN2wuPb52XEnPzjVrCtkYe5Xo8Czd3CDyV'))
 
     # setup the client
     network = SolanaNetwork.DEVNET
     solana_endpoint = get_solana_endpoint(network)
-    connection = AsyncClient(solana_endpoint, Confirmed)
-    opts = types.TxOpts(False, False, Confirmed)
-    self.client = await AverClient.load(connection, owner, opts, network, [first_program_id])
+    connection = AsyncClient(solana_endpoint, Finalized)
+    opts = types.TxOpts(False, False, Finalized)
+    self.client = await AverClient.load(connection, owner, opts, network, [self.first_program_id])
     self.user_markets: list[UserMarket] = []
+    self.host = derive_pubkey_and_bump(owner.public_key, self.first_program_id)[0]
 
     print(f"Successfully loaded client with owner: {self.client.owner.public_key}")
 
@@ -72,7 +76,6 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     second_program = await self.client.get_program_from_program_id(self.second_program_id)
     self.assertEqual(self.second_program_id, second_program.program_id)
     print("Successfully got program from program id")
-
 
   async def test_aver_client(self):
       client = self.client
@@ -101,7 +104,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     )
     self.init_market_args = self.init_market_args._replace(number_of_outcomes=number_of_outcomes)
     sig = await init_market_tx(self.client, self.init_market_args, accs)
-    await self.client.connection.confirm_transaction(sig, Finalized)
+    #await self.client.connection.confirm_transaction(sig, Finalized)
     self.market = market
     print(f"Market created: {market.public_key}")
 
@@ -119,7 +122,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
         outcome_id=0,
         outcome_names=["one", "two"])
       sig = await supplement_init_market_tx(self.client, args, accs)
-      await self.client.connection.confirm_transaction(sig, Finalized)
+      #await self.client.connection.confirm_transaction(sig, Finalized)
       print(f"Successfully finished supplement init market")
     else:
         coroutines = []
@@ -132,7 +135,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
             coroutine = supplement_init_market_tx(self.client, args, accs)
             coroutines.append(coroutine)
         sigs = await gather(*coroutines)
-        await gather(*[self.client.connection.confirm_transaction(sig, Finalized) for sig in sigs])
+        #await gather(*[self.client.connection.confirm_transaction(sig, Finalized) for sig in sigs])
         print(f"Successfully finished supplement init market")
     print('-'*10)
 
@@ -161,32 +164,47 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
           assert fee_tier == market.market_state.fee_tier_collection_bps_rates[i] 
       print('-'*10)
 
+  def check_uma_state(self, uma_state: UserMarketState):
+    assert uma_state.market.to_base58() == self.aver_market.market_pubkey.to_base58()
+    assert uma_state.user.to_base58() == self.client.owner.public_key.to_base58()
+
+  def check_uhl_state(self, uhl: UserHostLifetimeState):
+    assert uhl.host.to_base58() == self.host.to_base58()
+    assert not uhl.is_self_excluded_until
+    assert uhl.user.to_base58() == self.client.owner.public_key.to_base58()
+
   async def create_uma_test(self, owner):
     print('-'*10)
     print('CREATING UMA')
-    uma = await UserMarket.get_or_create_user_market_account(self.client, self.aver_market, owner)
+    uma = await UserMarket.get_or_create_user_market_account(self.client, self.aver_market, owner, host=self.host)
     self.user_markets.append(uma)
     print(f"Successfully loaded UMA {uma.pubkey}")
     print('-'*10)
 
-  async def place_order_test(self, uma: UserMarket):
-    sig = await uma.place_order(self.client.owner, 0, Side.BUY, 0.6, 5, SizeFormat.PAYOUT)
-    await self.client.connection.confirm_transaction(sig['result'], Finalized)
+  async def place_order_test(self, uma: UserMarket, bids: bool = True):
+    if(bids):
+      sig = await uma.place_order(self.client.owner, 0, Side.BUY, 0.6, 5, SizeFormat.PAYOUT)
+    else:
+      sig = await uma.place_order(self.owner_2, 0, Side.SELL, 0.4, 5, SizeFormat.PAYOUT)
+    #await self.client.connection.confirm_transaction(sig['result'], Finalized)
     uma = await refresh_user_market(self.client, uma)
     print(f"Successfully placed order {sig}")
+    return uma
 
   async def cancel_all_orders_test(self, uma: UserMarket):
     sigs = await uma.cancel_all_orders([0])
-    await gather(*[self.client.connection.confirm_transaction(sig['result'], Finalized) for sig in sigs])
+    #await gather(*[self.client.connection.confirm_transaction(sig['result'], Finalized) for sig in sigs])
     uma = await refresh_user_market(self.client, uma)
     print(f"Successfully cancelled all orders")
+    return uma
 
   async def cancel_specific_order(self, uma: UserMarket, order_id = None):
     order_id = order_id if order_id else uma.user_market_state.orders[0].order_id
     sig = await uma.cancel_order(order_id, 0)
-    await self.client.connection.confirm_transaction(sig['result'], Finalized)
+    #await self.client.connection.confirm_transaction(sig['result'], Finalized)
     uma = await refresh_user_market(self.client, uma)
     print(f"Successfully cancelled the order: {sig}")
+    return uma
 
 
   # run all the tests in order we want
@@ -194,25 +212,61 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     # aver client tests
     await self.test_aver_client()
 
+    # Create host
+    #sig = await create_host_account(self.client, self.client.owner, self.client.owner, program_id=self.first_program_id)
+    #await self.client.provider.connection.confirm_transaction(sig['result'], Finalized)
+
     # aver market tests
     await self.create_market(2)
     await self.load_market_test(self.market.public_key)
     self.check_market_is_as_expected(self.aver_market)
   
-    # UMA tests
+    # UMA / UHL tests
     await self.create_uma_test(self.client.owner)
     uma = self.user_markets[0]
     assert len(uma.user_market_state.orders) == 0
-    await self.place_order_test(uma)
+    assert len(uma.market.orderbooks) == 2
+
+    uhl = uma.user_host_lifetime.user_host_lifetime_state
+    self.check_uhl_state(uhl)
+    self.check_uma_state(uma.user_market_state)
+
+    uma = await self.place_order_test(uma)
     assert len(uma.user_market_state.orders) == 1
-    await self.cancel_specific_order(uma)
-    assert len(uma.user_market_state.orders) == 0
-    await self.place_order_test(uma)
-    await self.place_order_test(uma)
-    assert len(uma.user_market_state.orders) == 2
-    await self.cancel_all_orders_test(uma)
+    #Orderbook
+    bids_l2 = uma.market.orderbooks[0].get_bids_l2(10, True)
+    assert (bids_l2[0].price - 0.6) < 0.00001
+    assert (bids_l2[0].size - 5) < 0.00001
+    bids_l3 = uma.market.orderbooks[0].get_bids_L3()
+    assert (bids_l3[0].base_quantity_ui - 5) < 0.00001
+    assert (bids_l3[0].price_ui - 0.6) < 0.00001
+    assert (bids_l3[0].user_market.to_base58() == uma.pubkey.to_base58())
+    self.check_uhl_state(uhl) #checking if UHL still loads after refresh
+    self.check_uma_state(uma.user_market_state)
+
+    uma = await self.cancel_specific_order(uma)
     assert len(uma.user_market_state.orders) == 0
 
+    uma = await self.place_order_test(uma)
+    uma = await self.place_order_test(uma)
+    assert len(uma.user_market_state.orders) == 2
+
+    uma = await self.cancel_all_orders_test(uma)
+    assert len(uma.user_market_state.orders) == 0
+
+    #Order matching
+    await self.create_uma_test(self.owner_2)
+    uma_2 = self.user_markets[1]
+    uma = await self.place_order_test(uma)
+    uma_2 = await self.place_order_test(uma_2, False)
+    #Cranking
+    sig = await uma.market.crank_market([0,1], None, self.client.owner)
+    #await self.client.connection.confirm_transaction(sig, Finalized)
+    uma = await refresh_user_market(self.client, uma)
+    uma_2 = await refresh_user_market(self.client, uma_2)
+    assert len(uma.user_market_state.orders) == 0
+    assert len(uma_2.user_market_state.orders) == 0
+    assert (uma.market.market_state.matched_count - 3 * (10 ** 6)) <= 1 #Sometimes there is a roudning error on the matched count
 
 
 # Executing the tests in the above test case class

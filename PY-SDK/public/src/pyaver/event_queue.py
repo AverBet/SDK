@@ -1,9 +1,10 @@
-from anchorpy import Context
+from anchorpy import Context, Program
 from .data_classes import UserMarketState
 from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .utils import load_multiple_bytes_data
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
+from spl.token.constants import TOKEN_PROGRAM_ID
 from solana.transaction import AccountMeta
 from spl.token.instructions import get_associated_token_address
 from solana.keypair import Keypair
@@ -119,16 +120,13 @@ async def consume_events(
         if quote_token == None:
             quote_token = market.aver_client.quote_token
         
-        program = await market.aver_client.get_program_from_program_id(market.program_id)
+        program: Program = await market.aver_client.get_program_from_program_id(market.program_id)
 
-        user_accounts_unsorted = [AccountMeta(
-                pk, False, True) for pk in user_accounts]
-                
-        sorted_user_accounts = sorted(user_accounts_unsorted, key=lambda account: bytes(account.pubkey))
+        sorted_user_accounts = sorted(user_accounts, key=lambda account: bytes(account))
         sorted_loaded_umas: list[UserMarketState] = await program.account['UserMarket'].fetch_multiple(sorted_user_accounts)
         user_atas =  [get_associated_token_address(u.user, quote_token) for u in sorted_loaded_umas]
 
-        remaining_accounts  = sorted_user_accounts + user_atas
+        remaining_accounts  = [AccountMeta(pk, False, True) for pk in sorted_user_accounts + user_atas]
 
         return await program.rpc["consume_events"](
                 max_iterations,
@@ -140,6 +138,9 @@ async def consume_events(
                         "orderbook": market.market_store_state.orderbook_accounts[outcome_idx].orderbook,
                         "event_queue": market.market_store_state.orderbook_accounts[outcome_idx].event_queue,
                         "reward_target": reward_target,
+                        "vault_authority": market.market_state.vault_authority,
+                        "quote_vault": market.market_state.quote_vault,
+                        'spl_token_program': TOKEN_PROGRAM_ID
                     },
                     remaining_accounts=remaining_accounts,
                 ),
