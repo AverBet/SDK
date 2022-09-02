@@ -22,6 +22,9 @@ from solana.publickey import PublicKey
 from ..instructions.init_market import init_market_tx, InitMarketArgs, InitMarketAccounts
 from ..instructions.supplement_init_market import supplement_init_market_tx, SupplementInitMarketAccounts, SupplementInitMarketArgs
 
+#Change this to change test
+NUMBER_OF_OUTCOMES = 3
+
 class TestSdkV3(unittest.IsolatedAsyncioTestCase):
   init_market_args = InitMarketArgs(
         active_immediately=True,
@@ -131,7 +134,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
                 event_capacity=10,
                 nodes_capacity=10,
                 outcome_id=i,
-                outcome_names=range(number_of_outcomes))
+                outcome_names=[str(i) + 'aa'])
             coroutine = supplement_init_market_tx(self.client, args, accs)
             coroutines.append(coroutine)
         sigs = await gather(*coroutines)
@@ -217,7 +220,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     #await self.client.provider.connection.confirm_transaction(sig['result'], Finalized)
 
     # aver market tests
-    await self.create_market(2)
+    await self.create_market(NUMBER_OF_OUTCOMES)
     await self.load_market_test(self.market.public_key)
     self.check_market_is_as_expected(self.aver_market)
   
@@ -225,7 +228,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     await self.create_uma_test(self.client.owner)
     uma = self.user_markets[0]
     assert len(uma.user_market_state.orders) == 0
-    assert len(uma.market.orderbooks) == 2
+    assert len(uma.market.orderbooks) == NUMBER_OF_OUTCOMES
 
     uhl = uma.user_host_lifetime.user_host_lifetime_state
     self.check_uhl_state(uhl)
@@ -243,6 +246,10 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     assert (bids_l3[0].user_market.to_base58() == uma.pubkey.to_base58())
     self.check_uhl_state(uhl) #checking if UHL still loads after refresh
     self.check_uma_state(uma.user_market_state)
+    order_id = uma.user_market_state.orders[0].order_id
+    price = uma.market.orderbooks[0].get_bid_price_by_order_id(order_id)
+    assert (price.size - 5) < 0.00001
+    assert (price.price - 0.6) < 0.0001
 
     uma = await self.cancel_specific_order(uma)
     assert len(uma.user_market_state.orders) == 0
