@@ -693,6 +693,10 @@ class UserMarket():
 
         program = await self.aver_client.get_program_from_program_id(program_id)
 
+        # find the corresponding order id incase they pass in aaob order in by accident
+        order_from_aaob_id = self.get_order_from_aaob_order_id(order_id)
+        order_id = order_from_aaob_id.order_id if order_from_aaob_id else order_id
+
         if(active_pre_flight_check):
             check_if_instruction_is_out_of_date_with_idl('cancel_order', program)
             check_sufficient_lamport_balance(self.user_balance_state)
@@ -1350,3 +1354,6 @@ class UserMarket():
     
     def calculate_min_free_outcome_positions(self):
         return min([o.free for o in self.user_market_state.outcome_positions])
+
+    def get_order_from_aaob_order_id(self, aaob_order_id):
+        return next((order for order in self.user_market_state.orders if order.aaob_order_id == aaob_order_id), None)

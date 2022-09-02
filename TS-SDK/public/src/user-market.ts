@@ -988,6 +988,9 @@ export class UserMarket {
       aaobOrderId = this.orders.find(o => o.aaobOrderId.eq(orderId))?.aaobOrderId || null
     }
 
+    // find the corresponding order id incase they pass in aaob order in by accident
+    orderId = this.getOrderFromAaobOrderId(orderId)?.orderId || orderId
+
     if (averPreFlightCheck) {
       checkSufficientLamportBalance(this._userBalanceState)
       checkCancelOrderMarketStatus(this._market.marketStatus)
@@ -1544,4 +1547,9 @@ export class UserMarket {
     }
     return true
   }
+
+  getOrderFromAaobOrderId(aaob_order_id: BN) {
+    return this.orders.find(o => o.aaobOrderId.eq(aaob_order_id))
+  }
+        // return next((order for order in self.user_market_state.orders if order.aaob_order_id == aaob_order_id), None)
 }
