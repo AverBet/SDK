@@ -5,15 +5,22 @@ import {
   Side,
   SizeFormat,
   SolanaNetwork,
+  UserHostLifetimeState,
+  UserMarketState,
 } from "../../public/src/types"
 import { getQuoteToken, getSolanaEndpoint } from "../../public/src/ids"
 import { AverClient } from "../../public/src/aver-client"
 import { Market } from "../../public/src/market"
+import { ConfirmOptions } from "@solana/web3.js"
 import { UserMarket } from "../../public/src/user-market"
 import { BN } from "@project-serum/anchor"
 import { createMarket, InitMarketArgs } from "../utils/create-market"
+import { UserHostLifetime } from "../../public/src/user-host-lifetime"
 
 jest.setTimeout(100000)
+
+//Change this to change test
+const numberOfOutcomes = 2
 
 const args: InitMarketArgs = {
   numberOfOutcomes: 0,
@@ -52,7 +59,7 @@ const args: InitMarketArgs = {
 describe("run all tests", () => {
   // constants we can adjust
   const firstProgramId = new PublicKey(
-    "81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT"
+    "DfMQPAuAeECP7iSCwTKjbpzyx6X1HZT6rz872iYWA8St"
   )
 
   const secondProgramId = new PublicKey(
@@ -63,6 +70,11 @@ describe("run all tests", () => {
       "2S1DDiUZuqFNPHx2uzX9pphxynV1CgpLXnT9QrwPoWwXaGrqAP88XNEh9NK7JbFByJFDsER7PQgsNyacJyCGsH8S"
     )
   )
+  const owner2 = Keypair.fromSecretKey(
+    base58_to_binary(
+      "3onYh3TSCg92X3kD9gD7RCZF1N8JFVSDp39eSkRswsQb5YwWuyMnzuCN2wuPb52XEnPzjVrCtkYe5Xo8Czd3CDyV"
+    )
+  )
 
   const umas: UserMarket[] = []
 
@@ -71,6 +83,7 @@ describe("run all tests", () => {
   let marketPubkey: PublicKey
   let market: Market
   let userMarket: UserMarket
+  let host: PublicKey
 
   test("successfully load the client", async () => {
     const network = SolanaNetwork.Devnet
@@ -80,9 +93,18 @@ describe("run all tests", () => {
       connection,
       network,
       owner,
-      undefined,
+      {
+        commitment: "confirmed",
+        preflightCommitment: "confirmed",
+      },
       [firstProgramId, secondProgramId]
     )
+    host = (
+      await PublicKey.findProgramAddress(
+        [Buffer.from("host", "utf-8"), owner.publicKey.toBuffer()],
+        firstProgramId
+      )
+    )[0]
   })
 
   test("test aver client", async () => {
@@ -104,8 +126,9 @@ describe("run all tests", () => {
   test("create aver market", async () => {
     console.log("-".repeat(10))
     console.log("CREATING AVER MARKET")
-    marketPubkey = (await createMarket(2, client, owner, args, firstProgramId))
-      .publicKey
+    marketPubkey = (
+      await createMarket(numberOfOutcomes, client, owner, args, firstProgramId)
+    ).publicKey
     console.log("-".repeat(10))
   })
 
@@ -127,6 +150,17 @@ describe("run all tests", () => {
     expect(args.numberOfOutcomes).toBe(market.orderbooks?.length)
   }
 
+  function checkUMAState(uma: UserMarket, market: Market) {
+    expect(uma.market.pubkey.toBase58()).toBe(market.pubkey.toBase58())
+    expect(uma.user.toBase58()).toBe(owner.publicKey.toBase58())
+  }
+
+  function checkUHLState(uhl: UserHostLifetime) {
+    expect(uhl.host.toBase58()).toBe(host.toBase58())
+    expect(uhl.isSelfExcluded).toBe(false)
+    expect(uhl.user.toBase58()).toBe(owner.publicKey.toBase58())
+  }
+
   test("successfully load and test aver market", async () => {
     console.log("-".repeat(10))
     market = (await Market.load(client, marketPubkey)) as Market
@@ -134,34 +168,45 @@ describe("run all tests", () => {
     console.log("-".repeat(10))
   })
 
-  test("get or create UMA", async () => {
+  test("UMA / UHL tests", async () => {
     userMarket = await UserMarket.getOrCreateUserMarketAccount(
       client,
       owner,
-      market
+      market,
+      undefined,
+      undefined,
+      host
     )
     umas.push(userMarket)
-  })
 
-  test("place and cancel orders (binary market)", async () => {
     const uma = umas[0]
     expect(uma.orders.length).toBe(0)
+    expect(uma.market.orderbooks?.length).toBe(numberOfOutcomes)
+    checkUHLState(uma.userHostLifetime)
+    checkUMAState(uma, market)
+  })
+
+  test("place and cancel orders; orderbooks", async () => {
+    const uma = umas[0]
 
     await placeOrder(uma)
     expect(uma.orders.length).toBe(1)
-    expect(uma.market.orderbooks?.length).toBe(2)
     //@ts-ignore
-    let bids = uma.market.orderbooks[0].getBidsL2(10, true)
-    expect(bids[0].price - 0.6).toBeLessThan(0.000001)
-    expect(bids[0].size - 5).toBeLessThan(0.000001)
+    let bids_l2 = uma.market.orderbooks[0].getBidsL2(10, true)
+    expect(bids_l2[0].price - 0.6).toBeLessThan(0.000001)
+    expect(bids_l2[0].size - 5).toBeLessThan(0.000001)
+    //@ts-ignore
+    const bids_l3 = uma.market.orderbooks[0].getBidsL3(10, true)
+    expect(bids_l3[0].price_ui - 0.6).toBeLessThan(0.00001)
+    expect(bids_l3[0].base_quantity_ui - 5).toBeLessThan(0.00001)
+    checkUHLState(uma.userHostLifetime) //Check if accounts still correct after refresh
+    checkUMAState(uma, market)
 
     await cancelOrder(uma)
     expect(uma.orders.length).toBe(0)
-
     await placeOrder(uma)
     await placeOrder(uma)
     expect(uma.orders.length).toBe(2)
-
     await cancelAllOrders(uma)
     expect(uma.orders.length).toBe(0)
   })
@@ -175,7 +220,7 @@ describe("run all tests", () => {
       5,
       SizeFormat.Payout
     )
-    await client.connection.confirmTransaction(sig, "confirmed")
+    //await client.connection.confirmTransaction(sig, "confirmed")
     await uma.refresh()
   }
 
@@ -185,15 +230,15 @@ describe("run all tests", () => {
       uma.orders[0].orderId,
       uma.orders[0].outcomeId
     )
-    await client.connection.confirmTransaction(sig, "confirmed")
+    //await client.connection.confirmTransaction(sig, "confirmed")
     await uma.refresh()
   }
 
   async function cancelAllOrders(uma: UserMarket) {
     const sigs = await uma.cancelAllOrders(owner, [0])
-    await Promise.all(
-      sigs.map((sig) => client.connection.confirmTransaction(sig, "confirmed"))
-    )
+    // await Promise.all(
+    //   sigs.map((sig) => client.connection.confirmTransaction(sig, "confirmed"))
+    // )
     await uma.refresh()
   }
 })

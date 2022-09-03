@@ -229,7 +229,6 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     uma = self.user_markets[0]
     assert len(uma.user_market_state.orders) == 0
     assert len(uma.market.orderbooks) == NUMBER_OF_OUTCOMES
-
     uhl = uma.user_host_lifetime.user_host_lifetime_state
     self.check_uhl_state(uhl)
     self.check_uma_state(uma.user_market_state)
