@@ -152,21 +152,8 @@ class UserMarket():
         Returns:
             UserMarket: UserMarket object
         """
-        if(isinstance(market, PublicKey)):
-            market = await AverMarket.load(aver_client, market)
-
-        program = await aver_client.get_program_from_program_id(market.program_id)
-        res: UserMarketState = await program.account['UserMarket'].fetch(pubkey)
-        uhl = await UserHostLifetime.load(aver_client, uhl)
-
-        lamport_balance = await aver_client.request_lamport_balance(res.user)
-        token_balance = await aver_client.request_token_balance(aver_client.quote_token, res.user)
-        user_balance_state = UserBalanceState(lamport_balance, token_balance)
-
-        if(res.market.to_base58() != market.market_pubkey.to_base58()):
-            raise Exception('UserMarket and Market do not match')
-
-        return UserMarket(aver_client, pubkey, res, market, user_balance_state, uhl)   
+        user_market = await UserMarket.load_multiple_by_uma(aver_client, [pubkey], [market], [uhl])
+        return user_market[0]
     
     @staticmethod
     async def load_multiple_by_uma(
@@ -195,7 +182,7 @@ class UserMarket():
         #Just use the first program to load. This should not matter for the purpose of parsing IDLs
         #TODO - review
         # res: list[UserMarketState] = await aver_client.programs[0].account['UserMarket'].fetch_multiple(pubkeys)
-        account_buffers = await load_multiple_bytes_data(aver_client.connection, pubkeys, [], False)
+        account_buffers = await load_multiple_bytes_data(aver_client.connection, pubkeys, [], True)
         res: list[UserMarketState] = UserMarket.parse_multiple_user_market_state(account_buffers, aver_client)
         # TODO parse with version
         uhls = await UserHostLifetime.load_multiple(aver_client, uhls)
