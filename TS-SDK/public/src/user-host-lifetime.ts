@@ -13,7 +13,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js"
 import { AverClient } from "./aver-client"
-import { AVER_PROGRAM_IDS, AVER_HOST_ACCOUNT } from "./ids"
+import { AVER_PROGRAM_IDS, getAverHostAccount } from "./ids"
 import { AccountType, FeeTier, UserHostLifetimeState } from "./types"
 import {
   getBestDiscountToken,
@@ -145,7 +145,7 @@ export class UserHostLifetime {
     averClient: AverClient,
     userQuoteTokenAta: PublicKey,
     owner?: PublicKey,
-    host: PublicKey = AVER_HOST_ACCOUNT,
+    host: PublicKey = getAverHostAccount(averClient.solanaNetwork),
     referrer: PublicKey = SystemProgram.programId,
     programId = AVER_PROGRAM_IDS[0]
   ) {
@@ -205,7 +205,7 @@ export class UserHostLifetime {
     userQuoteTokenAta: PublicKey,
     sendOptions?: SendOptions,
     manualMaxRetry?: number,
-    host: PublicKey = AVER_HOST_ACCOUNT,
+    host: PublicKey = getAverHostAccount(averClient.solanaNetwork),
     referrer: PublicKey = SystemProgram.programId,
     programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
@@ -246,7 +246,7 @@ export class UserHostLifetime {
     owner: Keypair = averClient.keypair,
     sendOptions?: SendOptions,
     quoteTokenMint: PublicKey = averClient.quoteTokenMint,
-    host: PublicKey = AVER_HOST_ACCOUNT,
+    host: PublicKey = getAverHostAccount(averClient.solanaNetwork),
     referrer: PublicKey = SystemProgram.programId,
     programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {

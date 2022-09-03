@@ -191,8 +191,8 @@ export class Market {
     pubkeys: PublicKey[]
   ): Promise<(Market | null)[]> {
     // get programId of market
-    const programIds = (await averClient.connection.getMultipleAccountsInfo(pubkeys)).map((m: any) => m.owner)
-    const programs = await Promise.all(programIds.map(p => averClient.getProgramFromProgramId(p)))
+    const programIds = (await chunkAndFetchMultiple(averClient.connection, pubkeys)).map(m => m?.owner)
+    const programs = await Promise.all(programIds.map(p => p ? averClient.getProgramFromProgramId(p) : null))
 
     const marketStorePubkeys = (
       await Market.deriveMarketStorePubkeysAndBump(pubkeys, programIds)
@@ -201,9 +201,7 @@ export class Market {
     })
 
     const marketResultsAndMarketStoreResults =
-      await averClient.connection.getMultipleAccountsInfo(
-        pubkeys.concat(marketStorePubkeys)
-      )
+      await chunkAndFetchMultiple(averClient.connection, pubkeys.concat(marketStorePubkeys))
 
     const marketStateResults = marketResultsAndMarketStoreResults
       .slice(0, pubkeys.length)
@@ -551,13 +549,13 @@ export class Market {
    */
   private static async deriveMarketStorePubkeysAndBump(
     marketPubkeys: PublicKey[],
-    programIds: PublicKey[]
+    programIds: (PublicKey | null)[]
   ) {
     return await Promise.all(
       marketPubkeys.map((marketPubkey, i) => {
         return PublicKey.findProgramAddress(
           [Buffer.from("market-store", "utf-8"), marketPubkey.toBuffer()],
-          programIds[i]
+          programIds[i] || AVER_PROGRAM_IDS[0] // TODO make this dynamic
         )
       })
     )

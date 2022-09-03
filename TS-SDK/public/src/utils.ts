@@ -91,7 +91,7 @@ export function throwIfNull<T>(
 export const chunkAndFetchMultiple = async (
   connection: Connection,
   pubkeys: PublicKey[]
-): Promise<any> => {
+) => {
   const res = await Promise.all(
     chunk(pubkeys, 100).map((pubkeyChunk) =>
       connection.getMultipleAccountsInfo(pubkeyChunk)
