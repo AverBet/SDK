@@ -21,8 +21,8 @@ class TestSdkV2(unittest.IsolatedAsyncioTestCase):
     # constants we can adjust
     first_program_id = PublicKey('81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT')
     self.second_program_id = PublicKey('6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ')
-    owner = Keypair.from_secret_key(base58.b58decode('2S1DDiUZuqFNPHx2uzX9pphxynV1CgpLXnT9QrwPoWwXaGrqAP88XNEh9NK7JbFByJFDsER7PQgsNyacJyCGsH8S'))
-
+    # owner = Keypair.from_secret_key(base58.b58decode('2S1DDiUZuqFNPHx2uzX9pphxynV1CgpLXnT9QrwPoWwXaGrqAP88XNEh9NK7JbFByJFDsER7PQgsNyacJyCGsH8S'))
+    owner = Keypair.from_secret_key(base58.b58decode('4gdy52rZbYCdAxh6PEyZbuJMJXm7XaGjZKhuf48ogzULdGcUfj4KMca6eozSJFUgoL6hEdMjqdvmrW193gofrNAB'))
     # setup the client
     network = SolanaNetwork.DEVNET
     solana_endpoint = get_solana_endpoint(network)
@@ -139,13 +139,15 @@ class TestSdkV2(unittest.IsolatedAsyncioTestCase):
     # aver market tests
     # await self.create_market_test(2)
     # await self.supplement_init_market_test(2)
-    await self.load_market_test(PublicKey('9YfunACpVFCv6fLjpa2Mjqr835t543cYsK45xfgX6pJ4'))
+    await self.load_market_test(PublicKey('tCakDSQUm5cKy8fSy9TjmwMzF4wLrGCU35HjixYi5Hw'))
     
     # UMA tests
     await self.create_uma_test()
-    await self.place_order_test()
+    loaded_uma = await UserMarket.load_multiple_by_uma(self.client, [self.user_market.pubkey], [self.aver_market], [self.user_market.user_host_lifetime.pubkey])
+    print('done')
+    # await self.place_order_test()
     # await self.cancel_all_orders_test()
-    await self.cancel_specific_order()
+    # await self.cancel_specific_order()
 
 
 # Executing the tests in the above test case class
