@@ -1249,6 +1249,8 @@ class UserMarket():
             print(f"Creaing ix to UMA market from V{self.user_market_state.version} to V{get_version_of_account_type_in_program(AccountTypes.USER_MARKET, program)}")
             ix = await self.make_update_user_market_state_instruction(fee_payer)
             ixs.append(ix)
+        
+        return ixs
 
     async def update_all_accounts_if_required(self, fee_payer: Keypair = None, send_options: TxOpts = None):
         if(fee_payer == None):
