@@ -1236,17 +1236,19 @@ class UserMarket():
 
     async def make_update_all_accounts_if_required_instructions(self, fee_payer: PublicKey):
         ixs = []
+        program = await self.aver_client.get_program_from_program_id(self.program_id)
         if not await self.market.check_if_market_latest_version():
+            print(f"Creaing ix to update market from V{self.market.market_state.version} to V{get_version_of_account_type_in_program(AccountTypes.MARKET, program)}")
             ix = await self.market.make_update_market_state_instruction(fee_payer)
             ixs.append(ix)
         if not await self.user_host_lifetime.check_if_uhl_latest_version():
+            print(f"Creaing ix to update UHL from V{self.user_host_lifetime.user_host_lifetime_state.version} to V{get_version_of_account_type_in_program(AccountTypes.USER_HOST_LIFETIME, program)}")
             ix = await self.user_host_lifetime.make_update_user_host_lifetime_state_instruction()
             ixs.append(ix)
         if not await self.check_if_uma_latest_version():
+            print(f"Creaing ix to UMA market from V{self.user_market_state.version} to V{get_version_of_account_type_in_program(AccountTypes.USER_MARKET, program)}")
             ix = await self.make_update_user_market_state_instruction(fee_payer)
             ixs.append(ix)
-        
-        return ixs
 
     async def update_all_accounts_if_required(self, fee_payer: Keypair = None, send_options: TxOpts = None):
         if(fee_payer == None):
@@ -1254,6 +1256,7 @@ class UserMarket():
 
         ixs = await self.make_update_all_accounts_if_required_instructions(fee_payer.public_key)
         if len(ixs) > 0:
+            print(f"Sending {len(ixs)} instructions to update states")
             return await sign_and_send_transaction_instructions(
                 self.aver_client,
                 [],
