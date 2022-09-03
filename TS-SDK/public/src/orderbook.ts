@@ -288,6 +288,9 @@ export class Orderbook {
         price: isInverted
           ? 1 - node.getPrice() / 2 ** 32
           : node.getPrice() / 2 ** 32,
+        price_ui: isInverted
+          ? 1 - node.getPrice() / 2 ** 32
+          : node.getPrice() / 2 ** 32,
         base_quantity: node.baseQuantity,
         base_quantity_ui: node.baseQuantity * 10 ** -decimals,
         // user_market: new PublicKey(node.callBackInfoPt[0 - 32]), //TODO - CHECK THIS

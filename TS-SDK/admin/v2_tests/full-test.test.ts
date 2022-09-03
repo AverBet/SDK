@@ -157,7 +157,7 @@ describe("run all tests", () => {
 
   function checkUHLState(uhl: UserHostLifetime) {
     expect(uhl.host.toBase58()).toBe(host.toBase58())
-    expect(uhl.isSelfExcluded).toBe(false)
+    expect(uhl.isSelfExcluded).toBeFalsy()
     expect(uhl.user.toBase58()).toBe(owner.publicKey.toBase58())
   }
 
@@ -186,19 +186,19 @@ describe("run all tests", () => {
     checkUMAState(uma, market)
   })
 
-  test("place and cancel orders; orderbooks", async () => {
+  test("place and cancel orders; orderbook checks", async () => {
     const uma = umas[0]
 
     await placeOrder(uma)
     expect(uma.orders.length).toBe(1)
     //@ts-ignore
     let bids_l2 = uma.market.orderbooks[0].getBidsL2(10, true)
-    expect(bids_l2[0].price - 0.6).toBeLessThan(0.000001)
-    expect(bids_l2[0].size - 5).toBeLessThan(0.000001)
+    expect(bids_l2[0].price).toBeCloseTo(0.6)
+    expect(bids_l2[0].size).toBeCloseTo(5)
     //@ts-ignore
     const bids_l3 = uma.market.orderbooks[0].getBidsL3(10, true)
-    expect(bids_l3[0].price_ui - 0.6).toBeLessThan(0.00001)
-    expect(bids_l3[0].base_quantity_ui - 5).toBeLessThan(0.00001)
+    expect(bids_l3[0].price_ui).toBeCloseTo(0.6)
+    expect(bids_l3[0].base_quantity_ui).toBeCloseTo(5)
     checkUHLState(uma.userHostLifetime) //Check if accounts still correct after refresh
     checkUMAState(uma, market)
 
@@ -220,7 +220,7 @@ describe("run all tests", () => {
       5,
       SizeFormat.Payout
     )
-    //await client.connection.confirmTransaction(sig, "confirmed")
+    await client.connection.confirmTransaction(sig, "confirmed")
     await uma.refresh()
   }
 
@@ -230,15 +230,15 @@ describe("run all tests", () => {
       uma.orders[0].orderId,
       uma.orders[0].outcomeId
     )
-    //await client.connection.confirmTransaction(sig, "confirmed")
+    await client.connection.confirmTransaction(sig, "confirmed")
     await uma.refresh()
   }
 
   async function cancelAllOrders(uma: UserMarket) {
     const sigs = await uma.cancelAllOrders(owner, [0])
-    // await Promise.all(
-    //   sigs.map((sig) => client.connection.confirmTransaction(sig, "confirmed"))
-    // )
+    await Promise.all(
+      sigs.map((sig) => client.connection.confirmTransaction(sig, "confirmed"))
+    )
     await uma.refresh()
   }
 })

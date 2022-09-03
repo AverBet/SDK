@@ -34,6 +34,7 @@ import {
   OrderbookAccountsState,
   SolanaNetwork,
   UserBalanceState,
+  UserHostLifetimeState,
   UserMarketState,
 } from "./types"
 import { UserHostLifetime } from "./user-host-lifetime"
@@ -402,7 +403,10 @@ export class Market {
           ? new UserHostLifetime(
               averClient,
               userHostLifetimePubkeys[i],
-              UserHostLifetime.parseHostState(info.data),
+              UserHostLifetime.deserializeMultipleUserHostLifetimesData(
+                averClient,
+                [info]
+              )[0] as UserHostLifetimeState,
               info.owner
             )
           : null
