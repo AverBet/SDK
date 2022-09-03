@@ -1265,7 +1265,7 @@ class UserMarket():
         if(fee_payer == None):
             fee_payer = self.aver_client.owner
 
-        ixs = await self.make_update_all_accounts_if_required_instructions(fee_payer)
+        ixs = await self.make_update_all_accounts_if_required_instructions(fee_payer.public_key)
         if len(ixs) > 0:
             return await sign_and_send_transaction_instructions(
                 self.aver_client,
