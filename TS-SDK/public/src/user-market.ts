@@ -1550,7 +1550,6 @@ export class UserMarket {
   }
 
   getOrderFromAaobOrderId(aaob_order_id: BN) {
-    return this.orders.find(o => o.aaobOrderId.eq(aaob_order_id))
+    return this.orders.find(o => o.aaobOrderId && o.aaobOrderId.eq(aaob_order_id))
   }
-        // return next((order for order in self.user_market_state.orders if order.aaob_order_id == aaob_order_id), None)
 }

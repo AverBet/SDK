@@ -1348,4 +1348,4 @@ class UserMarket():
         return min([o.free for o in self.user_market_state.outcome_positions])
 
     def get_order_from_aaob_order_id(self, aaob_order_id):
-        return next((order for order in self.user_market_state.orders if order.aaob_order_id == aaob_order_id), None)
+        return next((order for order in self.user_market_state.orders if order.aaob_order_id and order.aaob_order_id == aaob_order_id), None)
