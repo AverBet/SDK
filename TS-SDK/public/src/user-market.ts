@@ -1386,6 +1386,7 @@ export class UserMarket {
     return program.instruction["updateUserMarketState"](
       {
         accounts: {
+          payer: payer,
           user: payer,
           userMarket: this.pubkey,
           systemProgram: SystemProgram.programId,
