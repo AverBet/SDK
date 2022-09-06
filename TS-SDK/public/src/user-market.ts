@@ -393,11 +393,13 @@ export class UserMarket {
         host: host,
         systemProgram: SystemProgram.programId,
       },
-      remainingAccounts: getBestDiscountTokenAccount.equals(
-        SystemProgram.programId
-      )
-        ? []
-        : [discountTokenAccount],
+      remainingAccounts: [],
+      //TODO - Remove this later as it is causing errors
+      // remainingAccounts: getBestDiscountTokenAccount.equals(
+      //   SystemProgram.programId
+      // )
+      //   ? []
+      //   : [discountTokenAccount],
     })
   }
 
@@ -434,7 +436,7 @@ export class UserMarket {
         numberOfOrders
       )
 
-    return signAndSendTransactionInstructions(
+    return await signAndSendTransactionInstructions(
       averClient,
       [],
       owner,

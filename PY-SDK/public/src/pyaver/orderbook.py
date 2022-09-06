@@ -443,8 +443,11 @@ class Orderbook:
         if(bid is None):
             return None
         
+        exp = 10 ** self.decimals
         bid_price = Price(price=bid.key >> 64, size=bid.base_quantity)
         bid_price = Orderbook.convert_price(bid_price, self.decimals)
+        print(bid_price.price)
+        bid_price.price = round((bid_price.price / 2 ** 32) * exp) / exp,
 
         if(self.is_inverted):
             bid_price = Orderbook.invert_price(bid_price)

@@ -1,8 +1,9 @@
+from asyncio import gather
 from .aver_client import AverClient
 from solana.publickey import PublicKey
 from .data_classes import UserHostLifetimeState
 from .constants import AVER_HOST_ACCOUNT, AVER_PROGRAM_IDS
-from .utils import get_version_of_account_type_in_program, sign_and_send_transaction_instructions
+from .utils import get_version_of_account_type_in_program, load_multiple_bytes_data, parse_with_version, sign_and_send_transaction_instructions
 from solana.system_program import SYS_PROGRAM_ID
 from solana.rpc.commitment import Finalized
 from anchorpy import Context
@@ -56,9 +57,7 @@ class UserHostLifetime():
         Returns:
             UserHostLifetime: UserHostLifetime object
         """
-        # TODO get by program ID
-        user_host_lifetime_result = await aver_client.programs[0].account['UserHostLifetime'].fetch(pubkey)
-        return UserHostLifetime(aver_client, pubkey, user_host_lifetime_result, aver_client.programs[0].program_id)
+        return (await UserHostLifetime.load_multiple(aver_client, [pubkey]))[0]
 
     @staticmethod
     async def load_multiple(aver_client: AverClient, pubkeys: list[PublicKey]):
@@ -72,12 +71,13 @@ class UserHostLifetime():
         Returns:
             list[UserHostLifetime]: List of UserHostLifetime objects
         """
-        # TODO get program correctly
-        program = aver_client.programs[0]
-        res = await program.account['UserHostLifetime'].fetch_multiple(pubkeys)
+        res = await load_multiple_bytes_data(aver_client.connection, pubkeys, [], False)
+        programs = await gather(*[aver_client.get_program_from_program_id(PublicKey(r['owner'])) for r in res])
         uhls: list[UserHostLifetime] = []
         for i, pubkey in enumerate(pubkeys):
-            uhls.append(UserHostLifetime(aver_client, pubkey, res[i]))
+            state = parse_with_version(programs[i], AccountTypes.USER_HOST_LIFETIME, res[i]['data'])
+            program = programs[i]
+            uhls.append(UserHostLifetime(aver_client, pubkey, state, program.program_id))
         return uhls
 
     @staticmethod

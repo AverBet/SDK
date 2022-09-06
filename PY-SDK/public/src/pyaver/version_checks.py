@@ -57,6 +57,10 @@ def check_idl_has_same_instructions_as_sdk(program: Program):
             print(f'INSTRUCTION {i} IS NOT FOUND...')
             print('PLEASE UPDATE YOUR SDK')
             continue
+        if(file_instruction is None):
+            print(f'INSTRUCTION {program_instruction} IS NOT FOUND')
+            print('PLEASE UPDATE YOUR SDK')
+            continue
         get_differences_between_idl_and_program_instruction(file_instruction, program_instruction, True)
 
 

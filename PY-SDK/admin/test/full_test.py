@@ -23,7 +23,7 @@ from ..instructions.init_market import init_market_tx, InitMarketArgs, InitMarke
 from ..instructions.supplement_init_market import supplement_init_market_tx, SupplementInitMarketAccounts, SupplementInitMarketArgs
 
 #Change this to change test
-NUMBER_OF_OUTCOMES = 3
+NUMBER_OF_OUTCOMES = 2
 
 class TestSdkV3(unittest.IsolatedAsyncioTestCase):
   init_market_args = InitMarketArgs(
@@ -245,8 +245,9 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     assert (bids_l3[0].user_market.to_base58() == uma.pubkey.to_base58())
     self.check_uhl_state(uhl) #checking if UHL still loads after refresh
     self.check_uma_state(uma.user_market_state)
-    order_id = uma.user_market_state.orders[0].order_id
-    price = uma.market.orderbooks[0].get_bid_price_by_order_id(order_id)
+    order = uma.user_market_state.orders[0]
+    price = uma.market.orderbooks[0].get_bid_price_by_order_id(order)
+    print(price)
     assert (price.size - 5) < 0.00001
     assert (price.price - 0.6) < 0.0001
 
