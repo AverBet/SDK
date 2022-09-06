@@ -126,15 +126,12 @@ class AverMarket():
         Returns:
             list[AverMarket]: List of AverMarket objects
         """
-        #market_states_and_stores = await AverMarket.load_multiple_market_states_and_stores(aver_client, market_pubkeys)
         market_states_and_program_ids = await AverMarket.load_multiple_market_states_and_program_ids(aver_client, market_pubkeys)
         market_states: list[MarketState] = [m['state'] for m in market_states_and_program_ids]
         program_ids: list[PublicKey] = [m['program_id'] for m in market_states_and_program_ids]
-        are_market_statuses_closed = []
-        for market_state in market_states:
-            are_market_statuses_closed.append(AverMarket.is_market_status_closed(market_state.market_status))
+        are_market_statuses_closed = [AverMarket.is_market_status_closed(market_state.market_status) if market_state else True for market_state in market_states]
 
-        market_store_pubkeys = [m.market_store for m in market_states]
+        market_store_pubkeys = [AverMarket.derive_market_store_pubkey_and_bump(m)[0] for m in market_pubkeys]
         market_stores: list[MarketStoreState] = await AverMarket.load_multiple_market_store_states(aver_client, market_store_pubkeys)
 
         orderbooks_market_list = await AverMarket.get_orderbooks_from_orderbook_accounts_multiple_markets(
@@ -153,7 +150,7 @@ class AverMarket():
                 program_ids[index],
                 market_stores[index],
                 orderbooks_market_list[index]
-                )
+                ) if market_states[index] else None
             markets.append(market)
         
         return markets
@@ -189,12 +186,12 @@ class AverMarket():
             list[MarketState]: List of MarketState objects
         """
         res = await load_multiple_bytes_data(aver_client.connection, market_pubkeys, [], False)
-        programs = await gather(*[aver_client.get_program_from_program_id(PublicKey(r['owner'])) for r in res])
+        programs = [await aver_client.get_program_from_program_id(PublicKey(r['owner'])) if r is not None else None for r in res]
         market_states_and_program_ids = []
         for i, m in enumerate(res):
-            state = parse_with_version(programs[i], AccountTypes.MARKET, m['data'])
-            program = programs[i]
-            market_states_and_program_ids.append({'state': state, 'program_id': program.program_id})
+            state = parse_with_version(programs[i], AccountTypes.MARKET, m['data']) if m else None
+            program_id = programs[i].program_id if programs[i] else None
+            market_states_and_program_ids.append({'state': state, 'program_id': program_id})
         return market_states_and_program_ids
         
     
@@ -360,9 +357,12 @@ class AverMarket():
         response = await load_multiple_bytes_data(aver_client.connection, market_store_pubkeys, [], False)
         market_stores = []
         for r in response:
-            program = await aver_client.get_program_from_program_id(PublicKey(r['owner']))
-            state = parse_with_version(program, AccountTypes.MARKET_STORE, r['data'])
-            market_stores.append(state)
+            if r:
+                program = await aver_client.get_program_from_program_id(PublicKey(r['owner']))
+                state = parse_with_version(program, AccountTypes.MARKET_STORE, r['data'])
+                market_stores.append(state)
+            else:
+                market_stores.append(None)
         return market_stores
 
     @staticmethod
@@ -462,12 +462,12 @@ class AverMarket():
 
         #Create a list for each market we received. The list contains all orderbooks for that market
         for index, market_state in enumerate(market_states):
-            number_of_outcomes = market_state.number_of_outcomes
             orderbooks = []
             #Market is closed
-            if(are_market_statuses_closed[index]):
+            if(market_state is None or market_stores[index] is None or are_market_statuses_closed[index]):
                 orderbooks_market_list.append(None)
                 continue
+            number_of_outcomes = market_state.number_of_outcomes
             #Binary markets only have 1 orderbook
             if(number_of_outcomes == 2):
                 orderbooks.append(all_orderbooks.pop(0))
