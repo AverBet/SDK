@@ -1018,6 +1018,9 @@ export class UserMarket {
         this.orders.find((o) => o.aaobOrderId.eq(orderId))?.aaobOrderId || null
     }
 
+    // find the corresponding order id incase they pass in aaob order in by accident
+    orderId = this.getOrderFromAaobOrderId(orderId)?.orderId || orderId
+
     if (averPreFlightCheck) {
       checkSufficientLamportBalance(this._userBalanceState)
       checkCancelOrderMarketStatus(this._market.marketStatus)
@@ -1430,6 +1433,7 @@ export class UserMarket {
     )
     return program.instruction["updateUserMarketState"]({
       accounts: {
+        payer: payer,
         user: payer,
         userMarket: this.pubkey,
         systemProgram: SystemProgram.programId,
@@ -1600,5 +1604,11 @@ export class UserMarket {
       )
     }
     return true
+  }
+
+  getOrderFromAaobOrderId(aaob_order_id: BN) {
+    return this.orders.find(
+      (o) => o.aaobOrderId && o.aaobOrderId.eq(aaob_order_id)
+    )
   }
 }

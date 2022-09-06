@@ -152,21 +152,8 @@ class UserMarket():
         Returns:
             UserMarket: UserMarket object
         """
-        if(isinstance(market, PublicKey)):
-            market = await AverMarket.load(aver_client, market)
-
-        program = await aver_client.get_program_from_program_id(market.program_id)
-        res: UserMarketState = await program.account['UserMarket'].fetch(pubkey)
-        uhl = await UserHostLifetime.load(aver_client, uhl)
-
-        lamport_balance = await aver_client.request_lamport_balance(res.user)
-        token_balance = await aver_client.request_token_balance(aver_client.quote_token, res.user)
-        user_balance_state = UserBalanceState(lamport_balance, token_balance)
-
-        if(res.market.to_base58() != market.market_pubkey.to_base58()):
-            raise Exception('UserMarket and Market do not match')
-
-        return UserMarket(aver_client, pubkey, res, market, user_balance_state, uhl)   
+        user_market = await UserMarket.load_multiple_by_uma(aver_client, [pubkey], [market], [uhl])
+        return user_market[0]
     
     @staticmethod
     async def load_multiple_by_uma(
@@ -195,7 +182,7 @@ class UserMarket():
         #Just use the first program to load. This should not matter for the purpose of parsing IDLs
         #TODO - review
         # res: list[UserMarketState] = await aver_client.programs[0].account['UserMarket'].fetch_multiple(pubkeys)
-        account_buffers = await load_multiple_bytes_data(aver_client.connection, pubkeys, [], False)
+        account_buffers = await load_multiple_bytes_data(aver_client.connection, pubkeys, [], True)
         res: list[UserMarketState] = UserMarket.parse_multiple_user_market_state(account_buffers, aver_client)
         # TODO parse with version
         uhls = await UserHostLifetime.load_multiple(aver_client, uhls)
@@ -692,6 +679,10 @@ class UserMarket():
             program_id = self.market.program_id
 
         program = await self.aver_client.get_program_from_program_id(program_id)
+
+        # find the corresponding order id incase they pass in aaob order in by accident
+        order_from_aaob_id = self.get_order_from_aaob_order_id(order_id)
+        order_id = order_from_aaob_id.order_id if order_from_aaob_id else order_id
 
         if(active_pre_flight_check):
             check_if_instruction_is_out_of_date_with_idl('cancel_order', program)
@@ -1245,13 +1236,17 @@ class UserMarket():
 
     async def make_update_all_accounts_if_required_instructions(self, fee_payer: PublicKey):
         ixs = []
+        program = await self.aver_client.get_program_from_program_id(self.program_id)
         if not await self.market.check_if_market_latest_version():
+            print(f"Creaing ix to update market from V{self.market.market_state.version} to V{get_version_of_account_type_in_program(AccountTypes.MARKET, program)}")
             ix = await self.market.make_update_market_state_instruction(fee_payer)
             ixs.append(ix)
         if not await self.user_host_lifetime.check_if_uhl_latest_version():
+            print(f"Creaing ix to update UHL from V{self.user_host_lifetime.user_host_lifetime_state.version} to V{get_version_of_account_type_in_program(AccountTypes.USER_HOST_LIFETIME, program)}")
             ix = await self.user_host_lifetime.make_update_user_host_lifetime_state_instruction()
             ixs.append(ix)
         if not await self.check_if_uma_latest_version():
+            print(f"Creaing ix to UMA market from V{self.user_market_state.version} to V{get_version_of_account_type_in_program(AccountTypes.USER_MARKET, program)}")
             ix = await self.make_update_user_market_state_instruction(fee_payer)
             ixs.append(ix)
         
@@ -1261,8 +1256,9 @@ class UserMarket():
         if(fee_payer == None):
             fee_payer = self.aver_client.owner
 
-        ixs = await self.make_update_all_accounts_if_required_instructions(fee_payer)
+        ixs = await self.make_update_all_accounts_if_required_instructions(fee_payer.public_key)
         if len(ixs) > 0:
+            print(f"Sending {len(ixs)} instructions to update states")
             return await sign_and_send_transaction_instructions(
                 self.aver_client,
                 [],
@@ -1350,3 +1346,6 @@ class UserMarket():
     
     def calculate_min_free_outcome_positions(self):
         return min([o.free for o in self.user_market_state.outcome_positions])
+
+    def get_order_from_aaob_order_id(self, aaob_order_id):
+        return next((order for order in self.user_market_state.orders if order.aaob_order_id and order.aaob_order_id == aaob_order_id), None)

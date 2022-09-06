@@ -77,7 +77,7 @@ class UserHostLifetime():
         res = await program.account['UserHostLifetime'].fetch_multiple(pubkeys)
         uhls: list[UserHostLifetime] = []
         for i, pubkey in enumerate(pubkeys):
-            uhls.append(UserHostLifetime(aver_client, pubkey, res[i]), program.program_id)
+            uhls.append(UserHostLifetime(aver_client, pubkey, res[i]))
         return uhls
 
     @staticmethod
