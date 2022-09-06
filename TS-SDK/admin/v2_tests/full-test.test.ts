@@ -165,6 +165,7 @@ describe("run all tests", () => {
     console.log("-".repeat(10))
     market = (await Market.load(client, marketPubkey)) as Market
     checkMarketIsAsExpected(market)
+    market = market
     console.log("-".repeat(10))
   })
 
@@ -211,17 +212,39 @@ describe("run all tests", () => {
     expect(uma.orders.length).toBe(0)
   })
 
-  test("market crank and matching", async () => {})
-
-  async function placeOrder(uma: UserMarket) {
-    const sig = await uma.placeOrder(
-      owner,
-      0,
-      Side.Bid,
-      0.6,
-      5,
-      SizeFormat.Payout
+  test("market crank and matching", async () => {
+    //Create 2nd UMA
+    const userMarket2 = await UserMarket.getOrCreateUserMarketAccount(
+      client,
+      owner2,
+      market,
+      undefined,
+      undefined,
+      host
     )
+    umas.push(userMarket2)
+    const uma1 = umas[0]
+    const uma2 = umas[1]
+
+    await placeOrder(uma1)
+    await placeOrder(uma2, false)
+    const sig = await market.crankMarket(owner, [0, 1])
+    await client.connection.confirmTransaction(sig, "confirmed")
+    await uma1.refresh()
+    await uma2.refresh()
+    expect(uma1.orders.length).toBe(0)
+    expect(uma2.orders.length).toBe(0)
+    console.log(uma1.market.volumeMatched)
+    expect(uma1.market.volumeMatched).toBeCloseTo(3 * 10 ** 6)
+  })
+
+  async function placeOrder(uma: UserMarket, bids: boolean = true) {
+    let sig = ""
+    if (bids) {
+      sig = await uma.placeOrder(owner, 0, Side.Bid, 0.6, 5, SizeFormat.Payout)
+    } else {
+      sig = await uma.placeOrder(owner, 0, Side.Ask, 0.4, 5, SizeFormat.Payout)
+    }
     await client.connection.confirmTransaction(sig, "confirmed")
     await uma.refresh()
   }
