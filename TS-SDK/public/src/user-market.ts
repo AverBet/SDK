@@ -28,6 +28,7 @@ import {
   UserMarketState,
 } from "./types"
 import {
+  chunkAndFetchMultiple,
   getBestDiscountToken,
   getVersionOfAccountTypeInProgram,
   parseWithVersion,
@@ -37,7 +38,7 @@ import { Market } from "./market"
 import BN from "bn.js"
 import {
   AVER_PROGRAM_IDS,
-  AVER_HOST_ACCOUNT,
+  getAverHostAccount,
   CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE,
   AVER_VERSION,
 } from "./ids"
@@ -144,7 +145,7 @@ export class UserMarket {
     averClient: AverClient,
     market: Market,
     owner?: PublicKey,
-    host: PublicKey = AVER_HOST_ACCOUNT
+    host: PublicKey = getAverHostAccount(averClient.solanaNetwork)
   ) {
     const umaOwner = owner || averClient.owner
 
@@ -232,7 +233,7 @@ export class UserMarket {
     averClient: AverClient,
     markets: Market[],
     owners?: PublicKey[],
-    host: PublicKey = AVER_HOST_ACCOUNT
+    host: PublicKey = getAverHostAccount(averClient.solanaNetwork)
   ) {
     const umaOwners = owners || Array(markets.length).fill(averClient.owner)
 
@@ -284,8 +285,10 @@ export class UserMarket {
       markets.map((m) => averClient.getProgramFromProgramId(m.programId))
     )
 
-    const userMarketResult =
-      await averClient.connection.getMultipleAccountsInfo(pubkeys)
+    const userMarketResult = await chunkAndFetchMultiple(
+      averClient.connection,
+      pubkeys
+    )
 
     const userMarketStates = UserMarket.deserializeMultipleUserMarketStoreData(
       averClient,
@@ -293,7 +296,6 @@ export class UserMarket {
     )
 
     const uhlAccounts = await UserHostLifetime.loadMultiple(averClient, uhls)
-
     const userPubkeys = userMarketStates.map(
       (umr) => umr?.user || new Keypair().publicKey
     )
@@ -355,7 +357,7 @@ export class UserMarket {
     averClient: AverClient,
     market: Market,
     owner?: PublicKey,
-    host: PublicKey = AVER_HOST_ACCOUNT,
+    host: PublicKey = getAverHostAccount(averClient.solanaNetwork),
     numberOfOrders: number = market.numberOfOutcomes * 5
   ): Promise<TransactionInstruction> {
     const umaOwner = owner || averClient.owner
@@ -424,7 +426,7 @@ export class UserMarket {
     owner: Keypair = averClient.keypair,
     sendOptions?: SendOptions,
     manualMaxRetry?: number,
-    host: PublicKey = AVER_HOST_ACCOUNT,
+    host: PublicKey = getAverHostAccount(averClient.solanaNetwork),
     numberOfOrders: number = market.numberOfOutcomes * 5
   ) {
     const createUserMarketAccountIx =
@@ -467,7 +469,7 @@ export class UserMarket {
     market: Market,
     sendOptions?: SendOptions,
     quoteTokenMint: PublicKey = averClient.quoteTokenMint,
-    host: PublicKey = AVER_HOST_ACCOUNT,
+    host: PublicKey = getAverHostAccount(averClient.solanaNetwork),
     numberOfOrders: number = market.numberOfOutcomes * 5,
     referrer: PublicKey = SystemProgram.programId
   ) {
@@ -645,7 +647,7 @@ export class UserMarket {
   static async derivePubkeyAndBump(
     owner: PublicKey,
     market: PublicKey,
-    host: PublicKey = AVER_HOST_ACCOUNT,
+    host: PublicKey,
     programId = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(

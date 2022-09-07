@@ -156,10 +156,10 @@ export class Market {
   ): Promise<(Market | null)[]> {
     // get programId of market
     const programIds = (
-      await averClient.connection.getMultipleAccountsInfo(pubkeys)
-    ).map((m: any) => m.owner)
+      await chunkAndFetchMultiple(averClient.connection, pubkeys)
+    ).map((m) => m?.owner)
     const programs = await Promise.all(
-      programIds.map((p) => averClient.getProgramFromProgramId(p))
+      programIds.map((p) => (p ? averClient.getProgramFromProgramId(p) : null))
     )
 
     const marketStorePubkeys = (
@@ -168,10 +168,10 @@ export class Market {
       return pubkey
     })
 
-    const marketResultsAndMarketStoreResults =
-      await averClient.connection.getMultipleAccountsInfo(
-        pubkeys.concat(marketStorePubkeys)
-      )
+    const marketResultsAndMarketStoreResults = await chunkAndFetchMultiple(
+      averClient.connection,
+      pubkeys.concat(marketStorePubkeys)
+    )
 
     const marketStateResults = marketResultsAndMarketStoreResults
       .slice(0, pubkeys.length)
@@ -530,13 +530,13 @@ export class Market {
    */
   private static async deriveMarketStorePubkeysAndBump(
     marketPubkeys: PublicKey[],
-    programIds: PublicKey[]
+    programIds: (PublicKey | null)[]
   ) {
     return await Promise.all(
       marketPubkeys.map((marketPubkey, i) => {
         return PublicKey.findProgramAddress(
           [Buffer.from("market-store", "utf-8"), marketPubkey.toBuffer()],
-          programIds[i]
+          programIds[i] || AVER_PROGRAM_IDS[0] // TODO make this dynamic
         )
       })
     )
@@ -886,6 +886,15 @@ export class Market {
     const program = await this._averClient.getProgramFromProgramId(
       this._programId
     )
+    const remainingAccounts = this._marketStoreState
+      ? [
+          {
+            pubkey: this.marketStore,
+            isSigner: false,
+            isWritable: true,
+          } as AccountMeta,
+        ]
+      : []
     return program.instruction["updateMarketState"]({
       accounts: {
         payer: feePayer,
@@ -894,6 +903,7 @@ export class Market {
         marketStore: this.marketStore,
         systemProgram: SystemProgram.programId,
       },
+      remainingAccounts: remainingAccounts,
     })
   }
 
