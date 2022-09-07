@@ -1,5 +1,4 @@
 from copy import deepcopy
-from tkinter.tix import Tree
 from pydash import chunk
 from .market import AverMarket
 from solana.publickey import PublicKey
@@ -10,7 +9,7 @@ from solana.keypair import Keypair
 from .version_checks import check_if_instruction_is_out_of_date_with_idl
 from solana.system_program import SYS_PROGRAM_ID
 from spl.token.constants import TOKEN_PROGRAM_ID
-from anchorpy import Context
+from anchorpy import Context, Program
 from .user_host_lifetime import UserHostLifetime
 from .aver_client import AverClient
 from .utils import get_version_of_account_type_in_program, load_multiple_bytes_data, sign_and_send_transaction_instructions, load_multiple_account_states, parse_user_market_state
@@ -179,12 +178,9 @@ class UserMarket():
         Returns:
             list[UserMarket]: List of UserMarket objects
         """
-        #Just use the first program to load. This should not matter for the purpose of parsing IDLs
-        #TODO - review
-        # res: list[UserMarketState] = await aver_client.programs[0].account['UserMarket'].fetch_multiple(pubkeys)
         account_buffers = await load_multiple_bytes_data(aver_client.connection, pubkeys, [], True)
-        res: list[UserMarketState] = UserMarket.parse_multiple_user_market_state(account_buffers, aver_client)
-        # TODO parse with version
+        programs = await gather(*[aver_client.get_program_from_program_id(m.program_id) for m in markets])
+        res: list[UserMarketState] = UserMarket.parse_multiple_user_market_state(account_buffers, aver_client, programs)
         uhls = await UserHostLifetime.load_multiple(aver_client, uhls)
 
         user_pubkeys = [u.user for u in res]
@@ -234,7 +230,8 @@ class UserMarket():
     @staticmethod
     def parse_multiple_user_market_state(
             buffer: list[bytes],
-            aver_client: AverMarket
+            aver_client: AverMarket,
+            programs: list[Program]
         ):
         """
         Parses raw onchain data to UserMarketState objects    
@@ -246,7 +243,7 @@ class UserMarket():
         Returns:
             list[UserMarketState]: List of UserMarketState objects
         """
-        return [parse_user_market_state(b, aver_client) for b in buffer]
+        return [parse_user_market_state(b, aver_client, programs[i]) for i, b in enumerate(buffer)]
 
     @staticmethod
     def derive_pubkey_and_bump(
@@ -439,7 +436,7 @@ class UserMarket():
                 host,
                 referrer,
                 discount_token,
-                market.program_id
+                market.program_id,
             )
 
             sig = await UserMarket.create_user_market_account(

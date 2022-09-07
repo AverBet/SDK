@@ -171,7 +171,7 @@ class AverMarket():
         market_states_and_program_ids = []
         for i, m in enumerate(res):
             state = parse_with_version(programs[i], AccountTypes.MARKET, m['data']) if m else None
-            program_id = programs[i].program_id if programs[i] else None
+            program_id = programs[i].program_id if programs[i] is not None else None
             market_states_and_program_ids.append({'state': state, 'program_id': program_id})
         return market_states_and_program_ids
         
@@ -241,7 +241,8 @@ class AverMarket():
         market_pubkeys: list[PublicKey], 
         market_states: list[MarketState], 
         market_stores: list[MarketStoreState],
-        slabs: list[Slab]
+        slabs: list[Slab],
+        program_ids: list[PublicKey]
         ):
         """
         Returns multiple AverMarket objects from their respective MarketStates, stores and orderbook objects
@@ -284,7 +285,7 @@ class AverMarket():
                 aver_client, 
                 m, 
                 market_states[i],
-                aver_client.programs[0].program_id,
+                program_ids[i],
                 market_stores[i],
                 all_orderbooks[i]
                 )

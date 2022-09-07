@@ -161,7 +161,9 @@ export class Orderbook {
    * @param {AccountInfo<Buffer | null>[]} slabsData
    * @returns {Slab[]} - Multiple deserialized Slab object
    */
-  static deserializeMultipleSlabData(slabsData: AccountInfo<Buffer | null>[]) {
+  static deserializeMultipleSlabData(
+    slabsData: (AccountInfo<Buffer> | null)[]
+  ) {
     return slabsData.map((d) =>
       !!d?.data ? Slab.deserialize(d.data, new BN(CALLBACK_INFO_LEN)) : null
     )

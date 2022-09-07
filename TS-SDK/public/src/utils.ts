@@ -240,7 +240,7 @@ export const getBestDiscountToken = async (
 export function parseWithVersion(
   program: Program,
   account_type: AccountType,
-  bytes: AccountInfo<Buffer | null>
+  bytes: AccountInfo<Buffer> | null
 ) {
   if (!bytes?.data) throw new Error("Buffer not found")
   //Version is 9th byte

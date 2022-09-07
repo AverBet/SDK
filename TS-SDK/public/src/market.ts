@@ -1,9 +1,11 @@
 import { EventFill, EventOut, Slab } from "@bonfida/aaob"
+import { BN, Wallet } from "@project-serum/anchor"
 import { Idl, IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl"
 import {
   IdlTypes,
   TypeDef,
 } from "@project-serum/anchor/dist/cjs/program/namespace/types"
+import { TOKEN_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token"
 import {
   AccountLayout,
   ACCOUNT_SIZE,
@@ -159,7 +161,7 @@ export class Market {
       await chunkAndFetchMultiple(averClient.connection, pubkeys)
     ).map((m) => m?.owner)
     const programs = await Promise.all(
-      programIds.map((p) => (p ? averClient.getProgramFromProgramId(p) : null))
+      programIds.map((p) => averClient.getProgramFromProgramId(p))
     )
 
     const marketStorePubkeys = (
@@ -205,7 +207,7 @@ export class Market {
             averClient,
             pubkeys[i],
             marketState,
-            programIds[i],
+            programIds[i] || AVER_PROGRAM_IDS[0],
             marketStoreStates[i] || undefined,
             nestedOrderbooks[i] || undefined
           )
@@ -397,7 +399,10 @@ export class Market {
       )
 
     const userHostLifetimes = accountsData
-      .slice(-userHostLifetimePubkeys.length)
+      .slice(
+        accountsData.length - userHostLifetimePubkeys.length,
+        accountsData.length
+      )
       .map((info, i) =>
         !!info
           ? new UserHostLifetime(
@@ -438,10 +443,12 @@ export class Market {
    */
   private static async deserializeMultipleMarketData(
     averClient: AverClient,
-    marketsData: AccountInfo<Buffer | null>[]
+    marketsData: (AccountInfo<Buffer> | null)[]
   ): Promise<(MarketState | null)[]> {
     const programs = await Promise.all(
-      marketsData.map((m) => averClient.getProgramFromProgramId(m.owner))
+      marketsData.map((m) =>
+        averClient.getProgramFromProgramId(m ? m.owner : AVER_PROGRAM_IDS[0])
+      )
     )
     return marketsData.map((marketData, i) =>
       parseWithVersion(programs[i], AccountType.MARKET, marketData)
@@ -457,7 +464,7 @@ export class Market {
    */
   private static async deserializeMultipleMarketStoreData(
     averClient: AverClient,
-    marketStoresData: AccountInfo<Buffer | null>[]
+    marketStoresData: (AccountInfo<Buffer> | null)[]
   ): Promise<(MarketStoreState | null)[]> {
     const programs = await Promise.all(
       marketStoresData.map((m) =>
@@ -530,7 +537,7 @@ export class Market {
    */
   private static async deriveMarketStorePubkeysAndBump(
     marketPubkeys: PublicKey[],
-    programIds: (PublicKey | null)[]
+    programIds: (PublicKey | undefined)[]
   ) {
     return await Promise.all(
       marketPubkeys.map((marketPubkey, i) => {
@@ -989,16 +996,41 @@ export class Market {
 
     if (!this.orderbookAccounts) throw new Error("No orderbook accounts")
 
-    return await program.rpc["consumeEvents"](max_iterations, outcome_idx, {
-      accounts: {
-        market: this.pubkey,
-        marketStore: this.marketStore,
-        orderbook: this.orderbookAccounts[outcome_idx].orderbook,
-        eventQueue: this.orderbookAccounts[outcome_idx].eventQueue,
-        rewardTarget: reward_target,
-      },
-      remainingAccounts: remainingAccountsUmas.concat(remainingAccountsAtas),
+    console.log({
+      market: this.pubkey,
+      marketStore: this.marketStore,
+      orderbook: this.orderbookAccounts[outcome_idx].orderbook,
+      eventQueue: this.orderbookAccounts[outcome_idx].eventQueue,
+      rewardTarget: reward_target,
+      quoteVault: this.quoteVault,
+      vaultAuthority: this.vaultAuthority,
+      splTokenProgram: TOKEN_PROGRAM_ID,
     })
+    console.log(remainingAccountsUmas.concat(remainingAccountsAtas))
+
+    console.log(program.provider.wallet.publicKey.toBase58())
+
+    //Wallet should be payer
+    //@ts-ignore
+    program.provider.wallet = new Wallet(payer)
+
+    return await program.rpc["consumeEvents"](
+      new BN(max_iterations),
+      new BN(outcome_idx),
+      {
+        accounts: {
+          market: this.pubkey,
+          marketStore: this.marketStore,
+          orderbook: this.orderbookAccounts[outcome_idx].orderbook,
+          eventQueue: this.orderbookAccounts[outcome_idx].eventQueue,
+          rewardTarget: reward_target,
+          quoteVault: this.quoteVault,
+          vaultAuthority: this.vaultAuthority,
+          splTokenProgram: TOKEN_PROGRAM_ID,
+        },
+        remainingAccounts: remainingAccountsUmas.concat(remainingAccountsAtas),
+      }
+    )
   }
 
   /**

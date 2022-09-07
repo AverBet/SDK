@@ -1,5 +1,4 @@
 from asyncio import gather
-import asyncio
 from datetime import datetime
 import math
 from dateutil.relativedelta import relativedelta
@@ -14,7 +13,7 @@ from solana.rpc.commitment import Confirmed, Finalized
 from ...public.src.pyaver.market import AverMarket
 from ...public.src.pyaver.enums import MarketStatus, Side, SizeFormat
 from solana.rpc.async_api import AsyncClient
-from ..instructions.init_uhl import derive_pubkey_and_bump, create_host_account
+from ..instructions.init_uhl import derive_pubkey_and_bump
 from solana.rpc.commitment import *
 from solana.rpc import types
 from ...public.src.pyaver.refresh import refresh_user_market
@@ -64,7 +63,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     solana_endpoint = get_solana_endpoint(network)
     connection = AsyncClient(solana_endpoint, Finalized)
     opts = types.TxOpts(False, False, Finalized)
-    self.client = await AverClient.load(connection, owner, opts, network, [self.first_program_id])
+    self.client = await AverClient.load(connection, owner, opts, network, [self.second_program_id, self.first_program_id])
     self.user_markets: list[UserMarket] = []
     self.host = derive_pubkey_and_bump(owner.public_key, self.first_program_id)[0]
 
@@ -106,7 +105,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
       payer=self.client.owner,
     )
     self.init_market_args = self.init_market_args._replace(number_of_outcomes=number_of_outcomes)
-    sig = await init_market_tx(self.client, self.init_market_args, accs)
+    sig = await init_market_tx(self.client, self.init_market_args, accs, self.first_program_id)
     #await self.client.connection.confirm_transaction(sig, Finalized)
     self.market = market
     print(f"Market created: {market.public_key}")
@@ -124,7 +123,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
         nodes_capacity=10,
         outcome_id=0,
         outcome_names=["one", "two"])
-      sig = await supplement_init_market_tx(self.client, args, accs)
+      sig = await supplement_init_market_tx(self.client, args, accs, self.first_program_id)
       #await self.client.connection.confirm_transaction(sig, Finalized)
       print(f"Successfully finished supplement init market")
     else:
@@ -135,7 +134,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
                 nodes_capacity=10,
                 outcome_id=i,
                 outcome_names=[str(i) + 'aa'])
-            coroutine = supplement_init_market_tx(self.client, args, accs)
+            coroutine = supplement_init_market_tx(self.client, args, accs, self.first_program_id)
             coroutines.append(coroutine)
         sigs = await gather(*coroutines)
         await gather(*[self.client.connection.confirm_transaction(sig, Finalized) for sig in sigs])
@@ -155,6 +154,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
   def check_market_is_as_expected(self, market: AverMarket):
       print('-'*10)
       print('TESTING MARKET CREATED AND LOADED CORRECTLY')
+      assert market.program_id.to_base58() == self.first_program_id.to_base58()
       assert self.init_market_args.cranker_reward == market.market_state.cranker_reward
       assert self.init_market_args.going_in_play_flag == market.market_state.going_in_play_flag
       assert MarketStatus.ACTIVE_PRE_EVENT == market.market_state.market_status
@@ -203,7 +203,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
 
   async def cancel_specific_order(self, uma: UserMarket, order_id = None):
     order_id = order_id if order_id else uma.user_market_state.orders[0].order_id
-    sig = await uma.cancel_order(order_id, 0)
+    sig = await uma.cancel_order(order_id, 0, program_id=uma.market.program_id)
     #await self.client.connection.confirm_transaction(sig['result'], Finalized)
     uma = await refresh_user_market(self.client, uma)
     print(f"Successfully cancelled the order: {sig}")

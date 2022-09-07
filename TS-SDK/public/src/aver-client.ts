@@ -203,10 +203,11 @@ export class AverClient {
   /**
    * Checks if a program is already loaded and returns it. If not, it loads it, saves it and returns it.
    *
-   * @param {PublicKey} programId - Program public key
+   * @param {PublicKey | undefined} programId - Program public key
    * @returns {Program} - Program
    */
-  async getProgramFromProgramId(programId: PublicKey) {
+  async getProgramFromProgramId(programId: PublicKey | undefined) {
+    if (!programId) return this.programs[0]
     for (const program of this._programs) {
       if (program.programId.equals(programId)) {
         return program

@@ -563,7 +563,7 @@ export class UserMarket {
    */
   static deserializeMultipleUserMarketStoreData(
     averClient: AverClient,
-    userMarketStoresData: AccountInfo<Buffer | null>[]
+    userMarketStoresData: (AccountInfo<Buffer> | null)[]
   ): (UserMarketState | null)[] {
     return userMarketStoresData.map((marketStoreData) =>
       marketStoreData

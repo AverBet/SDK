@@ -1,4 +1,4 @@
-from anchorpy import Context, Program
+from anchorpy import Context, Program, Wallet
 from .data_classes import UserMarketState
 from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .utils import load_multiple_bytes_data
