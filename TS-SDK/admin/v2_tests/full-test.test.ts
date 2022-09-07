@@ -214,6 +214,7 @@ describe("run all tests", () => {
 
   test("market crank and matching", async () => {
     //Create 2nd UMA
+    console.log("FIRST MESSAGE")
     const userMarket2 = await UserMarket.getOrCreateUserMarketAccount(
       client,
       owner2,
@@ -222,19 +223,23 @@ describe("run all tests", () => {
       undefined,
       host
     )
+    console.log("UMA 2 EXISTS")
     umas.push(userMarket2)
     const uma1 = umas[0]
     const uma2 = umas[1]
 
     await placeOrder(uma1)
+    console.log("ORDER 1 PLACED")
     await placeOrder(uma2, false)
+    console.log("ORDER 2 PLACED")
+    console.log("NEW ORDERS PLACED")
     const sig = await market.crankMarket(owner, [0, 1])
+    console.log("MARKT CRANKED")
     await client.connection.confirmTransaction(sig, "confirmed")
     await uma1.refresh()
     await uma2.refresh()
     expect(uma1.orders.length).toBe(0)
     expect(uma2.orders.length).toBe(0)
-    console.log(uma1.market.volumeMatched)
     expect(uma1.market.volumeMatched).toBeCloseTo(3 * 10 ** 6)
   })
 
@@ -243,7 +248,7 @@ describe("run all tests", () => {
     if (bids) {
       sig = await uma.placeOrder(owner, 0, Side.Bid, 0.6, 5, SizeFormat.Payout)
     } else {
-      sig = await uma.placeOrder(owner, 0, Side.Ask, 0.4, 5, SizeFormat.Payout)
+      sig = await uma.placeOrder(owner2, 0, Side.Ask, 0.4, 5, SizeFormat.Payout)
     }
     await client.connection.confirmTransaction(sig, "confirmed")
     await uma.refresh()
