@@ -138,7 +138,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
             coroutine = supplement_init_market_tx(self.client, args, accs)
             coroutines.append(coroutine)
         sigs = await gather(*coroutines)
-        #await gather(*[self.client.connection.confirm_transaction(sig, Finalized) for sig in sigs])
+        await gather(*[self.client.connection.confirm_transaction(sig, Finalized) for sig in sigs])
         print(f"Successfully finished supplement init market")
     print('-'*10)
 
@@ -237,19 +237,18 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     assert len(uma.user_market_state.orders) == 1
     #Orderbook
     bids_l2 = uma.market.orderbooks[0].get_bids_l2(10, True)
-    assert (bids_l2[0].price - 0.6) < 0.00001
-    assert (bids_l2[0].size - 5) < 0.00001
+    assert abs(bids_l2[0].price - 0.6) < 0.00001
+    assert abs(bids_l2[0].size - 5) < 0.00001
     bids_l3 = uma.market.orderbooks[0].get_bids_L3()
-    assert (bids_l3[0].base_quantity_ui - 5) < 0.00001
-    assert (bids_l3[0].price_ui - 0.6) < 0.00001
+    assert abs(bids_l3[0].base_quantity_ui - 5) < 0.00001
+    assert abs(bids_l3[0].price_ui - 0.6) < 0.00001
     assert (bids_l3[0].user_market.to_base58() == uma.pubkey.to_base58())
     self.check_uhl_state(uhl) #checking if UHL still loads after refresh
     self.check_uma_state(uma.user_market_state)
     order = uma.user_market_state.orders[0]
     price = uma.market.orderbooks[0].get_bid_price_by_order_id(order)
-    print(price)
-    assert (price.size - 5) < 0.00001
-    assert (price.price - 0.6) < 0.0001
+    assert abs(price.size - 5) < 0.00001
+    assert abs(price.price - 0.6) < 0.0001
 
     uma = await self.cancel_specific_order(uma)
     assert len(uma.user_market_state.orders) == 0
@@ -273,7 +272,7 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     uma_2 = await refresh_user_market(self.client, uma_2)
     assert len(uma.user_market_state.orders) == 0
     assert len(uma_2.user_market_state.orders) == 0
-    assert (uma.market.market_state.matched_count - 3 * (10 ** 6)) <= 1 #Sometimes there is a roudning error on the matched count
+    assert abs(uma.market.market_state.matched_count - 3 * (10 ** 6)) <= 1 #Sometimes there is a roudning error on the matched count
 
 
 # Executing the tests in the above test case class

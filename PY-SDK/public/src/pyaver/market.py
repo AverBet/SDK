@@ -115,7 +115,7 @@ class AverMarket():
         program_ids: list[PublicKey] = [m['program_id'] for m in market_states_and_program_ids]
         are_market_statuses_closed = [AverMarket.is_market_status_closed(market_state.market_status) if market_state else True for market_state in market_states]
 
-        market_store_pubkeys = [AverMarket.derive_market_store_pubkey_and_bump(m)[0] for m in market_pubkeys]
+        market_store_pubkeys = [AverMarket.derive_market_store_pubkey_and_bump(m, program_ids[i])[0] for i,m in enumerate(market_pubkeys)]
         market_stores: list[MarketStoreState] = await AverMarket.load_multiple_market_store_states(aver_client, market_store_pubkeys)
 
         orderbooks_market_list = await AverMarket.get_orderbooks_from_orderbook_accounts_multiple_markets(
