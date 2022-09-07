@@ -1,5 +1,6 @@
 from asyncio import gather
 from solana.rpc.async_api import AsyncClient
+from solana.transaction import AccountMeta
 from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .event_queue import load_all_event_queues, prepare_user_accounts_list
 from .aver_client import AverClient
@@ -544,6 +545,7 @@ class AverMarket():
 
     async def make_update_market_state_instruction(self, fee_payer: PublicKey):
         program = await self.aver_client.get_program_from_program_id(self.program_id)
+        remaining_accounts = [AccountMeta(self.market_state.market_store, False, True)] if self.market_store_state is not None else []
         return program.instruction['update_market_state'](
             ctx=Context(accounts={
                 "payer": fee_payer,
@@ -551,7 +553,9 @@ class AverMarket():
                 "market_store": self.market_state.market_store,
                 "market": self.market_pubkey,
                 "system_program": SYS_PROGRAM_ID 
-            })
+            },
+                remaining_accounts=remaining_accounts
+            ),
         )
 
     

@@ -897,6 +897,11 @@ export class Market {
 
   async makeUpdateMarketStateInstruction(feePayer: PublicKey) {
     const program = await this._averClient.getProgramFromProgramId(this._programId)
+    const remainingAccounts = this._marketStoreState ? [{
+      pubkey: this.marketStore,
+      isSigner: false,
+      isWritable: true
+    } as AccountMeta] : []
     return program.instruction['updateMarketState'](
       {
         accounts: {
@@ -905,7 +910,8 @@ export class Market {
           market: this.pubkey,
           marketStore: this.marketStore,
           systemProgram: SystemProgram.programId
-        }
+        },
+        remainingAccounts: remainingAccounts
       })
   }
 
