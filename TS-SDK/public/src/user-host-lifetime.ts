@@ -18,6 +18,7 @@ import { AverClient } from "./aver-client"
 import { AVER_PROGRAM_IDS, getAverHostAccount } from "./ids"
 import { AccountType, FeeTier, UserHostLifetimeState } from "./types"
 import {
+  chunkAndFetchMultiple,
   getBestDiscountToken,
   getVersionOfAccountTypeInProgram,
   parseWithVersion,
@@ -106,12 +107,15 @@ export class UserHostLifetime {
    */
   static async loadMultiple(averClient: AverClient, pubkeys: PublicKey[]) {
     const program = averClient.programs[0]
-    const uhld = await averClient.connection.getMultipleAccountsInfo(pubkeys)
+    const uhld = await chunkAndFetchMultiple(averClient.connection, pubkeys)
+    const programs = await Promise.all(
+      uhld.map((d) => averClient.getProgramFromProgramId(d?.owner))
+    )
 
     const userHostLifetimeStates =
       UserHostLifetime.deserializeMultipleUserHostLifetimesData(
-        averClient,
-        uhld
+        uhld,
+        programs
       ).map((r) => (r ? UserHostLifetime.parseHostState(r) : null))
 
     return userHostLifetimeStates.map((s, i) => {
@@ -129,16 +133,12 @@ export class UserHostLifetime {
    * @returns {(UserMarketState | null)[]} - UserMarketState objects
    */
   static deserializeMultipleUserHostLifetimesData(
-    averClient: AverClient,
-    userHostLifetimeStateData: (AccountInfo<Buffer> | null)[]
+    userHostLifetimeStateData: (AccountInfo<Buffer> | null)[],
+    programs: Program[]
   ): (UserHostLifetimeState | null)[] {
-    return userHostLifetimeStateData.map((uhld) =>
+    return userHostLifetimeStateData.map((uhld, i) =>
       uhld
-        ? parseWithVersion(
-            averClient.programs[0], // TODO find correct program
-            AccountType.USER_HOST_LIFETIME,
-            uhld
-          )
+        ? parseWithVersion(programs[i], AccountType.USER_HOST_LIFETIME, uhld)
         : null
     )
   }

@@ -61,6 +61,7 @@ import {
   checkUserMarketFull,
   checkUserPermissionAndQuoteTokenLimitExceeded,
 } from "./checks"
+import { Program } from "@project-serum/anchor"
 export class UserMarket {
   /**
    * Contains data on a user's orders on a particular market (for a particular host)
@@ -280,11 +281,6 @@ export class UserMarket {
     markets: Market[],
     uhls: PublicKey[]
   ) {
-    // TODO each market might have a different program
-    const programs = await Promise.all(
-      markets.map((m) => averClient.getProgramFromProgramId(m.programId))
-    )
-
     const userMarketResult = await chunkAndFetchMultiple(
       averClient.connection,
       pubkeys
@@ -384,25 +380,27 @@ export class UserMarket {
       pubkey: getBestDiscountTokenAccount,
     } as AccountMeta
 
-    // TODO check if instruction is out of date with IDL?
-
-    return program.instruction["initUserMarket"](numberOfOrders, {
-      accounts: {
-        user: umaOwner,
-        userHostLifetime: userHostLifetime,
-        userMarket: userMarket,
-        market: market.pubkey,
-        host: host,
-        systemProgram: SystemProgram.programId,
-      },
-      remainingAccounts: [],
-      //TODO - Remove this later as it is causing errors
-      // remainingAccounts: getBestDiscountTokenAccount.equals(
-      //   SystemProgram.programId
-      // )
-      //   ? []
-      //   : [discountTokenAccount],
-    })
+    if (program.programId.toBase58() == "") {
+      //DO something - Checks if instruction out of date with IDL
+    } else {
+      return program.instruction["initUserMarket"](numberOfOrders, {
+        accounts: {
+          user: umaOwner,
+          userHostLifetime: userHostLifetime,
+          userMarket: userMarket,
+          market: market.pubkey,
+          host: host,
+          systemProgram: SystemProgram.programId,
+        },
+        remainingAccounts: [],
+        //TODO - Remove this later as it is causing errors
+        // remainingAccounts: getBestDiscountTokenAccount.equals(
+        //   SystemProgram.programId
+        // )
+        //   ? []
+        //   : [discountTokenAccount],
+      })
+    }
   }
 
   /**
@@ -562,13 +560,13 @@ export class UserMarket {
    * @returns {(UserMarketState | null)[]} - UserMarketState objects
    */
   static deserializeMultipleUserMarketStoreData(
-    averClient: AverClient,
-    userMarketStoresData: (AccountInfo<Buffer> | null)[]
+    userMarketStoresData: (AccountInfo<Buffer> | null)[],
+    programs: Program[]
   ): (UserMarketState | null)[] {
-    return userMarketStoresData.map((marketStoreData) =>
+    return userMarketStoresData.map((marketStoreData, i) =>
       marketStoreData
         ? parseWithVersion(
-            averClient.programs[0], // TODO find correct program
+            programs[i], // TODO find correct program
             AccountType.USER_MARKET,
             marketStoreData
           )
@@ -600,6 +598,10 @@ export class UserMarket {
         (market) => market.orderbookAccounts
       ) as any as OrderbookAccountsState[][]
 
+    const programs = await Promise.all(
+      markets.map((m) => averClient.getProgramFromProgramId(m.programId))
+    )
+
     const multipleAccountStates = await Market.loadMultipleAccountStates(
       averClient,
       markets.map((market) => market.pubkey),
@@ -609,7 +611,8 @@ export class UserMarket {
       ),
       userMarkets.map((u) => u.pubkey),
       userMarkets.map((u) => u.user),
-      userMarkets.map((u) => u._userHostLifetime.pubkey)
+      userMarkets.map((u) => u._userHostLifetime.pubkey),
+      programs
     )
 
     const newMarkets = Market.getMarketsFromAccountStates(

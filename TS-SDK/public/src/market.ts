@@ -1,5 +1,5 @@
 import { EventFill, EventOut, Slab } from "@bonfida/aaob"
-import { BN, Wallet } from "@project-serum/anchor"
+import { BN, Program, Wallet } from "@project-serum/anchor"
 import { Idl, IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl"
 import {
   IdlTypes,
@@ -237,13 +237,21 @@ export class Market {
         (market) => market.orderbookAccounts
       ) as any as OrderbookAccountsState[][]
 
+    const programs = await Promise.all(
+      markets.map((m) => averClient.getProgramFromProgramId(m.programId))
+    )
+
     const multipleAccountStates = await Market.loadMultipleAccountStates(
       averClient,
       markets.map((market) => market.pubkey),
       markets.map((market) => market.marketStore),
       orderbookAccounts.flatMap((ordAcc) =>
         ordAcc?.flatMap((acc) => [acc.bids, acc.asks])
-      )
+      ),
+      undefined,
+      undefined,
+      undefined,
+      programs
     )
 
     return Market.getMarketsFromAccountStates(
@@ -322,7 +330,8 @@ export class Market {
     slabPubkeys: PublicKey[] = [],
     userMarketPubkeys: PublicKey[] = [],
     userPubkeys: PublicKey[] = [],
-    userHostLifetimePubkeys: PublicKey[] = []
+    userHostLifetimePubkeys: PublicKey[] = [],
+    programs: Program[]
   ): Promise<{
     marketStates: (MarketState | null)[]
     marketStoreStates: (MarketStoreState | null)[]
@@ -370,14 +379,14 @@ export class Market {
 
     const deserializedUserMarketData =
       UserMarket.deserializeMultipleUserMarketStoreData(
-        averClient,
         accountsData.slice(
           marketPubkeys.length + marketStorePubkeys.length + slabPubkeys.length,
           marketPubkeys.length +
             marketStorePubkeys.length +
             slabPubkeys.length +
             userMarketPubkeys.length
-        )
+        ),
+        programs
       )
 
     const lamportBalances: number[] = accountsData
@@ -409,8 +418,8 @@ export class Market {
               averClient,
               userHostLifetimePubkeys[i],
               UserHostLifetime.deserializeMultipleUserHostLifetimesData(
-                averClient,
-                [info]
+                [info],
+                programs
               )[0] as UserHostLifetimeState,
               info.owner
             )
@@ -543,7 +552,7 @@ export class Market {
       marketPubkeys.map((marketPubkey, i) => {
         return PublicKey.findProgramAddress(
           [Buffer.from("market-store", "utf-8"), marketPubkey.toBuffer()],
-          programIds[i] || AVER_PROGRAM_IDS[0] // TODO make this dynamic
+          programIds[i] || AVER_PROGRAM_IDS[0]
         )
       })
     )
@@ -996,23 +1005,11 @@ export class Market {
 
     if (!this.orderbookAccounts) throw new Error("No orderbook accounts")
 
-    console.log({
-      market: this.pubkey,
-      marketStore: this.marketStore,
-      orderbook: this.orderbookAccounts[outcome_idx].orderbook,
-      eventQueue: this.orderbookAccounts[outcome_idx].eventQueue,
-      rewardTarget: reward_target,
-      quoteVault: this.quoteVault,
-      vaultAuthority: this.vaultAuthority,
-      splTokenProgram: TOKEN_PROGRAM_ID,
-    })
-    console.log(remainingAccountsUmas.concat(remainingAccountsAtas))
-
-    console.log(program.provider.wallet.publicKey.toBase58())
-
     //Wallet should be payer
     //@ts-ignore
     program.provider.wallet = new Wallet(payer)
+
+    if (!reward_target) reward_target = program.provider.wallet.publicKey
 
     return await program.rpc["consumeEvents"](
       new BN(max_iterations),
@@ -1061,7 +1058,7 @@ export class Market {
     ) {
       outcome_idxs = [0]
     }
-    if (!reward_target) reward_target = this._averClient.owner
+    if (!reward_target) reward_target = payer.publicKey
 
     if (!this.orderbookAccounts) throw new Error("No orderbook accounts")
 

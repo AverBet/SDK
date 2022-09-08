@@ -22,7 +22,7 @@ from ..instructions.init_market import init_market_tx, InitMarketArgs, InitMarke
 from ..instructions.supplement_init_market import supplement_init_market_tx, SupplementInitMarketAccounts, SupplementInitMarketArgs
 
 #Change this to change test
-NUMBER_OF_OUTCOMES = 2
+NUMBER_OF_OUTCOMES = 3
 
 class TestSdkV3(unittest.IsolatedAsyncioTestCase):
   init_market_args = InitMarketArgs(

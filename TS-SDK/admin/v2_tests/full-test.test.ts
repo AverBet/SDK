@@ -5,13 +5,15 @@ import {
   Side,
   SizeFormat,
   SolanaNetwork,
-  UserHostLifetimeState,
-  UserMarketState,
 } from "../../public/src/types"
-import { getQuoteToken, getSolanaEndpoint } from "../../public/src/ids"
+import * as BufferLayout from "@solana/buffer-layout"
+import {
+  getQuoteToken,
+  getSolanaEndpoint,
+  USDC_DEVNET,
+} from "../../public/src/ids"
 import { AverClient } from "../../public/src/aver-client"
 import { Market } from "../../public/src/market"
-import { ConfirmOptions } from "@solana/web3.js"
 import { UserMarket } from "../../public/src/user-market"
 import { BN } from "@project-serum/anchor"
 import { createMarket, InitMarketArgs } from "../utils/create-market"
@@ -97,7 +99,7 @@ describe("run all tests", () => {
         commitment: "confirmed",
         preflightCommitment: "confirmed",
       },
-      [firstProgramId, secondProgramId]
+      [secondProgramId, firstProgramId]
     )
     host = (
       await PublicKey.findProgramAddress(
@@ -150,9 +152,11 @@ describe("run all tests", () => {
     expect(args.numberOfOutcomes).toBe(market.orderbooks?.length)
   }
 
-  function checkUMAState(uma: UserMarket, market: Market) {
+  function checkUMAState(uma: UserMarket, market: Market, owner: PublicKey) {
     expect(uma.market.pubkey.toBase58()).toBe(market.pubkey.toBase58())
-    expect(uma.user.toBase58()).toBe(owner.publicKey.toBase58())
+    expect(uma.user.toBase58()).toBe(owner.toBase58())
+    expect(uma.tokenBalanceUi).toBeGreaterThan(10) //Make sure trades can be placed
+    expect(uma.lamportBalanceUi).toBeGreaterThan(0.01) //Make sure trades can be placed
   }
 
   function checkUHLState(uhl: UserHostLifetime) {
@@ -184,7 +188,7 @@ describe("run all tests", () => {
     expect(uma.orders.length).toBe(0)
     expect(uma.market.orderbooks?.length).toBe(numberOfOutcomes)
     checkUHLState(uma.userHostLifetime)
-    checkUMAState(uma, market)
+    checkUMAState(uma, market, owner.publicKey)
   })
 
   test("place and cancel orders; orderbook checks", async () => {
@@ -201,7 +205,7 @@ describe("run all tests", () => {
     expect(bids_l3[0].price_ui).toBeCloseTo(0.6)
     expect(bids_l3[0].base_quantity_ui).toBeCloseTo(5)
     checkUHLState(uma.userHostLifetime) //Check if accounts still correct after refresh
-    checkUMAState(uma, market)
+    checkUMAState(uma, market, owner.publicKey)
 
     await cancelOrder(uma)
     expect(uma.orders.length).toBe(0)
@@ -214,7 +218,6 @@ describe("run all tests", () => {
 
   test("market crank and matching", async () => {
     //Create 2nd UMA
-    console.log("FIRST MESSAGE")
     const userMarket2 = await UserMarket.getOrCreateUserMarketAccount(
       client,
       owner2,
@@ -223,24 +226,19 @@ describe("run all tests", () => {
       undefined,
       host
     )
-    console.log("UMA 2 EXISTS")
     umas.push(userMarket2)
     const uma1 = umas[0]
     const uma2 = umas[1]
-
+    checkUMAState(uma2, market, owner2.publicKey)
     await placeOrder(uma1)
-    console.log("ORDER 1 PLACED")
     await placeOrder(uma2, false)
-    console.log("ORDER 2 PLACED")
-    console.log("NEW ORDERS PLACED")
     const sig = await market.crankMarket(owner, [0, 1])
-    console.log("MARKT CRANKED")
     await client.connection.confirmTransaction(sig, "confirmed")
     await uma1.refresh()
     await uma2.refresh()
     expect(uma1.orders.length).toBe(0)
     expect(uma2.orders.length).toBe(0)
-    expect(uma1.market.volumeMatched).toBeCloseTo(3 * 10 ** 6)
+    expect(uma1.market.volumeMatched).toBeCloseTo(3 * 10 ** 6, -1)
   })
 
   async function placeOrder(uma: UserMarket, bids: boolean = true) {
