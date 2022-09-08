@@ -1,4 +1,5 @@
 from asyncio import gather
+from cgitb import reset
 from datetime import datetime
 import math
 from dateutil.relativedelta import relativedelta
@@ -16,13 +17,16 @@ from solana.rpc.async_api import AsyncClient
 from ..instructions.init_uhl import derive_pubkey_and_bump
 from solana.rpc.commitment import *
 from solana.rpc import types
-from ...public.src.pyaver.refresh import refresh_user_market
+from ...public.src.pyaver.refresh import refresh_market, refresh_user_market
 from solana.publickey import PublicKey
 from ..instructions.init_market import init_market_tx, InitMarketArgs, InitMarketAccounts
 from ..instructions.supplement_init_market import supplement_init_market_tx, SupplementInitMarketAccounts, SupplementInitMarketArgs
+from ..instructions.close_aaob_tx import close_aaob_tx
+from ..instructions.change_market_status import change_market_status_tx
+from ..instructions.manual_resolve_market_tx import manual_resolve_market_tx
 
 #Change this to change test
-NUMBER_OF_OUTCOMES = 3
+NUMBER_OF_OUTCOMES = 2
 
 class TestSdkV3(unittest.IsolatedAsyncioTestCase):
   init_market_args = InitMarketArgs(
@@ -151,13 +155,13 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     print(f"Successfully loaded a market {market_pubkey}")
     print('-'*10)
 
-  def check_market_is_as_expected(self, market: AverMarket):
+  def check_market_is_as_expected(self, market: AverMarket, status: MarketStatus = MarketStatus.ACTIVE_PRE_EVENT):
       print('-'*10)
       print('TESTING MARKET CREATED AND LOADED CORRECTLY')
       assert market.program_id.to_base58() == self.first_program_id.to_base58()
       assert self.init_market_args.cranker_reward == market.market_state.cranker_reward
       assert self.init_market_args.going_in_play_flag == market.market_state.going_in_play_flag
-      assert MarketStatus.ACTIVE_PRE_EVENT == market.market_state.market_status
+      assert status == market.market_state.market_status
       assert self.init_market_args.max_quote_tokens_in == market.market_state.max_quote_tokens_in
       assert self.init_market_args.max_quote_tokens_in_permission_capped == market.market_state.max_quote_tokens_in_permission_capped
       assert self.init_market_args.permissioned_market_flag == market.market_state.permissioned_market_flag
@@ -208,6 +212,17 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     uma = await refresh_user_market(self.client, uma)
     print(f"Successfully cancelled the order: {sig}")
     return uma
+  
+  async def check_market_loads_correctly_after_orderbooks_closer(self, market: AverMarket, uma: UserMarket, status: MarketStatus):
+    market = await refresh_market(self.client, market)
+    self.check_market_is_as_expected(market, status)
+    market = await AverMarket.load(self.client, market.market_pubkey) #Check market loads correctly via 2 methods
+    self.check_market_is_as_expected(market, status)
+
+    uma = await refresh_user_market(self.client, uma)
+    self.check_uma_state(uma.user_market_state)
+    self.check_uhl_state(uma.user_host_lifetime.user_host_lifetime_state)
+
 
 
   # run all the tests in order we want
@@ -233,47 +248,57 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     self.check_uhl_state(uhl)
     self.check_uma_state(uma.user_market_state)
 
-    uma = await self.place_order_test(uma)
-    assert len(uma.user_market_state.orders) == 1
+    # uma = await self.place_order_test(uma)
+    # assert len(uma.user_market_state.orders) == 1
     #Orderbook
-    bids_l2 = uma.market.orderbooks[0].get_bids_l2(10, True)
-    assert abs(bids_l2[0].price - 0.6) < 0.00001
-    assert abs(bids_l2[0].size - 5) < 0.00001
-    bids_l3 = uma.market.orderbooks[0].get_bids_L3()
-    assert abs(bids_l3[0].base_quantity_ui - 5) < 0.00001
-    assert abs(bids_l3[0].price_ui - 0.6) < 0.00001
-    assert (bids_l3[0].user_market.to_base58() == uma.pubkey.to_base58())
-    self.check_uhl_state(uhl) #checking if UHL still loads after refresh
-    self.check_uma_state(uma.user_market_state)
-    order = uma.user_market_state.orders[0]
-    price = uma.market.orderbooks[0].get_bid_price_by_order_id(order)
-    assert abs(price.size - 5) < 0.00001
-    assert abs(price.price - 0.6) < 0.0001
+    # bids_l2 = uma.market.orderbooks[0].get_bids_l2(10, True)
+    # assert abs(bids_l2[0].price - 0.6) < 0.00001
+    # assert abs(bids_l2[0].size - 5) < 0.00001
+    # bids_l3 = uma.market.orderbooks[0].get_bids_L3()
+    # assert abs(bids_l3[0].base_quantity_ui - 5) < 0.00001
+    # assert abs(bids_l3[0].price_ui - 0.6) < 0.00001
+    # assert (bids_l3[0].user_market.to_base58() == uma.pubkey.to_base58())
+    # self.check_uhl_state(uhl) #checking if UHL still loads after refresh
+    # self.check_uma_state(uma.user_market_state)
+    # order = uma.user_market_state.orders[0]
+    # price = uma.market.orderbooks[0].get_bid_price_by_order_id(order)
+    # assert abs(price.size - 5) < 0.00001
+    # assert abs(price.price - 0.6) < 0.0001
 
-    uma = await self.cancel_specific_order(uma)
-    assert len(uma.user_market_state.orders) == 0
+    # uma = await self.cancel_specific_order(uma)
+    # assert len(uma.user_market_state.orders) == 0
 
-    uma = await self.place_order_test(uma)
-    uma = await self.place_order_test(uma)
-    assert len(uma.user_market_state.orders) == 2
+    # uma = await self.place_order_test(uma)
+    # uma = await self.place_order_test(uma)
+    # assert len(uma.user_market_state.orders) == 2
 
-    uma = await self.cancel_all_orders_test(uma)
-    assert len(uma.user_market_state.orders) == 0
+    # uma = await self.cancel_all_orders_test(uma)
+    # assert len(uma.user_market_state.orders) == 0
 
     #Order matching
-    await self.create_uma_test(self.owner_2)
-    uma_2 = self.user_markets[1]
-    uma = await self.place_order_test(uma)
-    uma_2 = await self.place_order_test(uma_2, False)
-    #Cranking
-    sig = await uma.market.crank_market([0,1], None, self.client.owner)
-    #await self.client.connection.confirm_transaction(sig, Finalized)
-    uma = await refresh_user_market(self.client, uma)
-    uma_2 = await refresh_user_market(self.client, uma_2)
-    assert len(uma.user_market_state.orders) == 0
-    assert len(uma_2.user_market_state.orders) == 0
-    assert abs(uma.market.market_state.matched_count - 3 * (10 ** 6)) <= 1 #Sometimes there is a roudning error on the matched count
+    # await self.create_uma_test(self.owner_2)
+    # uma_2 = self.user_markets[1]
+    # uma = await self.place_order_test(uma)
+    # uma_2 = await self.place_order_test(uma_2, False)
+    # #Cranking
+    # sig = await uma.market.crank_market([0,1], None, self.client.owner)
+    # #await self.client.connection.confirm_transaction(sig, Finalized)
+    # uma = await refresh_user_market(self.client, uma)
+    # uma_2 = await refresh_user_market(self.client, uma_2)
+    # assert len(uma.user_market_state.orders) == 0
+    # assert len(uma_2.user_market_state.orders) == 0
+    # assert abs(uma.market.market_state.matched_count - 3 * (10 ** 6)) <= 1 #Sometimes there is a roudning error on the matched count
 
+    #Resolve market and check
+    program = await self.client.get_program_from_program_id(self.aver_market.program_id)
+    await change_market_status_tx(program, self.aver_market, self.client.owner, MarketStatus.TRADING_CEASED)
+    await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, MarketStatus.TRADING_CEASED)
+
+    await close_aaob_tx(program, self.aver_market, self.client.owner, [0] if NUMBER_OF_OUTCOMES == 2 else range(NUMBER_OF_OUTCOMES))
+    await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, MarketStatus.TRADING_CEASED)
+
+    await manual_resolve_market_tx(program, self.market, self.client.owner, 1, MarketStatus.RESOLVED)
+    await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma)
 
 # Executing the tests in the above test case class
 if __name__ == "__main__":

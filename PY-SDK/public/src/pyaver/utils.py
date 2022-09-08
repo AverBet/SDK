@@ -298,7 +298,8 @@ async def load_multiple_account_states(
 
         all_pubkeys = market_pubkeys + market_store_pubkeys + user_market_pubkeys + uhl_pubkeys +  slab_pubkeys + user_pubkeys + all_ata_pubkeys 
         data = await load_multiple_bytes_data(aver_client.provider.connection, all_pubkeys, [], False)
-
+        
+        print([PublicKey(d['owner']).to_base58() for d in data[0: len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]])
         programs = await gather(*[aver_client.get_program_from_program_id(PublicKey(d['owner'])) for d in data[0: len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]])
        
         deserialized_market_state = []
