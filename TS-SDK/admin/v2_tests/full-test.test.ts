@@ -6,17 +6,15 @@ import {
   SizeFormat,
   SolanaNetwork,
 } from "../../public/src/types"
-import * as BufferLayout from "@solana/buffer-layout"
-import {
-  getQuoteToken,
-  getSolanaEndpoint,
-  USDC_DEVNET,
-} from "../../public/src/ids"
+import { getQuoteToken, getSolanaEndpoint } from "../../public/src/ids"
 import { AverClient } from "../../public/src/aver-client"
 import { Market } from "../../public/src/market"
 import { UserMarket } from "../../public/src/user-market"
 import { BN } from "@project-serum/anchor"
 import { createMarket, InitMarketArgs } from "../utils/create-market"
+import { changeMarketStatusTx } from "../utils/change-market-status"
+import { closeAaobTx } from "../utils/close-aaob"
+import { manualResolveMarketTx } from "../utils/resolve-market"
 import { UserHostLifetime } from "../../public/src/user-host-lifetime"
 
 jest.setTimeout(100000)
@@ -134,11 +132,14 @@ describe("run all tests", () => {
     console.log("-".repeat(10))
   })
 
-  function checkMarketIsAsExpected(market: Market) {
+  function checkMarketIsAsExpected(
+    market: Market,
+    status: MarketStatus = MarketStatus.ActivePreEvent
+  ) {
     console.log("TESTING MARKET CREATED AND LOADED CORRECTLY")
     expect(args.crankerReward.toString()).toBe(market.crankerReward.toString())
     expect(args.goingInPlayFlag).toBe(market.goingInPlayFlag)
-    expect(market.marketStatus).toBe(MarketStatus.ActivePreEvent)
+    expect(market.marketStatus).toBe(status)
     expect(args.maxQuoteTokensIn.toString()).toBe(
       market.maxQuoteTokensIn.toString()
     )
@@ -149,7 +150,30 @@ describe("run all tests", () => {
         market.feeTierCollectionBpsRates[i].toString()
       )
     })
-    expect(args.numberOfOutcomes).toBe(market.orderbooks?.length)
+    if (
+      status != MarketStatus.Resolved &&
+      status != MarketStatus.Voided &&
+      status != MarketStatus.CeasedCrankedClosed
+    ) {
+      expect(args.numberOfOutcomes).toBe(market.orderbooks?.length)
+    }
+  }
+
+  async function checkMarketLoadsCorrectlyAfterOrderbooksClosed(
+    market: Market,
+    uma: UserMarket,
+    status: MarketStatus
+  ) {
+    await market.refresh()
+    checkMarketIsAsExpected(market, status)
+    const market2 = await Market.load(client, market.pubkey)
+    expect(market2).toBeTruthy()
+    //@ts-ignore
+    checkMarketIsAsExpected(market2, status)
+
+    await uma.refresh()
+    checkUMAState(uma, market, owner.publicKey)
+    checkUHLState(uma.userHostLifetime)
   }
 
   function checkUMAState(uma: UserMarket, market: Market, owner: PublicKey) {
@@ -239,6 +263,36 @@ describe("run all tests", () => {
     expect(uma1.orders.length).toBe(0)
     expect(uma2.orders.length).toBe(0)
     expect(uma1.market.volumeMatched).toBeCloseTo(3 * 10 ** 6, -1)
+  })
+
+  test("resolve market and check it loads correctly", async () => {
+    const program = await client.getProgramFromProgramId(market.programId)
+    const uma = umas[0]
+    let sig = await changeMarketStatusTx(
+      program,
+      market,
+      owner,
+      MarketStatus.TradingCeased
+    )
+    await client.connection.confirmTransaction(sig, "confirmed")
+    await checkMarketLoadsCorrectlyAfterOrderbooksClosed(
+      market,
+      uma,
+      MarketStatus.TradingCeased
+    )
+
+    sig = await closeAaobTx(
+      program,
+      market,
+      owner,
+      numberOfOutcomes == 2 ? [0] : Array.from(Array(numberOfOutcomes).keys())
+    )
+    await client.connection.confirmTransaction(sig, "confirmed")
+    await checkMarketLoadsCorrectlyAfterOrderbooksClosed(market, uma, 8) //Seems to be an error with the MarketStatus naming
+
+    sig = await manualResolveMarketTx(program, market, owner, 1)
+    await client.connection.confirmTransaction(sig, "confirmed")
+    await checkMarketLoadsCorrectlyAfterOrderbooksClosed(market, uma, 9) //Seems to be an error with the MarketStatus naming
   })
 
   async function placeOrder(uma: UserMarket, bids: boolean = true) {

@@ -54,12 +54,7 @@ export async function createMarket(
     inPlayQueue: inPlayQueue.publicKey,
   }
 
-  console.log(accs)
-  console.log(args)
-
   const program = await client.getProgramFromProgramId(programId)
-
-  console.log(program.programId.toBase58())
 
   const initMarketIx = makeInitMarketInstruction(args, accs, program)
 

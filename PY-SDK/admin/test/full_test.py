@@ -215,7 +215,6 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
   
   async def check_market_loads_correctly_after_orderbooks_closer(self, market: AverMarket, uma: UserMarket, status: MarketStatus):
     market = await refresh_market(self.client, market)
-    print(market.market_state.market_status)
     self.check_market_is_as_expected(market, status)
     market = await AverMarket.load(self.client, market.market_pubkey) #Check market loads correctly via 2 methods
     self.check_market_is_as_expected(market, status)
@@ -296,10 +295,10 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, MarketStatus.TRADING_CEASED)
 
     await close_aaob_tx(program, self.aver_market, self.client.owner, [0] if NUMBER_OF_OUTCOMES == 2 else range(NUMBER_OF_OUTCOMES))
-    await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, 8) 
+    await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, 8) #
 
     await manual_resolve_market_tx(program, self.aver_market, self.client.owner, 1)
-    await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, 9)
+    await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, 9) #9 Means Voided, but actually the market is Resolved. I think the program needs to be updated
 
 # Executing the tests in the above test case class
 if __name__ == "__main__":
