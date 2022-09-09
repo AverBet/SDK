@@ -5,6 +5,7 @@ from spl.token.instructions import get_associated_token_address
 from spl.token._layouts import ACCOUNT_LAYOUT
 from spl.token.constants import ACCOUNT_LEN
 from .data_classes import UserBalanceState, MarketStatus
+from .constants import AVER_PROGRAM_IDS
 from solana.publickey import PublicKey
 from .errors import parse_error
 from hashlib import sha256
@@ -298,9 +299,7 @@ async def load_multiple_account_states(
 
         all_pubkeys = market_pubkeys + market_store_pubkeys + user_market_pubkeys + uhl_pubkeys +  slab_pubkeys + user_pubkeys + all_ata_pubkeys 
         data = await load_multiple_bytes_data(aver_client.provider.connection, all_pubkeys, [], False)
-        
-        print([PublicKey(d['owner']).to_base58() for d in data[0: len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]])
-        programs = await gather(*[aver_client.get_program_from_program_id(PublicKey(d['owner'])) for d in data[0: len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]])
+        programs = await gather(*[aver_client.get_program_from_program_id(PublicKey(d['owner'] if d else AVER_PROGRAM_IDS[0])) for d in data[0: len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]])
        
         deserialized_market_state = []
         for index, m in enumerate(market_pubkeys):
