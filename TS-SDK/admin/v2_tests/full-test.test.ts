@@ -20,7 +20,7 @@ import { UserHostLifetime } from "../../public/src/user-host-lifetime"
 jest.setTimeout(100000)
 
 //Change this to change test
-const numberOfOutcomes = 2
+const numberOfOutcomes = 3
 
 const args: InitMarketArgs = {
   numberOfOutcomes: 0,
@@ -285,6 +285,7 @@ describe("run all tests", () => {
       program,
       market,
       owner,
+      //@ts-ignore
       numberOfOutcomes == 2 ? [0] : Array.from(Array(numberOfOutcomes).keys())
     )
     await client.connection.confirmTransaction(sig, "confirmed")

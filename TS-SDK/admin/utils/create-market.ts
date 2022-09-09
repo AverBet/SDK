@@ -72,7 +72,7 @@ export async function createMarket(
   const numOfAobs = numberOfOutcomes === 2 ? 1 : numberOfOutcomes
   const outcomeNames = Array(numberOfOutcomes)
     .fill(0)
-    .map((v) => `outcomeNameBla`)
+    .map((v, i) => `outcomeNameBla${i}`)
   const supplementIxs: TransactionInstruction[] = []
 
   for (let i = 0; i < numOfAobs; i++) {
