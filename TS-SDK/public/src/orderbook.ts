@@ -403,7 +403,7 @@ export class Orderbook {
    * Example, a BUY on A at a (probability) price of 0.4 is equivelant to a SELL on B at a price of 0.6 (1-0.4) and vice versa.
    *
    * @param {Price} price - Price object
-   * @param uiAmount - Converts prices based on decimal precision if true. Defaults to False.
+   * @param {boolean} uiAmount - Converts prices based on decimal precision if true. Defaults to False.
    * @returns {Price} - Inverted Price object
    */
   private static invertPrice(price: Price, uiAmount?: boolean): Price {
@@ -460,11 +460,9 @@ export class Orderbook {
    *
    * See https://www.thebalance.com/order-book-level-2-market-data-and-depth-of-market-1031118 for more information
    *
-   * @param {number} depth - Number of orders to return
-   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
    * @returns {SlabOrder[]} - SlabOrder object lists
    */
-  getBidsL3(depth: number, uiAmount?: boolean) {
+  getBidsL3() {
     const isIncreasing = this._isInverted ? true : false
     return Orderbook.getL3ForSlab(
       this._slabBids,
@@ -479,11 +477,9 @@ export class Orderbook {
    *
    * See https://www.thebalance.com/order-book-level-2-market-data-and-depth-of-market-1031118 for more information
    *
-   * @param {number} depth - Number of orders to return
-   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
    * @returns {SlabOrder[]} - SlabOrder object lists
    */
-  getAsksL3(depth: number, uiAmount?: boolean) {
+  getAsksL3() {
     const isIncreasing = this._isInverted ? false : true
     return Orderbook.getL3ForSlab(
       this._slabAsks,

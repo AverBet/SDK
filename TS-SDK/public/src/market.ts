@@ -19,6 +19,7 @@ import {
   AccountMeta,
   SystemProgram,
   SendOptions,
+  TransactionInstruction,
 } from "@solana/web3.js"
 import { AverClient } from "./aver-client"
 import { loadAllEventQueues, prepareUserAccountsList } from "./event-queue"
@@ -264,6 +265,17 @@ export class Market {
     )
   }
 
+  /**
+   * Compiles account states into market objects
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {PublicKey[]} marketPubkeys - List of Market public keys
+   * @param {MarketState[]} marketStates - List of MarketState accounts
+   * @param {MarketStoreState[]} marketStoreStates - List of MarketStoreState accounts
+   * @param {Slab[]} slabs - List of Slab accounts
+   * @param {PublicKey[]} programIds - List of Program IDs
+   * @returns - List of Market objects
+   */
   static getMarketsFromAccountStates(
     averClient: AverClient,
     marketPubkeys: PublicKey[],
@@ -541,7 +553,7 @@ export class Market {
    * MarketStore account addresses are derived deterministically using the market's pubkey.
    *
    * @param {PublicKey[]} marketPubkeys - Markets' public keys
-   * @param {PublicKey} s - Program public keys. Defaults to AVER_PROGRAM_ID.
+   * @param {PublicKey} programIds - Program public keys.
    * @returns {PublicKey[]} - MarketStore public key
    */
   private static async deriveMarketStorePubkeysAndBump(
@@ -580,6 +592,7 @@ export class Market {
    * Quote Vault account addresses are derived deterministically using the market's pubkey.
    *
    * @param {PublicKey} marketPubkey - Market public key
+   * @param {SolanaNetwork} network - Network (DEVNET or MAINNET)
    * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
    * @returns {PublicKey} - Quote Vault public key
    */
@@ -886,6 +899,18 @@ export class Market {
     return orderbooks_market_list
   }
 
+  /**
+   * Returns what we believe the market status ought to be (rather than what is stored in the market's state on-chain)
+   *
+   * Note: As a fail safe, markets have specified times beyond which the market will react as if it is in another Status until it is formally cranked to that Status.
+   * For example, if Solana were to have issues and it was not possible for the market's authority to crank it into In-Play status or to Cease Trading in time,
+   * the market would use the System Time as a trigger to treat new requests as if it were in the later Status.
+   *
+   * If Solana clock time is beyond TradingCeaseTime, market is TradingCeased
+   * If Solana clock time is beyond InPlayStartTime but before TradingCeaseTime, market is ActiveInPlay
+   *
+   * @returns {Promise<MarketStatus>}
+   */
   async getImpliedMarketStatus(): Promise<MarketStatus> {
     const solanaDatetime = await this._averClient.getSystemClockDatetime()
     if (!solanaDatetime) return this.marketStatus
@@ -898,6 +923,14 @@ export class Market {
     return this.marketStatus
   }
 
+  /**
+   * Creates instruction to update market state to new version if the smart contract has an update.
+   *
+   * Returns TransactionInstruction object only. Does not send transaction.
+   *
+   * @param {PublicKey} feePayer - Pays transaction fees. Defaults to AverClient wallet
+   * @returns {Promise<TransactionInstruction>}
+   */
   async makeUpdateMarketStateInstruction(feePayer: PublicKey) {
     const program = await this._averClient.getProgramFromProgramId(
       this._programId
@@ -923,6 +956,16 @@ export class Market {
     })
   }
 
+  /**
+   * Updates market state account to latest version if the smart contract has an update
+   *
+   * Sends instructions on chain
+   *
+   * @param {Keypair | undefined} feePayer - Pays transaction fees. Defaults to AverClient wallet
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction.
+   * @param {nmber} manualMaxRetry - Max no. of times to retry the transaction if it fails
+   * @returns
+   */
   async updateMarketState(
     feePayer: Keypair | undefined = this._averClient.keypair,
     sendOptions?: SendOptions,
@@ -941,6 +984,13 @@ export class Market {
     )
   }
 
+  /**
+   * Returns true if market state does not need to be updated (using updateMarketState)
+   *
+   * Returns false if update required
+   *
+   * @returns {Promise<bool>} - Is update required
+   */
   async checkIfMarketLatestVersion() {
     const program = await this._averClient.getProgramFromProgramId(
       this._programId

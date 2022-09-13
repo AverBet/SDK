@@ -67,6 +67,7 @@ export class AverClient {
    *
    * @param {Program} programs - List of Aver program AnchorPy
    * @param {SolanaNetwork} solanaNetwork - Solana network
+   * @param {PublicKey} owner - Owner public key
    * @param {Keypair} keypair - Default keypair to use for paying transaction costs
    */
   private constructor(

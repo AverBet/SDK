@@ -129,6 +129,7 @@ async def sign_and_send_transaction_instructions(
         fee_payer (Keypair): Keypair to pay fee for transaction
         tx_instructions (list[TransactionInstruction]): List of transaction instructions to pack into transaction to be sent
         send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+        manual_max_retry (int, optional): Number of times to retry a transaction if it fails. Defaults to 0
 
     Raises:
         error: COMING SOON
@@ -213,6 +214,7 @@ def parse_user_market_state(buffer: bytes, aver_client: AverClient, program: Pro
         Args:
             buffer (bytes): Raw bytes coming from onchain
             aver_client (AverClient): AverClient object
+            program (Program, optional): Anchor Program. Defaults to first program in client.
 
         Returns:
             UserMarket: UserMarketState object
@@ -228,6 +230,7 @@ def parse_market_state(buffer: bytes, aver_client: AverClient, program: Program 
         Args:
             buffer (bytes): Raw bytes coming from onchain
             aver_client (AverClient): AverClient object
+            program (Program, optional): Anchor Program. Defaults to first program in client.
 
         Returns:
             MarketState: MarketState object
@@ -244,6 +247,7 @@ def parse_market_store(buffer: bytes, aver_client: AverClient, program = None):
         Args:
             buffer (bytes): Raw bytes coming from onchain
             aver_client (AverClient): AverClient
+            program (Program, optional): Anchor Program. Defaults to first program in client.
 
         Returns:
             MarketStore: MarketStore object
@@ -261,6 +265,7 @@ def parse_user_host_lifetime_state(aver_client: AverClient, buffer, program: Pro
         Args:
             aver_client (AverClient): AverClient object
             buffer (bytes): Raw bytes coming from onchain
+            program (Program, optional): Anchor Program. Defaults to first program in client.
 
         Returns:
             UserHostLifetime: UserHostLifetime object
@@ -290,10 +295,10 @@ async def load_multiple_account_states(
             slab_pubkeys (list[PublicKey]): List of Slab public keys for orderbooks
             user_market_pubkeys (list[PublicKey], optional): List of UserMarketState object public keys. Defaults to [].
             user_pubkeys (list[PublicKey], optional): List of UserMarket owners' public keys. Defaults to [].
-            uhl_pubkeuys(list[PublicKey], optional): List of UserHostLifetime public keys. Defaults to []
+            uhl_pubkeys(list[PublicKey], optional): List of UserHostLifetime public keys. Defaults to []
 
         Returns:
-            dict[str, list]: Dictionary containing `market_states`, `market_stores`, `slabs`, `user_market_states`, `user_balance_sheets`
+            dict[str, list]: Dictionary containing `market_states`, `market_stores`, `slabs`, `user_market_states`, `user_balance_sheets`, `program_ids`
         """
         all_ata_pubkeys = [get_associated_token_address(u, aver_client.quote_token) for u in user_pubkeys]
 

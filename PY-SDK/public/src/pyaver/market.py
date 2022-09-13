@@ -1,4 +1,3 @@
-from asyncio import gather
 from solana.rpc.async_api import AsyncClient
 from solana.transaction import AccountMeta
 from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
@@ -11,7 +10,7 @@ from spl.token.instructions import get_associated_token_address
 from solana.keypair import Keypair
 from .enums import AccountTypes, Fill, MarketStatus
 from .constants import AVER_MARKET_AUTHORITY, AVER_PROGRAM_IDS
-from .utils import get_version_of_account_type_in_program, load_multiple_bytes_data, parse_bytes_data, parse_with_version, sign_and_send_transaction_instructions, parse_market_store, parse_market_state
+from .utils import get_version_of_account_type_in_program, load_multiple_bytes_data, parse_with_version, sign_and_send_transaction_instructions
 from .data_classes import MarketState, MarketStoreState, OrderbookAccountsState
 from .orderbook import Orderbook
 from .slab import Slab
@@ -255,6 +254,7 @@ class AverMarket():
             market_states (list[MarketState]): List of MarketState objects
             market_stores (list[MarketStoreState]): List of MarketStoreState objects
             slabs (list[Slab]): List of slab objects (used in orderbooks)
+            program_ids (list[PublicKey]): List of each market's corresponding program_id
 
         Returns:
             lst[AverMarket]: List of AverMarket objects
@@ -297,7 +297,6 @@ class AverMarket():
     @staticmethod
     async def load_market_store_state(
         aver_client: AverClient, 
-        is_market_status_closed: bool,
         market_store_pubkey: PublicKey, 
         ) -> MarketStoreState:
         """
@@ -305,7 +304,6 @@ class AverMarket():
 
         Args:
             aver_client (AverClient): AverClient object
-            is_market_status_closed (bool): True if market status is closed, voided or resolved
             market_store_pubkey (PublicKey): MarketStore public key
 
         Returns:
@@ -519,6 +517,17 @@ class AverMarket():
         )
 
     async def make_update_market_state_instruction(self, fee_payer: PublicKey):
+        """
+        Creates instruction to update market state to new version if the smart contract has an update
+
+        Returns TransactionInstruction object only. Does not send transaction.
+
+        Args:
+            fee_payer (PublicKey): Pays transaction fees. Defaults to AverClient wallet
+
+        Returns:
+            TransactionInstruction: TransactionInstruction object
+        """
         program = await self.aver_client.get_program_from_program_id(self.program_id)
         remaining_accounts = [AccountMeta(self.market_state.market_store, False, True)] if self.market_store_state is not None else []
         return program.instruction['update_market_state'](
@@ -535,6 +544,18 @@ class AverMarket():
 
     
     async def update_market_state(self, fee_payer: Keypair = None, send_options: TxOpts = None):
+        """
+        Updates market state account to latest version if the smart contract has an update
+
+        Sends instructions on chain
+
+        Args:
+            fee_payer (Keypair, optional): Pays transaction fees. Defaults to AverClient wallet
+            send_options (TxOpts, optional): 
+
+        Returns:
+            RPCResponse: Response
+        """
         if(fee_payer == None):
             fee_payer = self.aver_client.owner
 
@@ -549,6 +570,14 @@ class AverMarket():
         )
 
     async def check_if_market_latest_version(self):
+        """
+        Returns true if market state does not need to be updated (using update_market_state)
+
+        Returns false if update required
+
+        Returns:
+            Boolean: Is update required
+        """
         program = await self.aver_client.get_program_from_program_id(self.program_id)
         if(self.market_state.version < get_version_of_account_type_in_program(AccountTypes.MARKET, program)):
             print("Market needs to be upgraded")
@@ -600,6 +629,11 @@ class AverMarket():
         """
         Refresh market before cranking
         If no outcome_idx are passed, all outcomes are cranked if they meet the criteria to be cranked.
+
+        Args:
+            fee_payer (Keypair, optional): Pays transaction fees. Defaults to AverClient wallet
+            reward_target (PublicKey, optional): Reward Target. Defaults to payer
+            send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
         """
         if outcome_idxs == None:
             # For binary markets, there is only one orderbook

@@ -80,16 +80,31 @@ class MarketStoreState():
 
 @dataclass
 class Price():
+    """
+    Price object
+
+    Holds data on an order in the Orderbook (L2 or L3)
+    """
     price: float
     size: float
 
 @dataclass
 class OutcomePosition():
+    """
+    OutcomePosition object
+
+    Holds data on a user's position
+    """
     free: int
     locked: int
 
 @dataclass
 class UmaOrder():
+    """
+    UmaOrder object
+
+    Holds data on a particular user's orders
+    """
     order_id: int
     outcome_id: int
     base_qty: int

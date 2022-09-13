@@ -282,25 +282,73 @@ class Orderbook:
             size=p.size
             )
 
-    def derive_orderbook(market: PublicKey, outcome_id: int, program_id):
+    def derive_orderbook(market: PublicKey, outcome_id: int, program_id: PublicKey):
+        """
+        Derives PDA (Program Derived Account) for Orderbook public key.
+        Orderbook account addresses are derived deterministically using the market's pubkey and outcome id
+
+        Args:
+            market_pubkey (PublicKey): Market public key
+            outcome_id (int): Outcome ID
+            program_id (PublicKey): Program public key
+
+        Returns:
+            Orderbook Public Key (PublicKey): Orderbook Public Key
+        """
         return PublicKey.find_program_address(
             [bytes('orderbook', 'utf-8'), bytes(market), to_uint8_bytes(outcome_id)], program_id
         )
 
 
-    def derive_event_queue(market: PublicKey, outcome_id: int, program_id):
+    def derive_event_queue(market: PublicKey, outcome_id: int, program_id: PublicKey):
+        """
+        Derives PDA (Program Derived Account) for Event Queue public key.
+        EventQueue account addresses are derived deterministically using the market's pubkey and outcome id
+
+        Args:
+            market_pubkey (PublicKey): Market public key
+            outcome_id (int): Outcome ID
+            program_id (PublicKey): Program public key
+
+        Returns:
+            EventQueue Public Key (PublicKey): EventQueue Public Key
+        """
         return PublicKey.find_program_address(
             [bytes('event-queue', 'utf-8'), bytes(market), to_uint8_bytes(outcome_id)], program_id
         )
 
 
-    def derive_bids(market: PublicKey, outcome_id: int, program_id):
+    def derive_bids(market: PublicKey, outcome_id: int, program_id: PublicKey):
+        """
+        Derives PDA (Program Derived Account) for Bids public key.
+        Bids account addresses are derived deterministically using the market's pubkey and outcome id
+
+        Args:
+            market_pubkey (PublicKey): Market public key
+            outcome_id (int): Outcome ID
+            program_id (PublicKey): Program public key
+
+        Returns:
+            Bids Public Key (PublicKey): Bids Public Key
+        """
         return PublicKey.find_program_address(
             [bytes('bids', 'utf-8'), bytes(market), to_uint8_bytes(outcome_id)], program_id
         )
 
 
-    def derive_asks(market: PublicKey, outcome_id: int, program_id):
+    def derive_asks(market: PublicKey, outcome_id: int, program_id: PublicKey):
+        """
+        Derives PDA (Program Derived Account) for Bids public key.
+        Bids account addresses are derived deterministically using the market's pubkey and outcome id
+
+        Args:
+            market_pubkey (PublicKey): Market public key
+            outcome_id (int): Outcome ID
+            program_id (PublicKey): Program public key
+
+        Returns:
+            Bids Public Key (PublicKey): Bids Public Key
+        """
         return PublicKey.find_program_address(
             [bytes('asks', 'utf-8'), bytes(market), to_uint8_bytes(outcome_id)], program_id
         )
@@ -430,10 +478,10 @@ class Orderbook:
     
     def get_bid_price_by_order_id(self, order: UmaOrder):
         """
-        Gets bid Price object by order_id
+        Gets bid Price object by UMA Order
 
         Args:
-            order_id (int): Order ID
+            UMA Order (UmaOrder): UMA Order
 
         Returns:
             Price: Price object (size and price)
@@ -456,10 +504,10 @@ class Orderbook:
 
     def get_ask_price_by_order_id(self, order: UmaOrder):
         """
-        Gets ask Price object by order_id
+        Gets ask Price object by UMA Order
 
         Args:
-            order_id (int): Order ID
+            UMA Order (UmaOrder): UMA Order
 
         Returns:
             Price: Price object (size and price)

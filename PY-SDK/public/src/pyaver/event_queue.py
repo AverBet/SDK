@@ -36,7 +36,7 @@ def read_event_queue_from_bytes(buffer: bytes) -> Tuple[Container, List[Union[Fi
         buffer (bytes): Raw bytes coming from onchain
 
     Returns:
-        Tuple[Container, List[Union[Fill, Out]]]: _description_
+        Tuple[Container, List[Union[Fill, Out]]]: List of headers and nodes (indexed by 'header' and 'node')
     """
     header = EVENT_QUEUE_HEADER_LAYOUT.parse(buffer)
     buffer_len = len(buffer)
@@ -106,7 +106,7 @@ async def consume_events(
             max_iterations (int, optional): Depth of events to iterate through. Defaults to MAX_ITERATIONS_FOR_CONSUME_EVENTS.
             reward_target (PublicKey, optional): Target for reward. Defaults to AverClient wallet.
             payer (Keypair, optional): Fee payer. Defaults to AverClient wallet.
-            quote_tone (PublicKey, optional): Quote Token. Defaults to AverClient quote token
+            quote_token (PublicKey, optional): Quote Token. Defaults to AverClient quote token
 
         Returns:
             Transaction Signature: TransactionSignature object

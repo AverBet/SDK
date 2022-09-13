@@ -291,7 +291,8 @@ export function parseWithVersion(
  * Calculates and returns a unique 8 byte discriminator prepended to all anchor accounts.
  *
  * @param {AccountType} account_type - The name of the account to calculate the discriminator.
- * @param {number} version - Aver version of account
+ * @param {number} version - Version of account
+ * @param {number} latest_version - Most up to date version of Aver
  */
 function accountDiscriminator(
   account_type: AccountType,

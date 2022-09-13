@@ -259,7 +259,7 @@ class UserMarket():
             owner (PublicKey): Owner of UserMarket account
             market (PublicKey): Corresponding Market account public key
             host (PublicKey): Host public key
-            program_id (PublicKey, optional): _description_. Defaults to AVER_PROGRAM_ID.
+            program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
 
         Returns:
             PublicKey: UserMarket account public key
@@ -491,6 +491,7 @@ class UserMarket():
             order_type (OrderType, optional): OrderType object. Defaults to OrderType.LIMIT.
             self_trade_behavior (SelfTradeBehavior, optional): Behavior when a user's trade is matched with themselves. Defaults to SelfTradeBehavior.CANCEL_PROVIDE.
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to False.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Raises:
             Exception: Cannot place error on closed market
@@ -602,6 +603,7 @@ class UserMarket():
             order_type (OrderType, optional): OrderType object. Defaults to OrderType.LIMIT. Other options include OrderType.IOC, OrderType.KILL_OR_FILL, OrderType.POST_ONLY.
             self_trade_behavior (SelfTradeBehavior, optional): Behavior when a user's trade is matched with themselves. Defaults to SelfTradeBehavior.CANCEL_PROVIDE. Other options include SelfTradeBehavior.DECREMENT_TAKE and SelfTradeBehavior.ABORT_TRANSACTION.
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to True. 
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Raises:
             Exception: Owner must be same as user market owner
@@ -659,6 +661,7 @@ class UserMarket():
             order_id (int): ID of order to cancel
             outcome_id (int): ID of outcome
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to False.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Raises:
             Exception: Cannot cancel orders on closed market
@@ -757,6 +760,7 @@ class UserMarket():
             outcome_id (int): ID of outcome
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to True.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Returns:
             RPCResponse: Response
@@ -801,6 +805,7 @@ class UserMarket():
         Args:
             outcome_ids_to_cancel (list[int]): List of outcome ids to cancel orders on
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to False.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Raises:
             Exception: Cannot cancel orders on closed market
@@ -913,6 +918,7 @@ class UserMarket():
             outcome_ids_to_cancel (list[int]): List of outcome ids to cancel orders on
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to True.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Returns:
             RPCResponse: Response
@@ -952,6 +958,7 @@ class UserMarket():
         Args:
             user_quote_token_ata (PublicKey): Quote token ATA public key (holds funds for this user)
             amount (float, optional): amount. Defaults to maximum available funds.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Returns:
             TransactionInstruction: TransactionInstruction object
@@ -996,6 +1003,7 @@ class UserMarket():
             owner (Keypair): Owner of UserMarket account
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             amount (float, optional): amount. Defaults to None.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Raises:
             Exception: Owner must be same as UMA owner
@@ -1039,6 +1047,7 @@ class UserMarket():
 
         Args:
             outcome_id (int): Outcome ids to neutralize positions on
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Returns:
             TransactionInstruction: TransactionInstruction object
@@ -1099,6 +1108,7 @@ class UserMarket():
             owner (Keypair): Owner of UserMarket account
             outcome_id (int): Outcome ids to neutralize positions on
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Raises:
             Exception: Owner must be same as UMA owner
@@ -1137,6 +1147,7 @@ class UserMarket():
 
         Args:
             new_size (int): New number of open orders available
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Returns:
             TransactionInstruction: TransactionInstruction object
@@ -1180,6 +1191,7 @@ class UserMarket():
             owner (Keypair): Owner of UserMarket account
             new_size (int): New number of open orders available
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Raises:
             Exception: Owner must be same as UMA owner
@@ -1206,6 +1218,17 @@ class UserMarket():
         )
 
     async def make_update_user_market_state_instruction(self, fee_payer = None):
+        """
+        Creates instruction to update user market state to new version if the smart contract has an update
+
+        Returns TransactionInstruction object only. Does not send transaction.
+
+        Args:
+            fee_payer (PublicKey): Pays transaction fees. Defaults to AverClient wallet
+
+        Returns:
+            TransactionInstruction: TransactionInstruction object
+        """
         program = await self.aver_client.get_program_from_program_id(self.program_id)
         fee_payer = fee_payer if fee_payer else self.aver_client.owner.public_key
         return program.instruction['update_user_market_state'](
@@ -1218,6 +1241,18 @@ class UserMarket():
         )
 
     async def update_user_market_state(self, fee_payer: Keypair = None, send_options: TxOpts = None):
+        """
+        Updates user market state account to latest version if the smart contract has an update
+
+        Sends instructions on chain
+
+        Args:
+            fee_payer (Keypair, optional): Pays transaction fees. Defaults to AverClient wallet
+            send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+
+        Returns:
+            RPCResponse: Response
+        """
         if(fee_payer == None):
             fee_payer = self.aver_client.owner
 
@@ -1232,6 +1267,17 @@ class UserMarket():
         )
 
     async def make_update_all_accounts_if_required_instructions(self, fee_payer: PublicKey):
+        """
+        Creates instruction to all accounts state to new version if the smart contract has an update
+
+        Returns TransactionInstruction object only. Does not send transaction.
+
+        Args:
+            fee_payer (PublicKey): Pays transaction fees. Defaults to AverClient wallet
+
+        Returns:
+            TransactionInstruction: TransactionInstruction object
+        """
         ixs = []
         program = await self.aver_client.get_program_from_program_id(self.program_id)
         if not await self.market.check_if_market_latest_version():
@@ -1250,6 +1296,18 @@ class UserMarket():
         return ixs
 
     async def update_all_accounts_if_required(self, fee_payer: Keypair = None, send_options: TxOpts = None):
+        """
+        Updates all accounts account to latest version if the smart contract has an update
+
+        Sends instructions on chain
+
+        Args:
+            fee_payer (Keypair, optional): Pays transaction fees. Defaults to AverClient wallet
+            send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+
+        Returns:
+            RPCResponse: Response
+        """
         if(fee_payer == None):
             fee_payer = self.aver_client.owner
 
@@ -1269,6 +1327,14 @@ class UserMarket():
     
 
     async def check_if_uma_latest_version(self):
+        """
+        Returns true if market state does not need to be updated (using update_user_market_state)
+
+        Returns false if update required
+
+        Returns:
+            Boolean: Is update required
+        """
         program = await self.aver_client.get_program_from_program_id(self.market.program_id)
         if(self.user_market_state.version < get_version_of_account_type_in_program(AccountTypes.USER_MARKET, program)):
             print("User market account needs to be upgraded")

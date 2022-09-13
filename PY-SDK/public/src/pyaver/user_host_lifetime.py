@@ -36,6 +36,7 @@ class UserHostLifetime():
         Args:
             pubkey (PublicKey): UserHostLifetime public key
             user_host_lifetime_state (UserHostLifetimeState): UserHostLifetimeState public key
+            program_id (PublicKey): Program public key. Defaults to AVER_PROGRAM_ID.
         """
         self.pubkey = pubkey
         self.user_host_lifetime_state = user_host_lifetime_state
@@ -288,6 +289,14 @@ class UserHostLifetime():
         )
 
     async def check_if_uhl_latest_version(self):
+        """
+        Returns true if UHL does not need to be updated (using update_user_host_lifetime_state)
+
+        Returns false if update required
+
+        Returns:
+            Boolean: Is update required
+        """
         program = await self.aver_client.get_program_from_program_id(self.program_id)
         if(self.user_host_lifetime_state.version < get_version_of_account_type_in_program(AccountTypes.USER_HOST_LIFETIME, program)):
             print("User host lifetime needs to be upgraded")

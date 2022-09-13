@@ -227,7 +227,6 @@ export class UserMarket {
    * @param {Market[]} markets - List of corresponding AverMarket objects (in correct order)
    * @param {PublicKey[]} owners - List of owners of UserMarket account
    * @param {PublicKey} host - Host account public key. Defaults to AVER_HOST_ACCOUNT.
-   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
    * @returns {Promise<(UserMarket | undefined)[]>} List of UserMarket objects
    */
   static async loadMultiple(
@@ -345,7 +344,6 @@ export class UserMarket {
    * @param {PublicKey} owner - Owner of UserMarket account
    * @param {PublicKey} host - Host account public key. Defaults to AVER_HOST_ACCOUNT.
    * @param {number} numberOfOrders - Max no. of open orders on UMA. Defaults to 5*number of market outcomes.
-   * @param {PublicKey} programId -  Program public key. Defaults to AVER_PROGRAM_ID.
    *
    * @returns {Promise<TransactionInstruction>} - TransactionInstruction object
    */
@@ -415,7 +413,6 @@ export class UserMarket {
    * @param {number} manualMaxRetry - No. of times to retry in case of failure
    * @param {PublicKey} host - Host account public key. Defaults to AVER_HOST_ACCOUNT.
    * @param {number} numberOfOrders - Max no. of open orders on UMA. Defaults to 5*number of market outcomes.
-   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
    * @returns {Promise<String>} Transaction signature
    */
   static async createUserMarketAccount(
@@ -457,7 +454,6 @@ export class UserMarket {
    * @param {PublicKey} host - Host account public key. Defaults to AVER_HOST_ACCOUNT.
    * @param {number} numberOfOrders - Max no. of open orders on UMA. Defaults to 5*number of market outcomes.
    * @param {PublicKey} referrer - Referrer account public key. Defaults to SYS_PROGRAM_ID.
-   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
    *
    * @returns {Promise<UserMarket>} - UserMarket account object
    */
@@ -891,57 +887,6 @@ export class UserMarket {
       }
     )
   }
-
-  // //Why are there 2? - TODO make this better
-  // /**
-  //  *
-  //  * @param outcomeIndex
-  //  * @param side
-  //  * @param limitPrice
-  //  * @param size
-  //  * @param sizeFormat
-  //  * @param market
-  //  * @param user
-  //  * @param averClient
-  //  * @param userHostLifetime
-  //  * @param umaPubkey
-  //  * @param orderType
-  //  * @param selfTradeBehavior
-  //  * @returns
-  //  */
-  // static async makePlaceOrderInstruction(
-  //   outcomeIndex: number,
-  //   side: Side,
-  //   limitPrice: number,
-  //   size: number,
-  //   sizeFormat: SizeFormat,
-  //   market: Market,
-  //   user: PublicKey,
-  //   averClient: AverClient,
-  //   umaPubkey: PublicKey,
-  //   userHostLifetime: PublicKey,
-  //   orderType: OrderType = OrderType.Limit,
-  //   selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide
-  // ) {
-  //   const dummyUma = new UserMarket(
-  //     averClient,
-  //     umaPubkey,
-  //     { user: user, userHostLifetime: userHostLifetime },
-  //     market,
-  //     null,
-  //     { pubkey: userHostLifetime }
-  //   )
-  //   return dummyUma.makePlaceOrderInstruction(
-  //     outcomeIndex,
-  //     side,
-  //     limitPrice,
-  //     size,
-  //     sizeFormat,
-  //     orderType,
-  //     selfTradeBehavior,
-  //     false
-  //   )
-  // }
 
   /**
    * Places a new order
@@ -1434,6 +1379,14 @@ export class UserMarket {
     )
   }
 
+  /**
+   * Creates instruction to update user market state to new version if the smart contract has an update
+   *
+   * Returns TransactionInstruction object only. Does not send transaction.
+   *
+   * @param {PublicKey} payer - Pays for transaction
+   * @returns {Promise<TransactionInstruction>} - TransactionInstruction
+   */
   async makeUpdateUserMarketStateInstruction(payer: PublicKey = this.user) {
     const program = await this._averClient.getProgramFromProgramId(
       this.market.programId
@@ -1448,6 +1401,16 @@ export class UserMarket {
     })
   }
 
+  /**
+   * Updates user market state account to latest version if the smart contract has an update
+   *
+   * Sends instructions on chain
+   *
+   * @param {Keypair} payer - Pays for transaction.
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction. Defaults to None.
+   * @param {number} manualMaxRetry - No. of times to retry in case of failure
+   * @returns {Promise<string>} - Transaction signature
+   */
   async updateUserMarketState(
     payer: Keypair = this._averClient.keypair,
     sendOptions?: SendOptions,
@@ -1552,6 +1515,13 @@ export class UserMarket {
     return minFreeTokensExceptOutcomeIndex + price * this.tokenBalance
   }
 
+  /**
+   * Returns true if market state does not need to be updated (using update_user_market_state)
+   *
+   * Returns false if update required
+   *
+   * @returns {boolean} - Is update required
+   */
   async checkIfUmaLatestVersion() {
     const program = await this._averClient.getProgramFromProgramId(
       this.market.programId
@@ -1566,6 +1536,14 @@ export class UserMarket {
     return true
   }
 
+  /**
+   * Creates instruction to all accounts state to new version if the smart contract has an update
+   *
+   * Returns TransactionInstruction object only. Does not send transaction.
+   *
+   * @param {Keypair} payer - Pays for transaction
+   * @returns {Promise<TransactionInstruction>} - TransactionInstruction
+   */
   async makeUpdateAllAccountsIfRequiredInstructions(
     payer: PublicKey = this.user
   ) {
@@ -1592,6 +1570,16 @@ export class UserMarket {
     return ixs
   }
 
+  /**
+   * Updates all accounts account to latest version if the smart contract has an update
+   *
+   * Sends instructions on chain
+   *
+   * @param {Keypair} payer - Pays transaction fee
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction. Defaults to None.
+   * @param {number} manualMaxRetry - No. of times to retry in case of failure
+   * @returns {Promise<string>} - Transaction signature
+   */
   async updateAllAccountsIfRequired(
     payer: Keypair = this._averClient.keypair,
     sendOptions?: SendOptions,

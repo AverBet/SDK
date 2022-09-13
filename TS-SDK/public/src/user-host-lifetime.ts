@@ -62,6 +62,7 @@ export class UserHostLifetime {
    * @param {AverClient} averClient - AverClient object
    * @param {PublicKey} pubkey - UserHostLifetime public key
    * @param {UserHostLifetimeState} userHostLifetimeState - UserHostLifetimeState public key
+   * @param {PublicKey} programId - Program ID of the UHL
    */
   constructor(
     averClient: AverClient,
@@ -462,6 +463,10 @@ export class UserHostLifetime {
     return this._userHostLifetimeState.version
   }
 
+  /**
+   * Function coming soon
+   *
+   */
   async makeUpdateUserHostLifetimeStateInstruction() {
     const program = await this._averClient.getProgramFromProgramId(
       this._programId
@@ -471,6 +476,15 @@ export class UserHostLifetime {
     return new TransactionInstruction(undefined)
   }
 
+  /**
+   * Function coming soon
+   *
+   *
+   * @param {Keypair | undefined} payer - Pays transaction fees. Defaults to AverClient wallet
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction
+   * @param {number} manualMaxRetry - Max no. of times to retry a transaction incase it fails
+   * @returns {Promise<string>} - Transaction Signature
+   */
   async updateUserHostLifetimeState(
     payer: Keypair | undefined = this._averClient.keypair,
     sendOptions?: SendOptions,
@@ -489,6 +503,13 @@ export class UserHostLifetime {
     )
   }
 
+  /**
+   * Returns true if UHL does not need to be updated (using update_user_host_lifetime_state)
+   *
+   * Returns false if update required
+   *
+   * @returns {Promise<boolean>} - Is update required
+   */
   async checkIfUhlLatestVersion() {
     const program = await this._averClient.getProgramFromProgramId(
       this._programId

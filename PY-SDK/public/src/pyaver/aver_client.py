@@ -75,9 +75,6 @@ class AverClient():
                 network (SolanaNetwork): Solana network
                 program_id (PublicKey, optional): Program public key. Defaults to latest AVER_PROGRAM_ID specified in constants.py.
 
-            Raises:
-                Exception: Invalid owner argument
-
             Returns:
                 AverClient: AverClient
             """
