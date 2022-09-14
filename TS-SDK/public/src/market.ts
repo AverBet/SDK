@@ -411,7 +411,9 @@ export class Market {
     const tokenBalances = accountsData
       .slice(
         -userPubkeys.length - userHostLifetimePubkeys.length,
-        -userPubkeys.length
+        -userHostLifetimePubkeys.length === 0
+          ? accountsData.length
+          : -userHostLifetimePubkeys.length
       )
       .map((info) =>
         info?.data?.length == ACCOUNT_SIZE

@@ -256,9 +256,13 @@ export class UserMarket {
       pubkeys
     )
 
+    const programs = await Promise.all(
+      markets.map((m) => averClient.getProgramFromProgramId(m.programId))
+    )
+
     const userMarketStates = UserMarket.deserializeMultipleUserMarketStoreData(
-      averClient,
-      userMarketResult
+      userMarketResult,
+      programs
     )
 
     const uhlAccounts = await UserHostLifetime.loadMultiple(averClient, uhls)

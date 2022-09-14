@@ -203,6 +203,7 @@ describe("run all tests", () => {
   })
 
   test("UMA / UHL tests", async () => {
+    //@ts-ignore
     userMarket = await UserMarket.getOrCreateUserMarketAccount(
       client,
       owner,
@@ -255,6 +256,7 @@ describe("run all tests", () => {
       undefined,
       host
     )
+    //@ts-ignore
     umas.push(userMarket2)
     const uma1 = umas[0]
     const uma2 = umas[1]

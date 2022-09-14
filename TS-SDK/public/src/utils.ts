@@ -43,9 +43,7 @@ export const signAndSendTransactionInstructions = async (
   manualMaxRetry?: number
 ): Promise<string> => {
   let tx = new Transaction()
-  if (feePayer instanceof Wallet) {
-    signers.push(feePayer.publicKey)
-  } else {
+  if (!(feePayer instanceof Wallet)) {
     tx.feePayer = feePayer.publicKey
     signers.push(feePayer)
     tx.add(...txInstructions)
