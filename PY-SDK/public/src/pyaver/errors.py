@@ -1,5 +1,4 @@
 from anchorpy import Program
-from anchorpy.error import ProgramError, _ExtendedRPCError
 from solana.rpc.core import RPCException
 import ast
 

@@ -1,10 +1,11 @@
 import asyncio
+from datetime import datetime
 import base58
 from solana.rpc.async_api import AsyncClient
 from solana.keypair import Keypair
 from pyaver.enums import SolanaNetwork
 from pyaver.aver_client import AverClient
-from pyaver.constants import get_solana_endpoint, AVER_PROGRAM_ID, get_aver_api_endpoint
+from pyaver.constants import get_solana_endpoint, AVER_PROGRAM_IDS
 from solana.rpc.types import TxOpts
 from solana.rpc.commitment import Confirmed
 import base58 
@@ -14,7 +15,7 @@ from solana.publickey import PublicKey
 from pyaver.market import AverMarket
 from pyaver.user_market import UserMarket
 from requests import get
-from token_airdrop import request_token_airdrop
+from token_airdrop import request_token_airdrop, api_endpoint
 
 # ----------------------------------------------------
 #    DEVNET AVER INTERACTION EXAMPLE
@@ -38,8 +39,6 @@ async def main():
     secret_key = base58.b58decode('zSaKmpRbsJQQjmMRQsADRQ1vss8P2SQLbxGiiL8LFf9rJ8bFT8S1jAqj8Fkwg9hyq6vb97rR8EDkyu5EFD2tFbj')
     owner_keypair = Keypair.from_secret_key(secret_key)
     print(f'Keypair loaded with public key {owner_keypair.public_key}')
-
-
     
     # ----------------------------------------------------
     #    GENERATE AN AVERCLIENT INSTANCE TO INTERACT
@@ -56,12 +55,12 @@ async def main():
         commitment = 'confirmed',
         timeout = 30
     )
-    client = await AverClient.load(
+    client: AverClient = await AverClient.load(
         connection=connection, 
         owner=owner_keypair, 
         opts=opts, 
         network=SolanaNetwork.DEVNET, 
-        program_id=AVER_PROGRAM_IDS[0]
+        program_ids=AVER_PROGRAM_IDS
     )
 
 
@@ -89,7 +88,7 @@ async def main():
     )
     token_balance = await client.request_token_balance(client.quote_token, owner_keypair.public_key)
     print(f' - Old token balance: {token_balance}')
-    txn_signature = request_token_airdrop(client.aver_api_endpoint, client.quote_token,owner_keypair.public_key, 1_000_000_000)['signature']
+    txn_signature = request_token_airdrop(api_endpoint(client.solana_network), client.quote_token,owner_keypair.public_key, 1_000_000_000)['signature']
     # Wait to ensure transaction has been confirmed before moving on
     await client.provider.connection.confirm_transaction(txn_signature, Confirmed) 
     token_balance = await client.request_token_balance(client.quote_token, owner_keypair.public_key)
@@ -105,11 +104,10 @@ async def main():
     # Here we simply load all markets and will select the first one in the section below
     # To find out more, query https://dev.api.aver.exchange/v2/markets/ in your browser
 
-    all_markets = get(get_aver_api_endpoint(SolanaNetwork.DEVNET) + '/v2/markets')
+    all_markets = get(api_endpoint(client.solana_network) + 'v2/markets')
     
     #Load all active markets from endpoint
     market_pubkeys = [PublicKey(m['pubkey']) for m in all_markets.json() if m['internal_status'] == 'active']
-
 
     # ----------------------------------------------------
     #    LOAD THE AVERMARKET IN-MEMORY
@@ -121,7 +119,7 @@ async def main():
     #Loads market data from onchain
     loaded_markets = await AverMarket.load_multiple(client, market_pubkeys)
     #Ensure market is in ACTIVE_PRE_EVENT status so we can place orders on it
-    active_pre_event_markets = list(filter(lambda market: market.market_state.market_status == MarketStatus.ACTIVE_PRE_EVENT, loaded_markets))
+    active_pre_event_markets = list(filter(lambda market: market.market_state.market_status == MarketStatus.ACTIVE_PRE_EVENT and market.market_state.trading_cease_time > datetime.utcnow().timestamp() if market is not None else False, loaded_markets))
     #Let's just pick the first market in the list
     market = active_pre_event_markets[0]
 

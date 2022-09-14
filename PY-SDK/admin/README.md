@@ -3,7 +3,7 @@
 Run using `python3 -m PY-SDK.admin.test.full_test` whilst in the TOP level directory (SDK)
 
 Make sure you have the latest version of pyaver installed.
-Currently: `pip install -i https://test.pypi.org/simple/ pyaver==0.0.10`
+Currently: `pip install -i https://test.pypi.org/simple/ pyaver==0.0.26`
 
 ## Uploading a new version
 

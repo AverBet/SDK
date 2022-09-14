@@ -1,5 +1,6 @@
 from solana.publickey import PublicKey
 from requests import post, get
+from pyaver.constants import SolanaNetwork
 
 def request_token_airdrop(
     aver_api_endpoint: str,
@@ -18,4 +19,10 @@ def request_token_airdrop(
 
     response = post(url, body)
     return response.json()
+
+def api_endpoint(network: SolanaNetwork):
+    if(network == SolanaNetwork.DEVNET):
+        return 'https://dev.api.aver.exchange/'
+    else:
+        return 'https://api.aver.exchange/'
 
