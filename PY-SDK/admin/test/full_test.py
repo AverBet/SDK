@@ -234,6 +234,10 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     #sig = await create_host_account(self.client, self.client.owner, self.client.owner, program_id=self.first_program_id)
     #await self.client.provider.connection.confirm_transaction(sig['result'], Finalized)
 
+    #Load market that doesn't exist
+    m = await AverMarket.load(self.client, Keypair().public_key)
+    assert m is None
+
     # aver market tests
     await self.create_market(NUMBER_OF_OUTCOMES)
     await self.load_market_test(self.market.public_key)

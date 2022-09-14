@@ -61,7 +61,7 @@ async def main():
         owner=owner_keypair, 
         opts=opts, 
         network=SolanaNetwork.DEVNET, 
-        program_id=AVER_PROGRAM_ID
+        program_id=AVER_PROGRAM_IDS[0]
     )
 
 
