@@ -123,6 +123,11 @@ describe("run all tests", () => {
     console.log("-".repeat(10))
   })
 
+  test("load a market that does not exist", async () => {
+    const fakeMarket = await Market.load(client, new Keypair().publicKey)
+    expect(fakeMarket).toBeNull()
+  })
+
   test("create aver market", async () => {
     console.log("-".repeat(10))
     console.log("CREATING AVER MARKET")

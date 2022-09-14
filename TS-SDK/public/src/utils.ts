@@ -1,4 +1,4 @@
-import { Program, ProgramError } from "@project-serum/anchor"
+import { Program, ProgramError, Wallet } from "@project-serum/anchor"
 import {
   Keypair,
   Connection,
@@ -37,17 +37,25 @@ import { AccountType } from "./types"
 export const signAndSendTransactionInstructions = async (
   client: AverClient,
   signers: Array<Keypair>,
-  feePayer: Keypair,
+  feePayer: Keypair | Wallet,
   txInstructions: Array<TransactionInstruction>,
   sendOptions?: SendOptions,
   manualMaxRetry?: number
 ): Promise<string> => {
-  const tx = new Transaction()
-  tx.feePayer = feePayer.publicKey
-  signers.push(feePayer)
-  tx.add(...txInstructions)
+  let tx = new Transaction()
+  if (feePayer instanceof Wallet) {
+    signers.push(feePayer.publicKey)
+  } else {
+    tx.feePayer = feePayer.publicKey
+    signers.push(feePayer)
+    tx.add(...txInstructions)
+  }
   let attempts = 0
   let errorThrown = new Error("Transaction failed")
+
+  if (feePayer instanceof Wallet) {
+    tx = await feePayer.signTransaction(tx)
+  }
 
   while (attempts <= (manualMaxRetry || 0)) {
     try {

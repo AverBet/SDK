@@ -547,17 +547,6 @@ export class Orderbook {
     return this._isInverted ? Orderbook.invertPrice(askPrice) : askPrice
   }
 
-  // TODO make this more efficient - tried with the new method but doesnt work for some orderIds...
-  // getPriceByOrderId(orderId: BN): PriceAndSide | undefined {
-  //   const bidPrice = this.getBidPriceByOrderId(orderId)
-  //   if (bidPrice) return {...this.convertPrice(bidPrice), side: Side.Bid}
-
-  //   const askPrice = this.getBidPriceByOrderId(orderId)
-  //   if (askPrice) return {...this.convertPrice(askPrice), side: Side.Ask}
-
-  //   return undefined
-  // }
-
   /**
    * Gets Price object by orderId
    *

@@ -20,7 +20,6 @@ class MarketState():
     decimals: int 
     cranker_reward: int 
     matched_count: int
-    prize_balance: int
     stable_quote_token_balance: int
     winning_outcome: int
     permissioned_market_flag: bool
@@ -28,7 +27,7 @@ class MarketState():
     max_quote_tokens_in: int
     max_quote_tokens_in_permission_capped: str
     outcome_names: list[str]
-    version: float
+    version: int
     number_of_umas: int
     vault_bump: int
     trading_cease_time: int
@@ -76,7 +75,10 @@ class MarketStoreState():
     min_new_order_base_size: int
     min_new_order_quote_size: int
     version: float
-    init_counter: float
+    init_counter: int
+    re_init_counter: int
+    order_id_counter: int
+    in_play_delay_seconds: int or None
 
 @dataclass
 class Price():
@@ -112,6 +114,23 @@ class UmaOrder():
     aaob_order_id: int
 
 @dataclass
+class InPlayOrder():
+    order_id: int
+    outcome_id: int
+    side: int
+    limit_price: float
+    size_format: int
+    size: int
+    order_type: int
+    self_trade_behavior: int
+    fee_tier: FeeTier
+    total_quote_qty: int
+    total_base_qty: int
+    post_only: bool
+    post_allowed: bool
+    neutralize: bool
+
+@dataclass
 class UserMarketState():
     """
     User market state object
@@ -133,6 +152,7 @@ class UserMarketState():
     version: int
     user_verification_account: PublicKey or None
     user_host_lifetime: PublicKey
+    in_play_orders: list[InPlayOrder]
 
 @dataclass
 class ReferrerState():

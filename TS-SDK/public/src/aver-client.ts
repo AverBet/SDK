@@ -7,7 +7,7 @@ import {
   PublicKey,
   Signer,
 } from "@solana/web3.js"
-import { Program, Provider } from "@project-serum/anchor"
+import { Program, Provider, Wallet } from "@project-serum/anchor"
 import NodeWallet from "@project-serum/anchor/dist/cjs/nodewallet"
 import {
   getOrCreateAssociatedTokenAccount,
@@ -99,7 +99,7 @@ export class AverClient {
   static async loadAverClient(
     connection: Connection,
     solanaNetwork: SolanaNetwork = SolanaNetwork.Devnet,
-    owner: null | PublicKey | Keypair,
+    owner: null | Wallet | Keypair,
     opts?: ConfirmOptions,
     programIds: PublicKey[] = AVER_PROGRAM_IDS
   ) {
@@ -112,11 +112,11 @@ export class AverClient {
       wallet = new NodeWallet(owner)
       keypair = owner
       pubkey = owner.publicKey
-    } else if (owner instanceof PublicKey) {
+    } else if (owner instanceof Wallet) {
       // create a dummy wallet
       keypair = new Keypair()
-      wallet = new NodeWallet(keypair)
-      pubkey = owner
+      wallet = owner
+      pubkey = wallet.publicKey
     } else {
       // create a dummy wallet
       keypair = new Keypair()

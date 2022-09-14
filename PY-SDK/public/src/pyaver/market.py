@@ -173,48 +173,6 @@ class AverMarket():
             program_id = programs[i].program_id if programs[i] is not None else None
             market_states_and_program_ids.append({'state': state, 'program_id': program_id})
         return market_states_and_program_ids
-        
-    
-    # @staticmethod
-    # async def load_market_state_and_store(aver_client: AverClient, market_pubkey: PublicKey):
-    #     """
-    #     @DEPRECATED
-    #     Loads onchain data for multiple MarketStates and MarketStoreStates at once
-
-    #     Args:
-    #         aver_client (AverClient): AverClient object
-    #         market_pubkey (PublicKey]: Market public key
-
-    #     Returns:
-    #         dict[str, list[MarketState] or list[MarketStoreState]]: Keys are market_states or market_stores
-    #     """
-    #     return await AverMarket.load_multiple_market_states_and_stores(aver_client, [market_pubkey])
-
-    
-    # @staticmethod
-    # @deprecate
-    # async def load_multiple_market_states_and_stores(aver_client: AverClient, market_pubkeys: list[PublicKey]):
-    #     """
-    #     Loads onchain data for multiple MarketStates and MarketStoreStates at once
-
-    #     Args:
-    #         aver_client (AverClient): AverClient object
-    #         market_pubkeys (list[PublicKey]): List of market public keys
-
-    #     Returns:
-    #         dict[str, list[MarketState] or list[MarketStoreState]]: Keys are market_states or market_stores
-    #     """
-
-    #     market_store_pubkeys = [AverMarket.derive_market_store_pubkey_and_bump(m, AVER_PROGRAM_ID)[0] for m in market_pubkeys]
-
-    #     data = await load_multiple_bytes_data(aver_client.connection, market_pubkeys + market_store_pubkeys)
-    #     market_states_data = data[0:len(market_pubkeys)]
-    #     market_stores_data = data[len(market_pubkeys):]
-
-    #     market_states = [parse_market_state(d, aver_client) for d in market_states_data]
-    #     market_stores = [parse_market_store(d, aver_client) if d is not None else None for d in market_stores_data]
-
-    #     return {'market_states': market_states, 'market_stores': market_stores}
 
     @staticmethod
     def derive_market_store_pubkey_and_bump(market_pubkey: PublicKey, program_id: PublicKey = AVER_PROGRAM_IDS[0]):

@@ -182,38 +182,9 @@ export class UserMarket {
     market: Market,
     uhl: PublicKey
   ) {
-    const program = await averClient.getProgramFromProgramId(market.programId)
-
-    const userMarketResult = await program.account["userMarket"].fetch(pubkey)
-
-    const uhlAccount = await UserHostLifetime.load(averClient, uhl)
-
-    const userMarketState = UserMarket.parseUserMarketState(userMarketResult)
-
-    const lamportBalance = await averClient.requestLamportBalance(
-      userMarketState.user
-    )
-    const tokenBalance = await averClient.requestTokenBalance(
-      averClient.quoteTokenMint,
-      userMarketState.user
-    )
-    const userBalanceState: UserBalanceState = {
-      lamportBalance: lamportBalance,
-      tokenBalance: parseInt(tokenBalance.amount),
-    }
-
-    if (userMarketState.market.toString() !== market.pubkey.toString()) {
-      throw Error("UserMarket and Market do not match")
-    }
-
-    return new UserMarket(
-      averClient,
-      pubkey,
-      userMarketState,
-      market,
-      userBalanceState,
-      uhlAccount
-    )
+    return (
+      await this.loadMultipleByUma(averClient, [pubkey], [market], [uhl])
+    )[0]
   }
 
   /**
@@ -888,6 +859,75 @@ export class UserMarket {
     )
   }
 
+  static async makePlaceOrderInstruction(
+    market: Market,
+    user: PublicKey,
+    uma: PublicKey,
+    uhl: PublicKey,
+    outcomeIndex: number,
+    side: Side,
+    limitPrice: number,
+    size: number,
+    sizeFormat: SizeFormat,
+    orderType: OrderType = OrderType.Limit,
+    selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide
+  ) {
+    const sizeU64 = new BN(Math.floor(size * Math.pow(10, market.decimals)))
+    const limitPriceU64 = new BN(
+      Math.ceil(limitPrice * Math.pow(10, market.decimals))
+    )
+    // consider when binary markets where there is only one order book
+    const orderbookAccountIndex =
+      market.numberOfOutcomes == 2 && outcomeIndex == 1 ? 0 : outcomeIndex
+    //@ts-ignore: Object is possibly 'null'. We do the pre flight check for this already
+    // @ts-ignore
+    const orderbookAccount = market.orderbookAccounts[orderbookAccountIndex]
+
+    const userQuoteTokenAta = await getAssociatedTokenAddress(
+      market.quoteTokenMint,
+      user
+    )
+
+    const program = await this._averClient.getProgramFromProgramId(
+      market.programId
+    )
+    const inPlayQueue =
+      !market.inPlayQueue || market.inPlayQueue.equals(SystemProgram.programId)
+        ? new Keypair().publicKey
+        : market.inPlayQueue
+
+    return program.instruction["placeOrder"](
+      {
+        size: sizeU64,
+        sizeFormat,
+        limitPrice: limitPriceU64,
+        side: side,
+        orderType: orderType,
+        selfTradeBehaviour: selfTradeBehavior,
+        outcomeId: outcomeIndex,
+      },
+      {
+        accounts: {
+          user: user,
+          userHostLifetime: uhl,
+          userMarket: uma,
+          userQuoteTokenAta: userQuoteTokenAta,
+          market: market.pubkey,
+          marketStore: market.marketStore,
+          quoteVault: market.quoteVault,
+          orderbook: orderbookAccount.orderbook,
+          bids: orderbookAccount.bids,
+          asks: orderbookAccount.asks,
+          eventQueue: orderbookAccount.eventQueue,
+          splTokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+          vaultAuthority: market.vaultAuthority,
+          inPlayQueue: inPlayQueue,
+        },
+      }
+    )
+  }
+
   /**
    * Places a new order
    *
@@ -1193,30 +1233,30 @@ export class UserMarket {
   //  *
   //  * @returns {Promise<TransactionInstruction>}
   //  */
-  // async makeWithdrawIdleFundsInstruction(amount?: BN) {
-  //   const userQuoteTokenAta = await getAssociatedTokenAddress(
-  //     this.market.quoteTokenMint,
-  //     this.user
-  //   )
-  //   const amountToWithdraw = new BN(
-  //     amount || this.calculateFundsAvailableToWithdraw()
-  //   )
+  async makeWithdrawIdleFundsInstruction(amount?: BN) {
+    const userQuoteTokenAta = await getAssociatedTokenAddress(
+      this.market.quoteTokenMint,
+      this.user
+    )
+    const amountToWithdraw = new BN(
+      amount || this.calculateFundsAvailableToWithdraw()
+    )
 
-  //   return this._averClient.program.instruction["withdrawTokens"](
-  //     amountToWithdraw,
-  //     {
-  //       accounts: {
-  //         market: this.market.pubkey,
-  //         userMarket: this.pubkey,
-  //         user: this.user,
-  //         userQuoteTokenAta,
-  //         quoteVault: this.market.quoteVault,
-  //         vaultAuthority: this.market.vaultAuthority,
-  //         splTokenProgram: TOKEN_PROGRAM_ID,
-  //       },
-  //     }
-  //   )
-  // }
+    return this._averClient.program.instruction["withdrawTokens"](
+      amountToWithdraw,
+      {
+        accounts: {
+          market: this.market.pubkey,
+          userMarket: this.pubkey,
+          user: this.user,
+          userQuoteTokenAta,
+          quoteVault: this.market.quoteVault,
+          vaultAuthority: this.market.vaultAuthority,
+          splTokenProgram: TOKEN_PROGRAM_ID,
+        },
+      }
+    )
+  }
 
   /**
   //  * Withdraw idle funds from the User Market
@@ -1226,27 +1266,27 @@ export class UserMarket {
   //  * @param manualMaxRetry
   //  *
   //  * @returns {Promise<string>}
-  //  */
-  // async withdrawIdleFunds(
-  //   owner: Keypair = this._averClient.keypair,
-  //   amount?: BN,
-  //   sendOptions?: SendOptions,
-  //   manualMaxRetry?: number
-  // ) {
-  //   if (!owner.publicKey.equals(this.user))
-  //     throw new Error("Owner must be same as user market owner")
+   */
+  async withdrawIdleFunds(
+    owner: Keypair = this._averClient.keypair,
+    amount?: BN,
+    sendOptions?: SendOptions,
+    manualMaxRetry?: number
+  ) {
+    if (!owner.publicKey.equals(this.user))
+      throw new Error("Owner must be same as user market owner")
 
-  //   const ix = await this.makeWithdrawIdleFundsInstruction(amount)
+    const ix = await this.makeWithdrawIdleFundsInstruction(amount)
 
-  //   return signAndSendTransactionInstructions(
-  //     this._averClient,
-  //     [],
-  //     owner,
-  //     [ix],
-  //     sendOptions,
-  //     manualMaxRetry
-  //   )
-  // }
+    return signAndSendTransactionInstructions(
+      this._averClient,
+      [],
+      owner,
+      [ix],
+      sendOptions,
+      manualMaxRetry
+    )
+  }
 
   /**
    * Format instruction to neutralise the outcome position

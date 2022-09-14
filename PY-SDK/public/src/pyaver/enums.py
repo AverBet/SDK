@@ -57,23 +57,36 @@ class TransactionType(IntEnum):
     """
     Type of transaction
     """
-    INIT_MARKET = 0
-    CHANGE_MARKET_STATUS = 1
-    ATTEMPT_RESOLUTION = 2
-    SWEEP_FEES = 3
-    CLOSE_AOB = 4
-    CONSUME_EVENTS_CRANK = 5
-    MAKER_FILL = 6
-    OUT = 7
-    INIT_USER_MARKET = 8
-    DEPOSIT = 9
-    WITHDRAW = 10
-    PLACE_ORDER = 11
-    TAKER_FILL = 12
-    CANCEL_ORDER = 13
-    COLLECT = 14
-    CLOSE_USER_MARKET = 15
-    COLLECT_CLOSE_CRANK = 16
+    InitMarket = 0,
+    InitUserMarket = 1,
+    InitHost = 2,
+    InitReferrer = 3,
+    InitUserHostLifetime = 4,
+    ProtocolFeesSwept = 5,
+    ThirdPartyFeesSwept = 6,
+    HostCollectRevenueShare = 7,
+    ReferrerCollectRevenueShare = 8,
+    Deposit = 9,
+    Withdraw = 10,
+    PlaceOrder = 11,
+    NeutralizeOutcomePosition = 12,
+    CancelOrder = 13,
+    TakerFill = 14,
+    MakerFill = 15,
+    Out = 16,
+    CollectWinnings = 17,
+    CloseUserAccount = 18,
+    MarketVoided = 19,
+    UpdateMarketTimes = 20,
+    ChangeMarketStatus = 21,
+    ManualResolution = 22,
+    AttemptResolution = 24,
+    CloseAaob = 25,
+    CloseMarket = 26,
+    ConsumeEventsCranker = 27,
+    CollectCloseCranker = 28,
+    UpdateUserSelfExclusionTime = 29,
+    InPlayPlaceOrder = 30,
 
 class FeeTier(Enum):
     """

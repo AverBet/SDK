@@ -143,7 +143,7 @@ class UserHostLifetime():
     async def make_create_user_host_lifetime_instruction(
         aver_client: AverClient,
         user_quote_token_ata: PublicKey,
-        owner: Keypair,
+        owner: PublicKey,
         host: PublicKey = AVER_HOST_ACCOUNT,
         referrer: PublicKey = SYS_PROGRAM_ID,
         discount_token: PublicKey = SYS_PROGRAM_ID,
@@ -166,7 +166,7 @@ class UserHostLifetime():
         Returns:
             TransactionInstruction: TransactionInstruction object
         """
-        user_host_lifetime, bump = UserHostLifetime.derive_pubkey_and_bump(owner.public_key, host, program_id)
+        user_host_lifetime, bump = UserHostLifetime.derive_pubkey_and_bump(owner, host, program_id)
 
         discount_token_account = AccountMeta(
             is_signer=False,
@@ -184,14 +184,14 @@ class UserHostLifetime():
         return program.instruction['init_user_host_lifetime'](
             ctx=Context(
                 accounts={
-                "user": owner.public_key,
+                "user": owner,
                 "user_host_lifetime": user_host_lifetime,
                 "user_quote_token_ata": user_quote_token_ata,
                 "host": host,
                 "system_program": SYS_PROGRAM_ID,
                 },
                 remaining_accounts=[discount_token_account, referrer_account],
-                signers=[owner]
+                
             )
             )
 
@@ -227,7 +227,7 @@ class UserHostLifetime():
         ix = await UserHostLifetime.make_create_user_host_lifetime_instruction(
             aver_client,
             user_quote_token_ata,
-            owner,
+            owner.public_key,
             host,
             referrer,
             discount_token,

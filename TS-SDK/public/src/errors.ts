@@ -1,5 +1,4 @@
 import { ProgramError, Program } from "@project-serum/anchor"
-import { Int } from "@solana/buffer-layout"
 
 /**
  * Tests whether RPCException is a Program Error or other RPC error.

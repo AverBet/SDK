@@ -191,7 +191,7 @@ def calculate_tick_size_for_price(limit_price: float):
         raise Exception('Limit price too high')
     return limit_price
 
-def round_price_to_nearest_tick_size(limit_price: float):
+def round_price_to_nearest_tick_size(limit_price: float, is_binary: bool = False):
     """
     Rounds price to the nearest tick size available
 
@@ -201,10 +201,11 @@ def round_price_to_nearest_tick_size(limit_price: float):
     Returns:
         float: Rounded limit price
     """
-    limit_price_to_6dp = limit_price * (10 ** 6)
-    tick_size  = calculate_tick_size_for_price(limit_price_to_6dp)
+    factor = 10 ** 6
+    limit_price_to_6dp = limit_price * factor
+    tick_size  = calculate_tick_size_for_price(factor - limit_price_to_6dp if is_binary else limit_price_to_6dp)
     rounded_limit_price_to_6dp = round(limit_price_to_6dp/tick_size) * tick_size
-    rounded_limit_price = rounded_limit_price_to_6dp / (10 ** 6)
+    rounded_limit_price = rounded_limit_price_to_6dp / factor
 
     return rounded_limit_price
 
