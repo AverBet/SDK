@@ -302,6 +302,8 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
 
     await manual_resolve_market_tx(program, self.aver_market, self.client.owner, 1)
     await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, 9) #9 Means Voided, but actually the market is Resolved. I think the program needs to be updated
+    print('Setting market')
+    await self.aver_market.settle_market(self.host)
 
 # Executing the tests in the above test case class
 if __name__ == "__main__":

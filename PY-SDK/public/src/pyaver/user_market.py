@@ -773,7 +773,7 @@ class UserMarket():
             program_id = self.market.program_id
         
         sig = await self.update_all_accounts_if_required(fee_payer)
-        await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
+        #await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
 
         ix = await self.make_cancel_order_instruction(
             order_id,
@@ -931,7 +931,7 @@ class UserMarket():
             program_id = self.market.program_id
 
         sig = await self.update_all_accounts_if_required(fee_payer)
-        await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
+        #await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
 
         ixs = await self.make_cancel_all_orders_instruction(outcome_ids_to_cancel, active_pre_flight_check, program_id)
 
@@ -1014,7 +1014,7 @@ class UserMarket():
             TransactionInstruction: TransactionInstruction object
         """
         sig = await self.update_all_accounts_if_required(owner)
-        await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
+        #await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
 
         user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
             self.user_market_state.user,
@@ -1123,7 +1123,7 @@ class UserMarket():
             program_id = self.market.program_id
 
         sig = await self.update_all_accounts_if_required(owner)
-        await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
+        #await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
         
         ix = self.make_neutralize_positions_instruction(outcome_id, program_id)
 
@@ -1207,7 +1207,7 @@ class UserMarket():
             program_id = self.market.program_id
 
         sig = await self.update_all_accounts_if_required(owner)
-        await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
+        #await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
 
         ix = await self.make_update_user_market_orders_instruction(new_size, program_id)
 

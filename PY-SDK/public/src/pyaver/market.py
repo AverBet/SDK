@@ -1,6 +1,6 @@
 from solana.rpc.async_api import AsyncClient
 from solana.transaction import AccountMeta
-from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
+from .constants import AVER_HOST_ACCOUNT, MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .event_queue import load_all_event_queues, prepare_user_accounts_list
 from .aver_client import AverClient
 from solana.publickey import PublicKey
@@ -641,6 +641,22 @@ class AverMarket():
                 )
 
         return sig
+
+    async def settle_market(self, host: PublicKey = AVER_HOST_ACCOUNT, reward_target: PublicKey = SYS_PROGRAM_ID):
+        program = await self.aver_client.get_program_from_program_id(self.program_id)
+
+        return await program.rpc["settle"](
+        ctx=Context(
+            accounts={
+                "market": self.market_pubkey,
+                "reward_target": reward_target,
+                "vault_authority": self.market_state.vault_authority,
+                "quote_vault": self.market_state.quote_vault,
+                'spl_token_program': TOKEN_PROGRAM_ID,
+                "host": host,
+            },
+        ),
+    )
 
 
 

@@ -1161,6 +1161,25 @@ export class Market {
     }
     return sig
   }
+
+  async settleMarket(
+    rewardTarget: PublicKey = SystemProgram.programId,
+    host: PublicKey
+  ) {
+    const program = await this.averClient.getProgramFromProgramId(
+      this.programId
+    )
+    return await program.rpc["settle"]({
+      accounts: {
+        market: this.pubkey,
+        rewardTarget: rewardTarget,
+        quoteVault: this.quoteVault,
+        vaultAuthority: this.vaultAuthority,
+        splTokenProgram: TOKEN_PROGRAM_ID,
+        host: host,
+      },
+    })
+  }
 }
 
 /**
