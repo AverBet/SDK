@@ -15,8 +15,10 @@ export async function loadAllEventQueues(
   event_queues: PublicKey[]
 ): Promise<EventQueue[]> {
   const data = await chunkAndFetchMultiple(conn, event_queues)
-  console.log(data)
-  return data.map((d) => readEventQueueFromBytes(d.data))
+  return data.map((d) => {
+    if (!d) throw new Error("Event Queue Cant be loaded")
+    return readEventQueueFromBytes(d.data)
+  })
 }
 
 /**

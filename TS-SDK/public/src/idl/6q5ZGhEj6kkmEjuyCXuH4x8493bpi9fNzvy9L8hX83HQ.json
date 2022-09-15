@@ -197,11 +197,6 @@
           "isSigner": false
         },
         {
-          "name": "marketStore",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
@@ -1491,10 +1486,7 @@
           {
             "name": "feeTierCollectionBpsRates",
             "type": {
-              "array": [
-                "u64",
-                7
-              ]
+              "array": ["u64", 7]
             }
           },
           {
@@ -1652,10 +1644,7 @@
           {
             "name": "feeTierCollectionBpsRates",
             "type": {
-              "array": [
-                "u64",
-                7
-              ]
+              "array": ["u64", 7]
             }
           },
           {
@@ -2175,10 +2164,7 @@
           {
             "name": "feeTierCollectionBpsRates",
             "type": {
-              "array": [
-                "u64",
-                7
-              ]
+              "array": ["u64", 7]
             }
           },
           {
@@ -2840,9 +2826,6 @@
             "name": "TradingCeased"
           },
           {
-            "name": "InPlayTransition"
-          },
-          {
             "name": "CeasedCrankedClosed"
           },
           {
@@ -2850,6 +2833,9 @@
           },
           {
             "name": "Voided"
+          },
+          {
+            "name": "InPlayTransition"
           }
         ]
       }
@@ -3311,5 +3297,8 @@
         }
       ]
     }
-  ]
+  ],
+  "metadata": {
+    "address": "6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ"
+  }
 }

@@ -1486,10 +1486,7 @@
           {
             "name": "feeTierCollectionBpsRates",
             "type": {
-              "array": [
-                "u64",
-                7
-              ]
+              "array": ["u64", 7]
             }
           },
           {
@@ -1647,10 +1644,7 @@
           {
             "name": "feeTierCollectionBpsRates",
             "type": {
-              "array": [
-                "u64",
-                7
-              ]
+              "array": ["u64", 7]
             }
           },
           {
@@ -2170,10 +2164,7 @@
           {
             "name": "feeTierCollectionBpsRates",
             "type": {
-              "array": [
-                "u64",
-                7
-              ]
+              "array": ["u64", 7]
             }
           },
           {
@@ -2835,9 +2826,6 @@
             "name": "TradingCeased"
           },
           {
-            "name": "InPlayTransition"
-          },
-          {
             "name": "CeasedCrankedClosed"
           },
           {
@@ -2845,6 +2833,9 @@
           },
           {
             "name": "Voided"
+          },
+          {
+            "name": "InPlayTransition"
           }
         ]
       }

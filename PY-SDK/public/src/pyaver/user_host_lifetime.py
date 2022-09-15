@@ -1,8 +1,9 @@
+from asyncio import gather
 from .aver_client import AverClient
 from solana.publickey import PublicKey
 from .data_classes import UserHostLifetimeState
 from .constants import AVER_HOST_ACCOUNT, AVER_PROGRAM_IDS
-from .utils import get_version_of_account_type_in_program, sign_and_send_transaction_instructions
+from .utils import get_version_of_account_type_in_program, load_multiple_bytes_data, parse_with_version, sign_and_send_transaction_instructions
 from solana.system_program import SYS_PROGRAM_ID
 from solana.rpc.commitment import Finalized
 from anchorpy import Context
@@ -35,6 +36,7 @@ class UserHostLifetime():
         Args:
             pubkey (PublicKey): UserHostLifetime public key
             user_host_lifetime_state (UserHostLifetimeState): UserHostLifetimeState public key
+            program_id (PublicKey): Program public key. Defaults to AVER_PROGRAM_ID.
         """
         self.pubkey = pubkey
         self.user_host_lifetime_state = user_host_lifetime_state
@@ -56,9 +58,7 @@ class UserHostLifetime():
         Returns:
             UserHostLifetime: UserHostLifetime object
         """
-        # TODO get by program ID
-        user_host_lifetime_result = await aver_client.programs[0].account['UserHostLifetime'].fetch(pubkey)
-        return UserHostLifetime(aver_client, pubkey, user_host_lifetime_result, aver_client.programs[0].program_id)
+        return (await UserHostLifetime.load_multiple(aver_client, [pubkey]))[0]
 
     @staticmethod
     async def load_multiple(aver_client: AverClient, pubkeys: list[PublicKey]):
@@ -72,12 +72,13 @@ class UserHostLifetime():
         Returns:
             list[UserHostLifetime]: List of UserHostLifetime objects
         """
-        # TODO get program correctly
-        program = aver_client.programs[0]
-        res = await program.account['UserHostLifetime'].fetch_multiple(pubkeys)
+        res = await load_multiple_bytes_data(aver_client.connection, pubkeys, [], False)
+        programs = await gather(*[aver_client.get_program_from_program_id(PublicKey(r['owner'])) for r in res])
         uhls: list[UserHostLifetime] = []
         for i, pubkey in enumerate(pubkeys):
-            uhls.append(UserHostLifetime(aver_client, pubkey, res[i]))
+            state = parse_with_version(programs[i], AccountTypes.USER_HOST_LIFETIME, res[i]['data'])
+            program = programs[i]
+            uhls.append(UserHostLifetime(aver_client, pubkey, state, program.program_id))
         return uhls
 
     @staticmethod
@@ -142,7 +143,7 @@ class UserHostLifetime():
     async def make_create_user_host_lifetime_instruction(
         aver_client: AverClient,
         user_quote_token_ata: PublicKey,
-        owner: Keypair,
+        owner: PublicKey,
         host: PublicKey = AVER_HOST_ACCOUNT,
         referrer: PublicKey = SYS_PROGRAM_ID,
         discount_token: PublicKey = SYS_PROGRAM_ID,
@@ -165,7 +166,7 @@ class UserHostLifetime():
         Returns:
             TransactionInstruction: TransactionInstruction object
         """
-        user_host_lifetime, bump = UserHostLifetime.derive_pubkey_and_bump(owner.public_key, host, program_id)
+        user_host_lifetime, bump = UserHostLifetime.derive_pubkey_and_bump(owner, host, program_id)
 
         discount_token_account = AccountMeta(
             is_signer=False,
@@ -177,20 +178,20 @@ class UserHostLifetime():
             is_writable=True,
             pubkey=referrer,
         )
-        #Just use the first program as they will all have init_user_host_lifetime
-        #TODO - review
+
         program = await aver_client.get_program_from_program_id(program_id)
+
         return program.instruction['init_user_host_lifetime'](
             ctx=Context(
                 accounts={
-                "user": owner.public_key,
+                "user": owner,
                 "user_host_lifetime": user_host_lifetime,
                 "user_quote_token_ata": user_quote_token_ata,
                 "host": host,
                 "system_program": SYS_PROGRAM_ID,
                 },
                 remaining_accounts=[discount_token_account, referrer_account],
-                signers=[owner]
+                
             )
             )
 
@@ -226,7 +227,7 @@ class UserHostLifetime():
         ix = await UserHostLifetime.make_create_user_host_lifetime_instruction(
             aver_client,
             user_quote_token_ata,
-            owner,
+            owner.public_key,
             host,
             referrer,
             discount_token,
@@ -288,6 +289,14 @@ class UserHostLifetime():
         )
 
     async def check_if_uhl_latest_version(self):
+        """
+        Returns true if UHL does not need to be updated (using update_user_host_lifetime_state)
+
+        Returns false if update required
+
+        Returns:
+            Boolean: Is update required
+        """
         program = await self.aver_client.get_program_from_program_id(self.program_id)
         if(self.user_host_lifetime_state.version < get_version_of_account_type_in_program(AccountTypes.USER_HOST_LIFETIME, program)):
             print("User host lifetime needs to be upgraded")

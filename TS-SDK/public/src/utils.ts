@@ -1,4 +1,4 @@
-import { Program, ProgramError } from "@project-serum/anchor"
+import { Program, ProgramError, Wallet } from "@project-serum/anchor"
 import {
   Keypair,
   Connection,
@@ -37,22 +37,29 @@ import { AccountType } from "./types"
 export const signAndSendTransactionInstructions = async (
   client: AverClient,
   signers: Array<Keypair>,
-  feePayer: Keypair,
+  feePayer: Keypair | Wallet,
   txInstructions: Array<TransactionInstruction>,
   sendOptions?: SendOptions,
   manualMaxRetry?: number
 ): Promise<string> => {
-  const tx = new Transaction()
-  tx.feePayer = feePayer.publicKey
-  signers.push(feePayer)
-  tx.add(...txInstructions)
+  let tx = new Transaction()
+  if (!(feePayer instanceof Wallet)) {
+    tx.feePayer = feePayer.publicKey
+    signers.push(feePayer)
+    tx.add(...txInstructions)
+  }
   let attempts = 0
   let errorThrown = new Error("Transaction failed")
+
+  if (feePayer instanceof Wallet) {
+    tx = await feePayer.signTransaction(tx)
+  }
 
   while (attempts <= (manualMaxRetry || 0)) {
     try {
       return await client.connection.sendTransaction(tx, signers, sendOptions)
     } catch (e) {
+      console.log(e)
       errorThrown = parseError(e, client.programs[0])
 
       // if its a program error, throw it
@@ -184,7 +191,9 @@ export const getBestDiscountToken = async (
       return zeroFeesTokenAccount.value[0].pubkey
     }
   } catch (e) {
-    console.log("Zero fees token mint does not exist on the network / program ID")
+    console.log(
+      "Zero fees token mint does not exist on the network / program ID"
+    )
   }
 
   try {
@@ -200,7 +209,9 @@ export const getBestDiscountToken = async (
       return communityRewardsTokenAccount.value[0].pubkey
     }
   } catch (e) {
-    console.log("Community rewards token mint does not exist on the network / program ID")
+    console.log(
+      "Community rewards token mint does not exist on the network / program ID"
+    )
   }
 
   try {
@@ -210,7 +221,8 @@ export const getBestDiscountToken = async (
       })
     if (
       averTokenAccount.value.length > 0 &&
-      averTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount > 0
+      averTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount >
+        0
     ) {
       return averTokenAccount.value[0].pubkey
     }
@@ -234,7 +246,7 @@ export const getBestDiscountToken = async (
 export function parseWithVersion(
   program: Program,
   account_type: AccountType,
-  bytes: AccountInfo<Buffer | null>
+  bytes: AccountInfo<Buffer> | null
 ) {
   if (!bytes?.data) throw new Error("Buffer not found")
   //Version is 9th byte
@@ -262,8 +274,13 @@ export function parseWithVersion(
       "PLEASE CALL THE UPDATE INSTRUCTION FOR THE CORRESPONDING ACCOUNT TYPE TO RECTIFY, IF POSSIBLE"
     )
     //We need to replace the discriminator on the bytes data to prevent anchor errors
-    const account_discriminator = accountDiscriminator(account_type, version, latestVersion)
+    const account_discriminator = accountDiscriminator(
+      account_type,
+      version,
+      latestVersion
+    )
     account_discriminator.map((v, i, a) => {
+      //@ts-ignore
       bytes.data[i] = v
       return 1
     })
@@ -280,28 +297,30 @@ export function parseWithVersion(
  * Calculates and returns a unique 8 byte discriminator prepended to all anchor accounts.
  *
  * @param {AccountType} account_type - The name of the account to calculate the discriminator.
- * @param {number} version - Aver version of account
+ * @param {number} version - Version of account
+ * @param {number} latest_version - Most up to date version of Aver
  */
 function accountDiscriminator(
   account_type: AccountType,
   version: number,
   latestVersion: number
 ): Buffer {
-  const name = version == latestVersion ? account_type : `${account_type}V${version}`
+  const name =
+    version == latestVersion ? account_type : `${account_type}V${version}`
   return Buffer.from(
-    sha256.digest(
-      `account:${camelcase(`${name}`, { pascalCase: true })}`
-    )
+    sha256.digest(`account:${camelcase(`${name}`, { pascalCase: true })}`)
   ).slice(0, 8)
 }
 
-
 // Latest version according to the program
-export function getVersionOfAccountTypeInProgram(accountType: AccountType, program: Program){
+export function getVersionOfAccountTypeInProgram(
+  accountType: AccountType,
+  program: Program
+) {
   let version = 0
-  while (true){
+  while (true) {
     const account = program.account[`${accountType}V${version}`]
-    if(account == null){
+    if (account == null) {
       break
     } else {
       version = version + 1

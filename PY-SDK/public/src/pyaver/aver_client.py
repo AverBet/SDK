@@ -75,9 +75,6 @@ class AverClient():
                 network (SolanaNetwork): Solana network
                 program_id (PublicKey, optional): Program public key. Defaults to latest AVER_PROGRAM_ID specified in constants.py.
 
-            Raises:
-                Exception: Invalid owner argument
-
             Returns:
                 AverClient: AverClient
             """
@@ -111,7 +108,7 @@ class AverClient():
 
         Args:
             provider (Provider): Provider
-            program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
+            program_id (PublicKey, optional): Program public key.
 
         Raises:
             Exception: Program IDL not loaded
@@ -128,11 +125,29 @@ class AverClient():
             raise Exception('Program IDL not loaded')
 
     async def add_program(self, program_id: PublicKey):
+        """
+        Loads and adds a program to the list of programs
+
+        Args:
+            program_id (PublicKey): Program public key
+
+        Returns:
+            Program: Program
+        """
         program = await AverClient.load_program(self.provider, program_id)
         self.programs.append(program)
         return program
     
     async def get_program_from_program_id(self, program_id: PublicKey):
+        """
+        Checks if a program is already loaded and returns it. If not, it loads it, saves it and returns it.
+
+        Args:
+            program_id (PublicKey): Program public key
+
+        Returns:
+            Program: Program
+        """
         for p in self.programs:
             if(p.program_id.to_base58() == program_id.to_base58()):
                 return p

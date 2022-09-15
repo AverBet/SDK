@@ -52,13 +52,13 @@ export class AverClient {
    */
   private _quoteTokenMint: PublicKey
 
-   /**
+  /**
    * The default payer for transactions on-chain, unless one is specified
    */
   private _keypair: Keypair
 
   /**
-   * 
+   *
    */
   private _owner: PublicKey
 
@@ -67,6 +67,7 @@ export class AverClient {
    *
    * @param {Program} programs - List of Aver program AnchorPy
    * @param {SolanaNetwork} solanaNetwork - Solana network
+   * @param {PublicKey} owner - Owner public key
    * @param {Keypair} keypair - Default keypair to use for paying transaction costs
    */
   private constructor(
@@ -80,6 +81,7 @@ export class AverClient {
     this._provider = programs[0].provider
     this._solanaNetwork = solanaNetwork
     this._quoteTokenMint = getQuoteToken(solanaNetwork)
+    //@ts-ignore
     this._keypair = keypair
     this._owner = owner
   }
@@ -94,31 +96,31 @@ export class AverClient {
    * @param {PublicKey} programIds - Program public key. Defaults to AVER_PROGRAM_IDS.
    * @returns {AverClient} - The Aver Client object
    */
-   static async loadAverClient(
+  static async loadAverClient(
     connection: Connection,
     solanaNetwork: SolanaNetwork = SolanaNetwork.Devnet,
-    owner: null | PublicKey | Keypair,
+    owner: null | Wallet | Keypair,
     opts?: ConfirmOptions,
     programIds: PublicKey[] = AVER_PROGRAM_IDS
   ) {
-    let wallet: NodeWallet;
+    let wallet: NodeWallet
     let keypair: Keypair
-    let pubkey: PublicKey = null
+    let pubkey: PublicKey | undefined = undefined
 
     if (owner instanceof Keypair) {
       // create a wallet with the keypair
-      wallet = new NodeWallet(owner);
+      wallet = new NodeWallet(owner)
       keypair = owner
       pubkey = owner.publicKey
-    } else if (owner instanceof PublicKey) {
+    } else if (owner instanceof Wallet) {
       // create a dummy wallet
       keypair = new Keypair()
-      wallet = new NodeWallet(keypair);
-      pubkey = owner
+      wallet = owner
+      pubkey = wallet.publicKey
     } else {
       // create a dummy wallet
       keypair = new Keypair()
-      wallet = new NodeWallet(keypair);
+      wallet = new NodeWallet(keypair)
       pubkey = keypair.publicKey
     }
 
@@ -130,9 +132,11 @@ export class AverClient {
         preflightCommitment: connection.commitment,
         skipPreflight: false,
       }
-    );
+    )
 
-    const programs = await Promise.all(programIds.map(programId => AverClient.loadProgram(provider, programId)))
+    const programs = await Promise.all(
+      programIds.map((programId) => AverClient.loadProgram(provider, programId))
+    )
     return new AverClient(programs, solanaNetwork, pubkey, keypair)
   }
 
@@ -167,6 +171,13 @@ export class AverClient {
     return this._owner
   }
 
+  /**
+   * Loads Aver Program
+   *
+   * @param {Provider} provider - Provider
+   * @param {PublicKey} programId - Program public key
+   * @returns {Program} Program
+   */
   static async loadProgram(provider: Provider, programId: PublicKey) {
     const idl = await Program.fetchIdl(programId, provider)
     if (idl) {
@@ -178,13 +189,26 @@ export class AverClient {
     }
   }
 
-  async addProgram(programId: PublicKey){
+  /**
+   * Loads and adds a program to the list of programs
+   *
+   * @param {PublicKey} programId - Program public key
+   * @returns {Program} - Program
+   */
+  async addProgram(programId: PublicKey) {
     const program = await AverClient.loadProgram(this._provider, programId)
     this._programs.push(program)
     return program
   }
 
-  async getProgramFromProgramId(programId: PublicKey){
+  /**
+   * Checks if a program is already loaded and returns it. If not, it loads it, saves it and returns it.
+   *
+   * @param {PublicKey | undefined} programId - Program public key
+   * @returns {Program} - Program
+   */
+  async getProgramFromProgramId(programId: PublicKey | undefined) {
+    if (!programId) return this.programs[0]
     for (const program of this._programs) {
       if (program.programId.equals(programId)) {
         return program
@@ -240,11 +264,12 @@ export class AverClient {
     mint: PublicKey = this.quoteTokenMint,
     owner: PublicKey = this.owner
   ) {
-    return getOrCreateAssociatedTokenAccount(
+    return await getOrCreateAssociatedTokenAccount(
       this._connection,
       payer,
       mint,
-      owner
+      owner,
+      true
     )
   }
 
@@ -326,7 +351,7 @@ export class AverClient {
   }
 
   /**
-   * 
+   *
    * @returns DEPCREATED
    */
   async checkHealth() {
@@ -346,7 +371,7 @@ export class AverClient {
     }
   }
 
-    /**
+  /**
    * DEPCREATED
    */
   async requestTokenAirdrop(
@@ -368,5 +393,4 @@ export class AverClient {
 
     return axios.post(url, params)
   }
-
 }

@@ -81,7 +81,6 @@ export type MarketState = {
   series: number
   event: number
   roundingFormat: number
-  vault_authority: PublicKey
   inPlayQueue: PublicKey
   inPlayStartTime?: number
 }
@@ -95,6 +94,9 @@ export type MarketStoreState = {
   minNewOrderQuoteSize: BN
   orderbookAccounts: OrderbookAccountsState[]
   initCounter: number
+  reInitCounter: number
+  orderIdCounter: BN
+  inPlayDelaySeconds?: number
 }
 
 export type UserMarketState = {
@@ -113,6 +115,24 @@ export type UserMarketState = {
   accumulatedTakerBaseVolume: BN
   outcomePositions: OutcomePosition[]
   orders: UmaOrder[]
+  inPlayOrders: InPlayOrder[]
+}
+
+export type InPlayOrder = {
+  order_id: BN
+  outcome_id: number
+  side: number
+  limit_price: BN // NOT fp32
+  size_format: number
+  size: BN
+  order_type: number
+  self_trade_behavior: number
+  fee_tier: FeeTier
+  total_quote_qty: number
+  total_base_qty: number
+  post_only: boolean
+  post_allowed: boolean
+  neutralize: boolean
 }
 
 export type UserBalanceState = {

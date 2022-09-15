@@ -5,6 +5,7 @@ from spl.token.instructions import get_associated_token_address
 from spl.token._layouts import ACCOUNT_LAYOUT
 from spl.token.constants import ACCOUNT_LEN
 from .data_classes import UserBalanceState, MarketStatus
+from .constants import AVER_PROGRAM_IDS
 from solana.publickey import PublicKey
 from .errors import parse_error
 from hashlib import sha256
@@ -128,6 +129,7 @@ async def sign_and_send_transaction_instructions(
         fee_payer (Keypair): Keypair to pay fee for transaction
         tx_instructions (list[TransactionInstruction]): List of transaction instructions to pack into transaction to be sent
         send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+        manual_max_retry (int, optional): Number of times to retry a transaction if it fails. Defaults to 0
 
     Raises:
         error: COMING SOON
@@ -189,7 +191,7 @@ def calculate_tick_size_for_price(limit_price: float):
         raise Exception('Limit price too high')
     return limit_price
 
-def round_price_to_nearest_tick_size(limit_price: float):
+def round_price_to_nearest_tick_size(limit_price: float, is_binary: bool = False):
     """
     Rounds price to the nearest tick size available
 
@@ -199,10 +201,11 @@ def round_price_to_nearest_tick_size(limit_price: float):
     Returns:
         float: Rounded limit price
     """
-    limit_price_to_6dp = limit_price * (10 ** 6)
-    tick_size  = calculate_tick_size_for_price(limit_price_to_6dp)
+    factor = 10 ** 6
+    limit_price_to_6dp = limit_price * factor
+    tick_size  = calculate_tick_size_for_price(factor - limit_price_to_6dp if is_binary else limit_price_to_6dp)
     rounded_limit_price_to_6dp = round(limit_price_to_6dp/tick_size) * tick_size
-    rounded_limit_price = rounded_limit_price_to_6dp / (10 ** 6)
+    rounded_limit_price = rounded_limit_price_to_6dp / factor
 
     return rounded_limit_price
 
@@ -212,6 +215,7 @@ def parse_user_market_state(buffer: bytes, aver_client: AverClient, program: Pro
         Args:
             buffer (bytes): Raw bytes coming from onchain
             aver_client (AverClient): AverClient object
+            program (Program, optional): Anchor Program. Defaults to first program in client.
 
         Returns:
             UserMarket: UserMarketState object
@@ -227,6 +231,7 @@ def parse_market_state(buffer: bytes, aver_client: AverClient, program: Program 
         Args:
             buffer (bytes): Raw bytes coming from onchain
             aver_client (AverClient): AverClient object
+            program (Program, optional): Anchor Program. Defaults to first program in client.
 
         Returns:
             MarketState: MarketState object
@@ -243,6 +248,7 @@ def parse_market_store(buffer: bytes, aver_client: AverClient, program = None):
         Args:
             buffer (bytes): Raw bytes coming from onchain
             aver_client (AverClient): AverClient
+            program (Program, optional): Anchor Program. Defaults to first program in client.
 
         Returns:
             MarketStore: MarketStore object
@@ -260,6 +266,7 @@ def parse_user_host_lifetime_state(aver_client: AverClient, buffer, program: Pro
         Args:
             aver_client (AverClient): AverClient object
             buffer (bytes): Raw bytes coming from onchain
+            program (Program, optional): Anchor Program. Defaults to first program in client.
 
         Returns:
             UserHostLifetime: UserHostLifetime object
@@ -289,17 +296,16 @@ async def load_multiple_account_states(
             slab_pubkeys (list[PublicKey]): List of Slab public keys for orderbooks
             user_market_pubkeys (list[PublicKey], optional): List of UserMarketState object public keys. Defaults to [].
             user_pubkeys (list[PublicKey], optional): List of UserMarket owners' public keys. Defaults to [].
-            uhl_pubkeuys(list[PublicKey], optional): List of UserHostLifetime public keys. Defaults to []
+            uhl_pubkeys(list[PublicKey], optional): List of UserHostLifetime public keys. Defaults to []
 
         Returns:
-            dict[str, list]: Dictionary containing `market_states`, `market_stores`, `slabs`, `user_market_states`, `user_balance_sheets`
+            dict[str, list]: Dictionary containing `market_states`, `market_stores`, `slabs`, `user_market_states`, `user_balance_sheets`, `program_ids`
         """
         all_ata_pubkeys = [get_associated_token_address(u, aver_client.quote_token) for u in user_pubkeys]
 
         all_pubkeys = market_pubkeys + market_store_pubkeys + user_market_pubkeys + uhl_pubkeys +  slab_pubkeys + user_pubkeys + all_ata_pubkeys 
         data = await load_multiple_bytes_data(aver_client.provider.connection, all_pubkeys, [], False)
-
-        programs = await gather(*[aver_client.get_program_from_program_id(PublicKey(d['owner'])) for d in data[0: len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]])
+        programs = await gather(*[aver_client.get_program_from_program_id(PublicKey(d['owner'] if d else AVER_PROGRAM_IDS[0])) for d in data[0: len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]])
        
         deserialized_market_state = []
         for index, m in enumerate(market_pubkeys):
@@ -323,7 +329,6 @@ async def load_multiple_account_states(
                     continue
                 deserialized_uma_data.append(parse_user_market_state(buffer['data'], aver_client, programs[index]))
         
-
         uhl_states = []
         for index, pubkey in enumerate(uhl_pubkeys):
             buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]
