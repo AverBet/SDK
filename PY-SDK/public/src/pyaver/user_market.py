@@ -6,18 +6,18 @@ from asyncio import gather
 from .checks import *
 from solana.transaction import AccountMeta
 from solana.keypair import Keypair
+from .version_checks import check_if_instruction_is_out_of_date_with_idl
 from solana.system_program import SYS_PROGRAM_ID
 from spl.token.constants import TOKEN_PROGRAM_ID
-from anchorpy import Context
+from anchorpy import Context, Program
 from .user_host_lifetime import UserHostLifetime
-from spl.token.instructions import get_associated_token_address
 from .aver_client import AverClient
-from .utils import sign_and_send_transaction_instructions, load_multiple_account_states, parse_user_market_state
+from .utils import get_version_of_account_type_in_program, load_multiple_bytes_data, sign_and_send_transaction_instructions, load_multiple_account_states, parse_user_market_state
 from solana.rpc.types import TxOpts
 from solana.rpc.commitment import Finalized
 from .data_classes import UserHostLifetimeState, UserMarketState, UserBalanceState
-from .constants import AVER_PROGRAM_ID, AVER_HOST_ACCOUNT, CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
-from .enums import OrderType, SelfTradeBehavior, Side, SizeFormat
+from .constants import AVER_HOST_ACCOUNT, AVER_PROGRAM_IDS, CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
+from .enums import AccountTypes, OrderType, SelfTradeBehavior, Side, SizeFormat
 import math
 
 class UserMarket():
@@ -69,6 +69,7 @@ class UserMarket():
         self.market = market
         self.user_balance_state = user_balance_state
         self.user_host_lifetime = user_host_lifetime
+        self.program_id = market.program_id
 
     @staticmethod
     async def load(
@@ -76,7 +77,6 @@ class UserMarket():
             market: AverMarket, 
             owner: PublicKey, 
             host: PublicKey = AVER_HOST_ACCOUNT,
-            program_id: PublicKey = AVER_PROGRAM_ID
         ):
             """
             Initialises an UserMarket object from Market, Host and Owner public keys
@@ -93,8 +93,8 @@ class UserMarket():
             Returns:
                 UserMarket: UserMarket object
             """
-            uma, bump = UserMarket.derive_pubkey_and_bump(owner, market.market_pubkey, host, program_id)
-            uhl = UserHostLifetime.derive_pubkey_and_bump(owner, host, program_id)[0]
+            uma, bump = UserMarket.derive_pubkey_and_bump(owner, market.market_pubkey, host, market.program_id)
+            uhl = UserHostLifetime.derive_pubkey_and_bump(owner, host, market.program_id)[0]
             return await UserMarket.load_by_uma(aver_client, uma, market, uhl)
 
     @staticmethod
@@ -103,7 +103,6 @@ class UserMarket():
             markets: list[AverMarket], 
             owners: list[PublicKey], 
             host: PublicKey = AVER_HOST_ACCOUNT,
-            program_id: PublicKey = AVER_PROGRAM_ID,
         ):
             """
             Initialises multiple UserMarket objects from Market, Host and Owner public keys
@@ -124,8 +123,11 @@ class UserMarket():
             """
             umas = []
             for i, m in enumerate(markets):
+                program_id = m.program_id
                 umas.append(UserMarket.derive_pubkey_and_bump(owners[i], m.market_pubkey, host, program_id)[0])
-            uhls = [UserHostLifetime.derive_pubkey_and_bump(owner, host, program_id)[0] for owner in owners]
+            uhls = []
+            for i, o in enumerate(owners):
+                uhls.append(UserHostLifetime.derive_pubkey_and_bump(o, host, markets[i].program_id)[0])
             return await UserMarket.load_multiple_by_uma(aver_client, umas, markets, uhls)
 
     @staticmethod
@@ -133,7 +135,7 @@ class UserMarket():
             aver_client: AverClient,
             pubkey: PublicKey,
             market: (AverMarket or PublicKey),
-            uhl: PublicKey
+            uhl: PublicKey,
         ):
         """
         Initialises an UserMarket object from UserMarket account public key
@@ -149,20 +151,8 @@ class UserMarket():
         Returns:
             UserMarket: UserMarket object
         """
-        res: UserMarketState = await aver_client.program.account['UserMarket'].fetch(pubkey)
-        uhl = await UserHostLifetime.load(aver_client, uhl)
-
-        lamport_balance = await aver_client.request_lamport_balance(res.user)
-        token_balance = await aver_client.request_token_balance(aver_client.quote_token, res.user)
-        user_balance_state = UserBalanceState(lamport_balance, token_balance)
-
-        if(isinstance(market, PublicKey)):
-            market = await AverMarket.load(aver_client, market)
-
-        if(res.market.to_base58() != market.market_pubkey.to_base58()):
-            raise Exception('UserMarket and Market do not match')
-
-        return UserMarket(aver_client, pubkey, res, market, user_balance_state, uhl)   
+        user_market = await UserMarket.load_multiple_by_uma(aver_client, [pubkey], [market], [uhl])
+        return user_market[0]
     
     @staticmethod
     async def load_multiple_by_uma(
@@ -188,8 +178,9 @@ class UserMarket():
         Returns:
             list[UserMarket]: List of UserMarket objects
         """
-
-        res: list[UserMarketState] = await aver_client.program.account['UserMarket'].fetch_multiple(pubkeys)
+        account_buffers = await load_multiple_bytes_data(aver_client.connection, pubkeys, [], True)
+        programs = await gather(*[aver_client.get_program_from_program_id(m.program_id) for m in markets])
+        res: list[UserMarketState] = UserMarket.parse_multiple_user_market_state(account_buffers, aver_client, programs)
         uhls = await UserHostLifetime.load_multiple(aver_client, uhls)
 
         user_pubkeys = [u.user for u in res]
@@ -231,7 +222,7 @@ class UserMarket():
         """
         user_markets: list[UserMarket] = []
         for i, pubkey in enumerate(pubkeys):
-            user_market = UserMarket(aver_client, pubkey, user_market_states[i], aver_markets[i], user_balance_states[i], UserHostLifetime(user_host_lifetime_pubkeys[i],user_host_lifetime_states[i]))
+            user_market = UserMarket(aver_client, pubkey, user_market_states[i], aver_markets[i], user_balance_states[i], UserHostLifetime(aver_client, user_host_lifetime_pubkeys[i],user_host_lifetime_states[i]))
             user_markets.append(user_market)
         return user_markets
     
@@ -239,7 +230,8 @@ class UserMarket():
     @staticmethod
     def parse_multiple_user_market_state(
             buffer: list[bytes],
-            aver_client: AverMarket
+            aver_client: AverMarket,
+            programs: list[Program]
         ):
         """
         Parses raw onchain data to UserMarketState objects    
@@ -251,14 +243,14 @@ class UserMarket():
         Returns:
             list[UserMarketState]: List of UserMarketState objects
         """
-        return [parse_user_market_state(b, aver_client) for b in buffer]
+        return [parse_user_market_state(b, aver_client, programs[i]) for i, b in enumerate(buffer)]
 
     @staticmethod
     def derive_pubkey_and_bump(
             owner: PublicKey,
             market: PublicKey,
             host: PublicKey,
-            program_id: PublicKey = AVER_PROGRAM_ID
+            program_id: PublicKey = AVER_PROGRAM_IDS[0]
         ) -> PublicKey:
         """
         Derives PDA (Program Derived Account) for UserMarket public key given a user, host and market
@@ -267,7 +259,7 @@ class UserMarket():
             owner (PublicKey): Owner of UserMarket account
             market (PublicKey): Corresponding Market account public key
             host (PublicKey): Host public key
-            program_id (PublicKey, optional): _description_. Defaults to AVER_PROGRAM_ID.
+            program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
 
         Returns:
             PublicKey: UserMarket account public key
@@ -279,13 +271,13 @@ class UserMarket():
         )    
 
     @staticmethod
-    def make_create_user_market_account_instruction(
+    async def make_create_user_market_account_instruction(
             aver_client: AverClient,
             market: AverMarket,
             owner: PublicKey,
             host: PublicKey = AVER_HOST_ACCOUNT, 
             number_of_orders: int = None,
-            program_id: PublicKey = AVER_PROGRAM_ID
+            program_id: PublicKey = AVER_PROGRAM_IDS[0]
         ):
         """
         Creates instruction for UserMarket account creation
@@ -309,20 +301,28 @@ class UserMarket():
         uma, uma_bump = UserMarket.derive_pubkey_and_bump(owner, market.market_pubkey, host, program_id)
         user_host_lifetime, uhl_bump = UserHostLifetime.derive_pubkey_and_bump(owner, host, program_id)
 
-        return aver_client.program.instruction['init_user_market'](
-            number_of_orders,
-            uma_bump, 
-            ctx=Context(
-                accounts={
-                    "user": owner,
-                    "user_host_lifetime": user_host_lifetime,
-                    "user_market": uma,
-                    "market": market.market_pubkey,
-                    "host": host,
-                    "system_program": SYS_PROGRAM_ID,
-                },
+        program = await aver_client.get_program_from_program_id(program_id)
+
+        # check_if_instruction_is_out_of_date_with_idl('place_order', program)
+
+        #Logic to return correct instruction based on ProgramID
+        if(program_id.to_base58() == ''):
+            #return program.instruction()...
+            return ''
+        else:
+            return program.instruction['init_user_market'](
+                number_of_orders,
+                ctx=Context(
+                    accounts={
+                        "user": owner,
+                        "user_host_lifetime": user_host_lifetime,
+                        "user_market": uma,
+                        "market": market.market_pubkey,
+                        "host": host,
+                        "system_program": SYS_PROGRAM_ID,
+                    },
+                )
             )
-        )
 
     @staticmethod
     async def create_user_market_account(
@@ -332,7 +332,7 @@ class UserMarket():
             send_options: TxOpts = None,
             host: PublicKey = AVER_HOST_ACCOUNT,
             number_of_orders: int = None,
-            program_id: PublicKey = AVER_PROGRAM_ID
+            program_id: PublicKey = None
         ):
         """
         Creates UserMarket account
@@ -346,7 +346,7 @@ class UserMarket():
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             host (PublicKey, optional): Host account public key. Defaults to AVER_HOST_ACCOUNT.
             number_of_orders (int, optional): _description_. Defaults to 5 * number of market outcomes.
-            program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Returns:
             RPCResponse: Response
@@ -356,8 +356,11 @@ class UserMarket():
 
         if(owner is None):
             owner = aver_client.owner
+        
+        if(program_id is None):
+            program_id = market.program_id
 
-        ix = UserMarket.make_create_user_market_account_instruction(
+        ix = await UserMarket.make_create_user_market_account_instruction(
             aver_client,
             market,
             owner.public_key,
@@ -394,7 +397,6 @@ class UserMarket():
             number_of_orders: int = None,
             referrer: PublicKey = SYS_PROGRAM_ID,
             discount_token: PublicKey = SYS_PROGRAM_ID,
-            program_id: PublicKey = AVER_PROGRAM_ID 
         ):
         """
         Attempts to load UserMarket object or creates one if not one is not found
@@ -421,9 +423,9 @@ class UserMarket():
         if(owner is None):
             owner = client.owner
         
-        user_market_pubkey = UserMarket.derive_pubkey_and_bump(owner.public_key, market.market_pubkey, host, program_id)[0]
+        user_market_pubkey = UserMarket.derive_pubkey_and_bump(owner.public_key, market.market_pubkey, host, market.program_id)[0]
         try:
-            uma = await UserMarket.load(client, market, owner.public_key, host, program_id)
+            uma = await UserMarket.load(client, market, owner.public_key, host)
             return uma
         except:
             uhl = await UserHostLifetime.get_or_create_user_host_lifetime(
@@ -434,7 +436,7 @@ class UserMarket():
                 host,
                 referrer,
                 discount_token,
-                program_id
+                market.program_id,
             )
 
             sig = await UserMarket.create_user_market_account(
@@ -444,7 +446,7 @@ class UserMarket():
                 send_options,
                 host,
                 number_of_orders,
-                program_id,
+                market.program_id
             )
 
             await client.provider.connection.confirm_transaction(
@@ -457,11 +459,11 @@ class UserMarket():
                 market,  
                 owner.public_key,
                 host,
-                program_id)
+                )
 
 
 
-    def make_place_order_instruction(
+    async def make_place_order_instruction(
             self,
             outcome_id: int,
             side: Side,
@@ -472,6 +474,7 @@ class UserMarket():
             order_type: OrderType = OrderType.LIMIT,
             self_trade_behavior: SelfTradeBehavior = SelfTradeBehavior.CANCEL_PROVIDE,
             active_pre_flight_check: bool = False,
+            program_id: PublicKey = None,
         ):
         """
         Creates instruction to place order.
@@ -488,6 +491,7 @@ class UserMarket():
             order_type (OrderType, optional): OrderType object. Defaults to OrderType.LIMIT.
             self_trade_behavior (SelfTradeBehavior, optional): Behavior when a user's trade is matched with themselves. Defaults to SelfTradeBehavior.CANCEL_PROVIDE.
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to False.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Raises:
             Exception: Cannot place error on closed market
@@ -498,7 +502,13 @@ class UserMarket():
         if(self.market.orderbooks is None):
             raise Exception('Cannot place error on closed market')
 
+        if(program_id is None):
+            program_id = self.market.program_id
+
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
         if(active_pre_flight_check):
+            check_if_instruction_is_out_of_date_with_idl('place_order', program)
             check_sufficient_lamport_balance(self.user_balance_state)
             check_correct_uma_market_match(self.user_market_state, self.market)
             check_market_active_pre_event(self.market.market_state.market_status)
@@ -521,34 +531,47 @@ class UserMarket():
         orderbook_account_index = outcome_id if not is_binary_market_second_outcome else 0
         orderbook_account = self.market.market_store_state.orderbook_accounts[orderbook_account_index]
 
-        return self.aver_client.program.instruction['place_order'](
-            {
-                "limit_price": limit_price_u64,
-                "size": max_base_qty,
-                "size_format": size_format,
-                "side": side,
-                "order_type": order_type,
-                "self_trade_behavior": self_trade_behavior,
-                "outcome_id": outcome_id,
-            },
-            ctx=Context(
-                accounts={
-                    "user": self.user_market_state.user,
-                    "user_host_lifetime": self.user_market_state.user_host_lifetime,
-                    "market": self.market.market_pubkey,
-                    "market_store": self.market.market_state.market_store,
-                    "user_market": self.pubkey,
-                    "user": self.user_market_state.user,
-                    "user_quote_token_ata": user_quote_token_ata,
-                    "quote_vault": self.market.market_state.quote_vault,
-                    "orderbook": orderbook_account.orderbook,
-                    "bids": orderbook_account.bids,
-                    "asks": orderbook_account.asks,
-                    "event_queue": orderbook_account.event_queue,
-                    "spl_token_program": TOKEN_PROGRAM_ID,
-                    "system_program": SYS_PROGRAM_ID,
-               },)
-        )
+        if self.market.market_state.in_play_queue == None or self.market.market_state.in_play_queue == SYS_PROGRAM_ID:
+            in_play_queue = Keypair().public_key
+        else:
+            in_play_queue = self.market.market_state.in_play_queue
+
+        #Logic to return correct instruction based on ProgramID
+        if(program_id.to_base58() == ''):
+            #return program.instruction()...
+            return ''
+        else:        
+            return program.instruction['place_order'](
+                {
+                    "limit_price": limit_price_u64,
+                    "size": max_base_qty,
+                    "size_format": size_format,
+                    "side": side,
+                    "order_type": order_type,
+                    "self_trade_behavior": self_trade_behavior,
+                    "outcome_id": outcome_id,
+                },
+                ctx=Context(
+                    accounts={
+                        "user": self.user_market_state.user,
+                        "user_host_lifetime": self.user_market_state.user_host_lifetime,
+                        "market": self.market.market_pubkey,
+                        "market_store": self.market.market_state.market_store,
+                        "user_market": self.pubkey,
+                        "user": self.user_market_state.user,
+                        "user_quote_token_ata": user_quote_token_ata,
+                        "quote_vault": self.market.market_state.quote_vault,
+                        "vault_authority": self.market.market_state.vault_authority,
+                        "orderbook": orderbook_account.orderbook,
+                        "bids": orderbook_account.bids,
+                        "asks": orderbook_account.asks,
+                        "event_queue": orderbook_account.event_queue,
+                        "in_play_queue": in_play_queue,
+                        "spl_token_program": TOKEN_PROGRAM_ID,
+                        "system_program": SYS_PROGRAM_ID,
+                        "vault_authority": self.market.market_state.vault_authority
+                },)
+            )
 
     async def place_order(
             self,
@@ -562,6 +585,7 @@ class UserMarket():
             order_type: OrderType = OrderType.LIMIT,
             self_trade_behavior: SelfTradeBehavior = SelfTradeBehavior.CANCEL_PROVIDE,
             active_pre_flight_check: bool = True,  
+            program_id: PublicKey = None,
         ):
         """
         Places a new order
@@ -579,6 +603,7 @@ class UserMarket():
             order_type (OrderType, optional): OrderType object. Defaults to OrderType.LIMIT. Other options include OrderType.IOC, OrderType.KILL_OR_FILL, OrderType.POST_ONLY.
             self_trade_behavior (SelfTradeBehavior, optional): Behavior when a user's trade is matched with themselves. Defaults to SelfTradeBehavior.CANCEL_PROVIDE. Other options include SelfTradeBehavior.DECREMENT_TAKE and SelfTradeBehavior.ABORT_TRANSACTION.
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to True. 
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Raises:
             Exception: Owner must be same as user market owner
@@ -589,13 +614,18 @@ class UserMarket():
         if(not owner.public_key == self.user_market_state.user):
             raise Exception('Owner must be same as user market owner')
 
+        if(program_id is None):
+            program_id = self.market.program_id
+        
+        await self.update_all_accounts_if_required(owner)
+
         user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
             self.user_market_state.user,
             self.market.aver_client.owner,
             self.market.market_state.quote_token_mint
         )
 
-        ix = self.make_place_order_instruction(
+        ix = await self.make_place_order_instruction(
             outcome_id,
             side, 
             limit_price,
@@ -604,7 +634,8 @@ class UserMarket():
             user_quote_token_ata,
             order_type,
             self_trade_behavior,
-            active_pre_flight_check
+            active_pre_flight_check,
+            program_id
         )
         return await sign_and_send_transaction_instructions(
             self.aver_client,
@@ -614,11 +645,12 @@ class UserMarket():
             send_options
         )
 
-    def make_cancel_order_instruction(
+    async def make_cancel_order_instruction(
             self,
             order_id: int,
             outcome_id: int,
             active_pre_flight_check: bool = False,
+            program_id: PublicKey = None
         ):
         """
         Creates instruction for to cancel order.
@@ -629,6 +661,7 @@ class UserMarket():
             order_id (int): ID of order to cancel
             outcome_id (int): ID of outcome
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to False.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Raises:
             Exception: Cannot cancel orders on closed market
@@ -641,31 +674,72 @@ class UserMarket():
         """
         if(self.market.orderbooks is None):
             raise Exception('Cannot cancel orders on closed market')
+        
+        if(program_id is None):
+            program_id = self.market.program_id
+
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
+        # find the corresponding order id incase they pass in aaob order in by accident
+        order_from_aaob_id = self.get_order_from_aaob_order_id(order_id)
+        order_id = order_from_aaob_id.order_id if order_from_aaob_id else order_id
 
         if(active_pre_flight_check):
+            check_if_instruction_is_out_of_date_with_idl('cancel_order', program)
             check_sufficient_lamport_balance(self.user_balance_state)
             check_cancel_order_market_status(self.market.market_state.market_status)
             check_order_exists(self.user_market_state, order_id)
+
+        user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
+            self.user_market_state.user,
+            self.market.aver_client.owner,
+            self.market.market_state.quote_token_mint
+        )
       
         is_binary_market_second_outcome = self.market.market_state.number_of_outcomes == 2 and outcome_id == 1
         orderbook_account_index = outcome_id if not is_binary_market_second_outcome else 0
         orderbook_account = self.market.market_store_state.orderbook_accounts[orderbook_account_index]
 
-        return self.aver_client.program.instruction['cancel_order'](
-            order_id, 
-            orderbook_account_index, 
-            ctx=Context(accounts={
-                "orderbook": orderbook_account.orderbook,
-                "event_queue": orderbook_account.event_queue,
-                "bids": orderbook_account.bids,
-                "asks": orderbook_account.asks,
-                "market": self.market.market_pubkey,
-                "user_market": self.pubkey,
-                "user": self.user_market_state.user,
-                "market_store": self.market.market_state.market_store,
-            })
-        )
-    
+        if self.market.market_state.in_play_queue == None or self.market.market_state.in_play_queue == SYS_PROGRAM_ID:
+            in_play_queue = Keypair().public_key
+        else:
+            in_play_queue = self.market.market_state.in_play_queue
+
+        if self.user_market_state.version == 0:
+            aaob_order_id = order_id
+            order_id = 0
+        else:
+            # if the order is from 1.0 but we migrated to 1.2, we need to pass in this value
+            aaob_order_id = next((order.aaob_order_id for order in self.user_market_state.orders if order.aaob_order_id == order_id), None)
+
+        #Logic to return correct instruction based on ProgramID
+        if(program_id.to_base58() == ''):
+            #return program.instruction()...
+            return ''
+        else:
+            return program.instruction['cancel_order'](
+                {
+                    "order_id": order_id, 
+                    "outcome_id": orderbook_account_index,
+                    "aaob_order_id": aaob_order_id
+                },
+                ctx=Context(accounts={
+                    "orderbook": orderbook_account.orderbook,
+                    "event_queue": orderbook_account.event_queue,
+                    "bids": orderbook_account.bids,
+                    "asks": orderbook_account.asks,
+                    "market": self.market.market_pubkey,
+                    "user_market": self.pubkey,
+                    "user": self.user_market_state.user,
+                    "market_store": self.market.market_state.market_store,
+                    "user_quote_token_ata": user_quote_token_ata,
+                    "quote_vault": self.market.market_state.quote_vault,
+                    "vault_authority": self.market.market_state.vault_authority,
+                    "spl_token_program": TOKEN_PROGRAM_ID,
+                    "in_play_queue": in_play_queue
+                })
+            )
+        
     async def cancel_order(
         self,
         order_id: int,
@@ -673,6 +747,7 @@ class UserMarket():
         fee_payer: Keypair = None,
         send_options: TxOpts = None,
         active_pre_flight_check: bool = True,
+        program_id: PublicKey = None
     ):
         """
         Cancels order
@@ -685,6 +760,7 @@ class UserMarket():
             outcome_id (int): ID of outcome
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to True.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Returns:
             RPCResponse: Response
@@ -693,10 +769,17 @@ class UserMarket():
         if(fee_payer is None):
             fee_payer = self.aver_client.owner
 
-        ix = self.make_cancel_order_instruction(
+        if(program_id is None):
+            program_id = self.market.program_id
+        
+        sig = await self.update_all_accounts_if_required(fee_payer)
+        #await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
+
+        ix = await self.make_cancel_order_instruction(
             order_id,
             outcome_id,
-            active_pre_flight_check
+            active_pre_flight_check,
+            program_id
         )
 
         return await sign_and_send_transaction_instructions(
@@ -707,10 +790,11 @@ class UserMarket():
             send_options
         )
 
-    def make_cancel_all_orders_instruction(
+    async def make_cancel_all_orders_instruction(
         self, 
         outcome_ids_to_cancel: list[int],
         active_pre_flight_check: bool = False,
+        program_id: PublicKey = None,
         ):
         """
         Creates instruction for to cancelling all orders
@@ -722,6 +806,7 @@ class UserMarket():
         Args:
             outcome_ids_to_cancel (list[int]): List of outcome ids to cancel orders on
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to False.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Raises:
             Exception: Cannot cancel orders on closed market
@@ -734,11 +819,23 @@ class UserMarket():
         if(self.market.orderbooks is None):
             raise Exception('Cannot cancel orders on closed market')
 
+        if(program_id is None):
+            program_id = self.market.program_id
+
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
         if(active_pre_flight_check):
+            check_if_instruction_is_out_of_date_with_idl('cancel_all_orders', program)
             check_sufficient_lamport_balance(self.user_balance_state)
             check_cancel_order_market_status(self.market.market_state.market_status)
             for outcome_id in outcome_ids_to_cancel:
                 check_outcome_has_orders(outcome_id, self.user_market_state)
+
+        user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
+            self.user_market_state.user,
+            self.market.aver_client.owner,
+            self.market.market_state.quote_token_mint
+        )
 
         remaining_accounts: list[AccountMeta] = []
         for i, accounts in enumerate(self.market.market_store_state.orderbook_accounts):
@@ -771,9 +868,19 @@ class UserMarket():
 
         ixs = []
 
+        if self.market.market_state.in_play_queue == None or self.market.market_state.in_play_queue == SYS_PROGRAM_ID:
+            in_play_queue = Keypair().public_key
+        else:
+            in_play_queue = self.market.market_state.in_play_queue
+
         for i, outcome_ids in enumerate(chunked_outcome_ids):
-            ixs.append(
-                self.aver_client.program.instruction['cancel_all_orders'](
+            #Logic to return correct instruction based on ProgramID
+            ix = None
+            if(program_id.to_base58() == ''):
+                #ix = program.instruction()...
+                pass
+            else:
+                ix = program.instruction['cancel_all_orders'](
                     outcome_ids,
                     ctx=Context(
                         accounts={
@@ -781,11 +888,16 @@ class UserMarket():
                                 "market": self.market.market_pubkey,
                                 "user": self.user_market_state.user,
                                 "market_store": self.market.market_state.market_store,
+                                "user_quote_token_ata": user_quote_token_ata,
+                                "quote_vault": self.market.market_state.quote_vault,
+                                "vault_authority": self.market.market_state.vault_authority,
+                                "spl_token_program": TOKEN_PROGRAM_ID,
+                                "in_play_queue": in_play_queue
                             },
                         remaining_accounts = chunked_remaining_accounts[i],
                         )
                     )
-            )
+            ixs.append(ix)
 
         return ixs
     
@@ -795,6 +907,7 @@ class UserMarket():
         fee_payer: Keypair = None, 
         send_options: TxOpts = None,
         active_pre_flight_check: bool = True,
+        program_id: PublicKey = None,
     ):
         """
         Cancels all orders on particular outcome_ids (not by order_id)
@@ -806,6 +919,7 @@ class UserMarket():
             outcome_ids_to_cancel (list[int]): List of outcome ids to cancel orders on
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             active_pre_flight_check (bool, optional): Clientside check if order will success or fail. Defaults to True.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Returns:
             RPCResponse: Response
@@ -813,7 +927,13 @@ class UserMarket():
         if(fee_payer is None):
             fee_payer = self.aver_client.owner
         
-        ixs = self.make_cancel_all_orders_instruction(outcome_ids_to_cancel, active_pre_flight_check)
+        if(program_id is None):
+            program_id = self.market.program_id
+
+        sig = await self.update_all_accounts_if_required(fee_payer)
+        #await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
+
+        ixs = await self.make_cancel_all_orders_instruction(outcome_ids_to_cancel, active_pre_flight_check, program_id)
 
         sigs = await gather(
             *[sign_and_send_transaction_instructions(
@@ -826,10 +946,11 @@ class UserMarket():
             )
         return sigs
 
-    def make_withdraw_idle_funds_instruction(
+    async def make_withdraw_idle_funds_instruction(
         self,
         user_quote_token_ata: PublicKey,
         amount: float = None,
+        program_id: PublicKey = None
     ):
         """
         Creates instruction for withdrawing funds in ATA 
@@ -839,29 +960,42 @@ class UserMarket():
         Args:
             user_quote_token_ata (PublicKey): Quote token ATA public key (holds funds for this user)
             amount (float, optional): amount. Defaults to maximum available funds.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Returns:
             TransactionInstruction: TransactionInstruction object
         """
         if(amount is None):
             amount = self.calculate_funds_available_to_withdraw()
+
+        if(program_id is None):
+            program_id = self.market.program_id
         
-        return self.aver_client.program.instruction['withdraw_tokens'](
-            amount,
-            ctx=Context(
-                accounts={
-                    "market": self.market.market_pubkey,
-                    "user_market": self.pubkey,
-                    "user": self.user_market_state.user,
-                    "user_quote_token_ata": user_quote_token_ata,
-                    "quote_vault": self.market.market_state.quote_vault,
-                    "vault_authority": self.market.market_state.vault_authority,
-                    "spl_token_program": TOKEN_PROGRAM_ID,
-                },
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
+        check_if_instruction_is_out_of_date_with_idl('cancel_all_orders', program)
+        
+        #Logic to return correct instruction based on ProgramID
+        if(program_id.to_base58() == ''):
+            #return program.instruction()...
+            return ''
+        else:        
+            return program.instruction['withdraw_tokens'](
+                amount,
+                ctx=Context(
+                    accounts={
+                        "market": self.market.market_pubkey,
+                        "user_market": self.pubkey,
+                        "user": self.user_market_state.user,
+                        "user_quote_token_ata": user_quote_token_ata,
+                        "quote_vault": self.market.market_state.quote_vault,
+                        "vault_authority": self.market.market_state.vault_authority,
+                        "spl_token_program": TOKEN_PROGRAM_ID
+                    },
+                )
             )
-        )
     
-    async def withdraw_idle_funds(self, owner: Keypair, send_options: TxOpts = None, amount: float = None):
+    async def withdraw_idle_funds(self, owner: Keypair, send_options: TxOpts = None, amount: float = None, program_id: PublicKey = None):
         """
         Withdraws idle funds in ATA
 
@@ -871,6 +1005,7 @@ class UserMarket():
             owner (Keypair): Owner of UserMarket account
             send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
             amount (float, optional): amount. Defaults to None.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
 
         Raises:
             Exception: Owner must be same as UMA owner
@@ -878,13 +1013,19 @@ class UserMarket():
         Returns:
             TransactionInstruction: TransactionInstruction object
         """
+        sig = await self.update_all_accounts_if_required(owner)
+        #await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
+
         user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
             self.user_market_state.user,
             self.market.aver_client.owner,
             self.market.market_state.quote_token_mint
         )
+
+        if(program_id is None):
+            program_id = self.market.program_id
         
-        ix = self.make_withdraw_idle_funds_instruction(user_quote_token_ata, amount)
+        ix = await self.make_withdraw_idle_funds_instruction(user_quote_token_ata, amount, program_id)
 
         if(not owner.public_key == self.user_market_state.user):
             raise Exception('Owner must be same as UMA owner')
@@ -897,6 +1038,313 @@ class UserMarket():
             send_options
         )
 
+    async def make_neutralize_positions_instruction(
+        self,
+        outcome_id: int,
+        program_id: PublicKey = None,
+    ):
+        """
+        Format instruction to neutralise the outcome position
+   
+        Returns TransactionInstruction object only. Does not send transaction.
+
+        Args:
+            outcome_id (int): Outcome ids to neutralize positions on
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
+
+        Returns:
+            TransactionInstruction: TransactionInstruction object
+        """
+        if(program_id is None):
+            program_id = self.market.program_id
+        
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
+        user_quote_token_ata = await self.market.aver_client.get_or_create_associated_token_account(
+            self.user_market_state.user,
+            self.market.aver_client.owner,
+            self.market.market_state.quote_token_mint
+        )
+
+        check_if_instruction_is_out_of_date_with_idl('cancel_all_orders', program)
+
+         #Logic to return correct instruction based on ProgramID
+        if(program_id.to_base58() == ''):
+            #return program.instruction()...
+            return ''
+        else:       
+            return program.instruction['neutralize_outcome_position'](
+                outcome_id,
+                ctx=Context(
+                    accounts={
+                        "market": self.market.market_pubkey,
+                        "user_market": self.pubkey,
+                        "user": self.user_market_state.user,
+                        "user_host_lifetime": self.user_host_lifetime.pubkey,
+                        "user_quote_token_ata": user_quote_token_ata,
+                        "quote_vault": self.market.market_state.quote_vault,
+                        "market_store": self.market.market_state.market_store,
+                        "orderbook": self.market.market_store_state.orderbook_accounts[outcome_id].orderbook,
+                        "bids": self.market.market_store_state.orderbook_accounts[outcome_id].bids,
+                        "asks": self.market.market_store_state.orderbook_accounts[outcome_id].asks,
+                        "event_queue": self.market.market_store_state.orderbook_accounts[outcome_id].event_queue,
+                        "system_program": SYS_PROGRAM_ID,
+                        "spl_token_program": TOKEN_PROGRAM_ID,
+                        "vault_authority": self.market.market_state.vault_authority,
+                    },
+                )
+            )
+
+    async def neutralize_positions(
+        self,
+        owner: Keypair,
+        outcome_id: int,
+        send_options: TxOpts = None,
+        program_id: PublicKey = None,
+    ):
+        """
+        Neutralise the outcome position
+    
+        Sends instructions on chain
+
+        Args:
+            owner (Keypair): Owner of UserMarket account
+            outcome_id (int): Outcome ids to neutralize positions on
+            send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
+
+        Raises:
+            Exception: Owner must be same as UMA owner
+
+        Returns:
+            RPCResponse: Response
+        """
+        if(program_id is None):
+            program_id = self.market.program_id
+
+        sig = await self.update_all_accounts_if_required(owner)
+        #await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
+        
+        ix = self.make_neutralize_positions_instruction(outcome_id, program_id)
+
+        if(not owner.public_key == self.user_market_state.user):
+            raise Exception('Owner must be same as UMA owner')
+        
+
+        return await sign_and_send_transaction_instructions(
+            self.aver_client,
+            [],
+            owner,
+            [ix],
+            send_options
+        )
+
+    async def make_update_user_market_orders_instruction(
+        self,
+        new_size: int,
+        program_id: PublicKey = None
+        ):
+        """
+        Changes size of UMA account to hold more or less max open orders
+
+        Returns TransactionInstruction object only. Does not send transaction.
+
+        Args:
+            new_size (int): New number of open orders available
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
+
+        Returns:
+            TransactionInstruction: TransactionInstruction object
+        """
+        if(program_id is None):
+            program_id = self.market.program_id
+        
+        program = await self.aver_client.get_program_from_program_id(program_id)
+
+        check_if_instruction_is_out_of_date_with_idl('cancel_all_orders', program)
+        
+        #Logic to return correct instruction based on ProgramID
+        if(program_id.to_base58() == ''):
+            #return program.instruction()...
+            return ''
+        else:
+            return program.instruction['update_user_market_orders'](
+                new_size,
+                ctx=Context(
+                    accounts={
+                        "user_market": self.pubkey,
+                        "user": self.user_market_state.user,
+                        "system_program": SYS_PROGRAM_ID
+                    },
+                )
+            )
+    
+    async def update_user_market_orders(
+        self,
+        owner: Keypair,
+        new_size: int,
+        send_options: TxOpts = None,
+        program_id: PublicKey = None,
+    ):
+        """
+        Changes size of UMA account to hold more or less max open orders
+
+        Sends instructions on chain 
+
+        Args:
+            owner (Keypair): Owner of UserMarket account
+            new_size (int): New number of open orders available
+            send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+            program_id (PublicKey, optional): Program public key. Defaults to Market Program ID.
+
+        Raises:
+            Exception: Owner must be same as UMA owner
+
+        Returns:
+            RPCResponse: Response
+        """
+        if(program_id is None):
+            program_id = self.market.program_id
+
+        sig = await self.update_all_accounts_if_required(owner)
+        #await self.market.aver_client.connection.confirm_transaction(sig['result'], Finalized)
+
+        ix = await self.make_update_user_market_orders_instruction(new_size, program_id)
+
+        if(not owner.public_key == self.user_market_state.user):
+            raise Exception('Owner must be same as UMA owner')
+
+        return await sign_and_send_transaction_instructions(
+            self.aver_client,
+            [],
+            owner,
+            [ix],
+            send_options
+        )
+
+    async def make_update_user_market_state_instruction(self, fee_payer = None):
+        """
+        Creates instruction to update user market state to new version if the smart contract has an update
+
+        Returns TransactionInstruction object only. Does not send transaction.
+
+        Args:
+            fee_payer (PublicKey): Pays transaction fees. Defaults to AverClient wallet
+
+        Returns:
+            TransactionInstruction: TransactionInstruction object
+        """
+        program = await self.aver_client.get_program_from_program_id(self.program_id)
+        fee_payer = fee_payer if fee_payer else self.aver_client.owner.public_key
+        return program.instruction['update_user_market_state'](
+            ctx=Context(accounts={
+                "payer": fee_payer,
+                "user": self.user_market_state.user,
+                "user_market": self.pubkey,
+                "system_program": SYS_PROGRAM_ID 
+            })
+        )
+
+    async def update_user_market_state(self, fee_payer: Keypair = None, send_options: TxOpts = None):
+        """
+        Updates user market state account to latest version if the smart contract has an update
+
+        Sends instructions on chain
+
+        Args:
+            fee_payer (Keypair, optional): Pays transaction fees. Defaults to AverClient wallet
+            send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+
+        Returns:
+            RPCResponse: Response
+        """
+        if(fee_payer == None):
+            fee_payer = self.aver_client.owner
+
+        ix = await self.make_update_user_market_state_instruction(fee_payer.public_key)
+
+        return await sign_and_send_transaction_instructions(
+            self.aver_client,
+            [],
+            fee_payer,
+            [ix],
+            send_options
+        )
+
+    async def make_update_all_accounts_if_required_instructions(self, fee_payer: PublicKey):
+        """
+        Creates instruction to all accounts state to new version if the smart contract has an update
+
+        Returns TransactionInstruction object only. Does not send transaction.
+
+        Args:
+            fee_payer (PublicKey): Pays transaction fees. Defaults to AverClient wallet
+
+        Returns:
+            TransactionInstruction: TransactionInstruction object
+        """
+        ixs = []
+        program = await self.aver_client.get_program_from_program_id(self.program_id)
+        if not await self.market.check_if_market_latest_version():
+            print(f"Creaing ix to update market from V{self.market.market_state.version} to V{get_version_of_account_type_in_program(AccountTypes.MARKET, program)}")
+            ix = await self.market.make_update_market_state_instruction(fee_payer)
+            ixs.append(ix)
+        if not await self.user_host_lifetime.check_if_uhl_latest_version():
+            print(f"Creaing ix to update UHL from V{self.user_host_lifetime.user_host_lifetime_state.version} to V{get_version_of_account_type_in_program(AccountTypes.USER_HOST_LIFETIME, program)}")
+            ix = await self.user_host_lifetime.make_update_user_host_lifetime_state_instruction()
+            ixs.append(ix)
+        if not await self.check_if_uma_latest_version():
+            print(f"Creaing ix to UMA market from V{self.user_market_state.version} to V{get_version_of_account_type_in_program(AccountTypes.USER_MARKET, program)}")
+            ix = await self.make_update_user_market_state_instruction(fee_payer)
+            ixs.append(ix)
+        
+        return ixs
+
+    async def update_all_accounts_if_required(self, fee_payer: Keypair = None, send_options: TxOpts = None):
+        """
+        Updates all accounts account to latest version if the smart contract has an update
+
+        Sends instructions on chain
+
+        Args:
+            fee_payer (Keypair, optional): Pays transaction fees. Defaults to AverClient wallet
+            send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+
+        Returns:
+            RPCResponse: Response
+        """
+        if(fee_payer == None):
+            fee_payer = self.aver_client.owner
+
+        ixs = await self.make_update_all_accounts_if_required_instructions(fee_payer.public_key)
+        if len(ixs) > 0:
+            print(f"Sending {len(ixs)} instructions to update states")
+            return await sign_and_send_transaction_instructions(
+                self.aver_client,
+                [],
+                fee_payer,
+                ixs,
+                send_options
+            )
+        else:
+            return True
+
+    
+
+    async def check_if_uma_latest_version(self):
+        """
+        Returns true if market state does not need to be updated (using update_user_market_state)
+
+        Returns false if update required
+
+        Returns:
+            Boolean: Is update required
+        """
+        program = await self.aver_client.get_program_from_program_id(self.market.program_id)
+        if(self.user_market_state.version < get_version_of_account_type_in_program(AccountTypes.USER_MARKET, program)):
+            print("User market account needs to be upgraded")
+            return False
+        return True
 
     def calculate_funds_available_to_withdraw(self):
         """
@@ -945,7 +1393,7 @@ class UserMarket():
         Returns:
             float: Token amount
         """
-        return self.user_market_state.outcome_positions[outcome_index].free + price * self.user_balance_state.token_balance
+        return self.user_market_state.outcome_positions[outcome_index].free + (1 - price) * self.user_balance_state.token_balance
     
     def calculate_tokens_available_to_buy(self, outcome_index: int, price: float):
         """
@@ -966,3 +1414,6 @@ class UserMarket():
     
     def calculate_min_free_outcome_positions(self):
         return min([o.free for o in self.user_market_state.outcome_positions])
+
+    def get_order_from_aaob_order_id(self, aaob_order_id):
+        return next((order for order in self.user_market_state.orders if order.aaob_order_id and order.aaob_order_id == aaob_order_id), None)

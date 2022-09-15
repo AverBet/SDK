@@ -15,7 +15,7 @@ class build_py(build_py_orig):
 
 setup(
     name='pyaver',
-    version='0.0.6',
+    version='0.0.26',
     license='MIT',
     author="Aver Ramanujan",
     author_email='email@example.com',
@@ -23,6 +23,8 @@ setup(
     package_dir={'': 'src'},
     url='https://www.aver.exchange/',
     keywords='Aver Python SDK Solana',
+    #package_data={'idl': ['*']},
+    include_package_data=True,
     install_requires=[
         'solana',
         'anchorpy',

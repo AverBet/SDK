@@ -1,9 +1,9 @@
 ## Tests
 
-Run using `python3 FILENAME.PY`
+Run using `python3 -m PY-SDK.admin.test.full_test` whilst in the TOP level directory (SDK)
 
 Make sure you have the latest version of pyaver installed.
-Currently: `pip install -i https://test.pypi.org/simple/ pyaver==0.0.10`
+Currently: `pip install -i https://test.pypi.org/simple/ pyaver==0.0.26`
 
 ## Uploading a new version
 
@@ -20,17 +20,3 @@ Currently: `pip install -i https://test.pypi.org/simple/ pyaver==0.0.10`
 Delete the old folder and run `pdoc --docformat google ./src/pyaver -o ./docs`
 
 Make sure you're in the /public folder
-
-## Running the services
-
-# consume cranker
-
-From inside `src` run
-All markets: `python3 -m pyaver_admin.services.consume_crank.crank_all_markets`
-Aver only markets: `python3 -m pyaver_admin.services.consume_crank.crank_aver_markets`
-
-# settle cranker
-
-From inside `src` run
-All markets: `python3 -m pyaver_admin.services.settle_crank.settle_all_markets`
-Aver only markets: `python3 -m pyaver_admin.services.settle_crank.settle_aver_markets`

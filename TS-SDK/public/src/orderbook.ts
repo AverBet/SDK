@@ -1,8 +1,8 @@
 import { Slab, Price, Side, LeafNode } from "@bonfida/aaob"
 import { BN } from "@project-serum/anchor"
 import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
-import { AVER_PROGRAM_ID, CALLBACK_INFO_LEN } from "./ids"
-import { PriceAndSide, SlabOrder } from "./types"
+import { AVER_PROGRAM_IDS, CALLBACK_INFO_LEN } from "./ids"
+import { PriceAndSide, SlabOrder, UmaOrder } from "./types"
 import { chunkAndFetchMultiple, throwIfNull } from "./utils"
 
 /**
@@ -63,7 +63,7 @@ export class Orderbook {
     slabBidsPubkey: PublicKey,
     slabAsksPubkey: PublicKey,
     decimals: number,
-    isInverted: boolean = false
+    isInverted = false
   ) {
     this._pubkey = pubkey
     this._decimals = decimals
@@ -161,7 +161,9 @@ export class Orderbook {
    * @param {AccountInfo<Buffer | null>[]} slabsData
    * @returns {Slab[]} - Multiple deserialized Slab object
    */
-  static deserializeMultipleSlabData(slabsData: AccountInfo<Buffer | null>[]) {
+  static deserializeMultipleSlabData(
+    slabsData: (AccountInfo<Buffer> | null)[]
+  ) {
     return slabsData.map((d) =>
       !!d?.data ? Slab.deserialize(d.data, new BN(CALLBACK_INFO_LEN)) : null
     )
@@ -187,7 +189,7 @@ export class Orderbook {
     bids: PublicKey,
     asks: PublicKey,
     decimals: number,
-    isInverted: boolean = false
+    isInverted = false
   ) {
     const slabBids = await Orderbook.loadSlab(connection, bids)
     const slabAsks = await Orderbook.loadSlab(connection, asks)
@@ -288,6 +290,9 @@ export class Orderbook {
         price: isInverted
           ? 1 - node.getPrice() / 2 ** 32
           : node.getPrice() / 2 ** 32,
+        price_ui: isInverted
+          ? 1 - node.getPrice() / 2 ** 32
+          : node.getPrice() / 2 ** 32,
         base_quantity: node.baseQuantity,
         base_quantity_ui: node.baseQuantity * 10 ** -decimals,
         // user_market: new PublicKey(node.callBackInfoPt[0 - 32]), //TODO - CHECK THIS
@@ -311,7 +316,7 @@ export class Orderbook {
   static async deriveOrderbookPubkeyAndBump(
     market: PublicKey,
     outcomeId: number,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [
@@ -336,7 +341,7 @@ export class Orderbook {
   static async deriveEventQueuePubkeyAndBump(
     market: PublicKey,
     outcomeId: number,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [
@@ -361,7 +366,7 @@ export class Orderbook {
   static async deriveBidsPubkeyAndBump(
     market: PublicKey,
     outcomeId: number,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [Buffer.from("bids", "utf-8"), market.toBuffer(), Buffer.of(outcomeId)],
@@ -382,7 +387,7 @@ export class Orderbook {
   static async deriveAsksPubkeyAndBump(
     market: PublicKey,
     outcomeId: number,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [Buffer.from("asks", "utf-8"), market.toBuffer(), Buffer.of(outcomeId)],
@@ -398,7 +403,7 @@ export class Orderbook {
    * Example, a BUY on A at a (probability) price of 0.4 is equivelant to a SELL on B at a price of 0.6 (1-0.4) and vice versa.
    *
    * @param {Price} price - Price object
-   * @param uiAmount - Converts prices based on decimal precision if true. Defaults to False.
+   * @param {boolean} uiAmount - Converts prices based on decimal precision if true. Defaults to False.
    * @returns {Price} - Inverted Price object
    */
   private static invertPrice(price: Price, uiAmount?: boolean): Price {
@@ -455,11 +460,9 @@ export class Orderbook {
    *
    * See https://www.thebalance.com/order-book-level-2-market-data-and-depth-of-market-1031118 for more information
    *
-   * @param {number} depth - Number of orders to return
-   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
    * @returns {SlabOrder[]} - SlabOrder object lists
    */
-  getBidsL3(depth: number, uiAmount?: boolean) {
+  getBidsL3() {
     const isIncreasing = this._isInverted ? true : false
     return Orderbook.getL3ForSlab(
       this._slabBids,
@@ -474,11 +477,9 @@ export class Orderbook {
    *
    * See https://www.thebalance.com/order-book-level-2-market-data-and-depth-of-market-1031118 for more information
    *
-   * @param {number} depth - Number of orders to return
-   * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
    * @returns {SlabOrder[]} - SlabOrder object lists
    */
-  getAsksL3(depth: number, uiAmount?: boolean) {
+  getAsksL3() {
     const isIncreasing = this._isInverted ? false : true
     return Orderbook.getL3ForSlab(
       this._slabAsks,
@@ -546,24 +547,15 @@ export class Orderbook {
     return this._isInverted ? Orderbook.invertPrice(askPrice) : askPrice
   }
 
-  // TODO make this more efficient - tried with the new method but doesnt work for some orderIds...
-  // getPriceByOrderId(orderId: BN): PriceAndSide | undefined {
-  //   const bidPrice = this.getBidPriceByOrderId(orderId)
-  //   if (bidPrice) return {...this.convertPrice(bidPrice), side: Side.Bid}
-
-  //   const askPrice = this.getBidPriceByOrderId(orderId)
-  //   if (askPrice) return {...this.convertPrice(askPrice), side: Side.Ask}
-
-  //   return undefined
-  // }
-
   /**
    * Gets Price object by orderId
    *
-   * @param {BN} orderId - Order ID
+   * @param {UmaOrder} order - the order
    * @returns {PriceAndSide | undefined} - PriceAndSide object
    */
-  getPriceByOrderId(orderId: BN): PriceAndSide | undefined {
+  getPriceByOrder(order: UmaOrder): PriceAndSide | undefined {
+    const orderId = order.aaobOrderId || order.orderId
+
     for (const node of this._slabBids.items()) {
       if (orderId.eq(node.key)) {
         let bidPriceRaw = {
@@ -575,7 +567,7 @@ export class Orderbook {
           ? Orderbook.invertPrice(bidPriceRaw)
           : bidPriceRaw
 
-        let bidPrice = {
+        const bidPrice = {
           ...this.convertPrice(bidPriceRaw),
         }
 
@@ -594,7 +586,7 @@ export class Orderbook {
           ? Orderbook.invertPrice(askPriceRaw)
           : askPriceRaw
 
-        let askPrice = {
+        const askPrice = {
           ...this.convertPrice(askPriceRaw),
         }
 

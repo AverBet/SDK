@@ -1,4 +1,4 @@
-import { BN } from "@project-serum/anchor"
+import { BN, Program } from "@project-serum/anchor"
 import { Market } from "./market"
 import {
   MarketStatus,
@@ -10,6 +10,9 @@ import {
 } from "./types"
 import { UserHostLifetime } from "./user-host-lifetime"
 import { roundPriceToNearestTickSize } from "./utils"
+import * as fs from "fs"
+// import path from 'path'
+import { PublicKey } from "@solana/web3.js"
 
 export function checkSufficientLamportBalance(
   user_balance_state: UserBalanceState
@@ -245,7 +248,7 @@ export function checkOrderExists(
   user_market_state: UserMarketState,
   order_id: number
 ) {
-  for (let o of user_market_state.orders) {
+  for (const o of user_market_state.orders) {
     if (o.orderId - order_id === 0) return
   }
 
@@ -266,4 +269,61 @@ export function checkOutcomeHasOrders(
   }
 
   throw Error(`No open orders found for outcome ${outcome_id} in this market.`)
+}
+
+export function loadIdlFromJson(programId: PublicKey) {
+  const filePath = __dirname + "/idl" + `/${programId.toBase58()}.json`
+  const data = fs.readFileSync(filePath, "utf-8")
+  const fileIdl = JSON.parse(data)
+
+  return fileIdl
+}
+
+/**
+ * Checks the idl json file's instructions against the instructions in the program
+ *
+ * Warns the user incase their SDK version may be out of date
+ *
+ * @param program -  AnchorPy Program
+ */
+export function checkIdlHasSameInstructionsAsSdk(program: Program) {
+  // do not do read file or do checks for browser
+  if (typeof window !== "undefined") {
+    return true
+  }
+  let fileIdl: any = undefined
+  try {
+    fileIdl = loadIdlFromJson(program.programId)
+  } catch {
+    console.log(
+      "IDL not found. This means your SDK version is likely out of date"
+    )
+    return
+  }
+  const fileInstructions = fileIdl["instructions"]
+
+  program.idl.instructions.map((i) => {
+    const fileInstruction = fileInstructions.find((f) => f["name"] === i.name)
+    if (!fileInstruction) {
+      console.log("-".repeat(10))
+      console.log(`INSTRUCTION ${i.name} IS IN THE IDL BUT IS NOT EXPECTED`)
+      console.log("THIS MEANS YOUR VERSION OF THE SDK MAY NEEDED TO BE UPDATED")
+      console.log("-".repeat(10))
+      return
+    }
+
+    const fileAccountNames = fileInstruction["accounts"].map((a) => a.name)
+    const idlAccountNames = i.accounts.map((a) => a.name)
+    //Checks for array equality
+    if (
+      fileAccountNames.sort().join(",") !== idlAccountNames.sort().join(",")
+    ) {
+      console.log("-".repeat(10))
+      console.log(
+        `INSTRUCTION ${i.name} ACCOUNTS REQUIRED FROM THE IDL ARE DIFFERENT FROM EXPECTED`
+      )
+      console.log("THIS MEANS YOUR VERSION OF THE SDK MAY NEEDED TO BE UPDATED")
+      console.log("-".repeat(10))
+    }
+  })
 }

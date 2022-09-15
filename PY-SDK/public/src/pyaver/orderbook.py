@@ -1,10 +1,10 @@
 from solana.publickey import PublicKey
 from .enums import Side
 from .utils import load_bytes_data, load_multiple_bytes_data
-from .data_classes import Price, SlabOrder
+from .data_classes import Price, SlabOrder, UmaOrder
 from .slab import Slab
 from solana.rpc.async_api import AsyncClient
-
+from solana.utils.helpers import to_uint8_bytes
 
 class Orderbook:
     """
@@ -282,6 +282,77 @@ class Orderbook:
             size=p.size
             )
 
+    def derive_orderbook(market: PublicKey, outcome_id: int, program_id: PublicKey):
+        """
+        Derives PDA (Program Derived Account) for Orderbook public key.
+        Orderbook account addresses are derived deterministically using the market's pubkey and outcome id
+
+        Args:
+            market_pubkey (PublicKey): Market public key
+            outcome_id (int): Outcome ID
+            program_id (PublicKey): Program public key
+
+        Returns:
+            Orderbook Public Key (PublicKey): Orderbook Public Key
+        """
+        return PublicKey.find_program_address(
+            [bytes('orderbook', 'utf-8'), bytes(market), to_uint8_bytes(outcome_id)], program_id
+        )
+
+
+    def derive_event_queue(market: PublicKey, outcome_id: int, program_id: PublicKey):
+        """
+        Derives PDA (Program Derived Account) for Event Queue public key.
+        EventQueue account addresses are derived deterministically using the market's pubkey and outcome id
+
+        Args:
+            market_pubkey (PublicKey): Market public key
+            outcome_id (int): Outcome ID
+            program_id (PublicKey): Program public key
+
+        Returns:
+            EventQueue Public Key (PublicKey): EventQueue Public Key
+        """
+        return PublicKey.find_program_address(
+            [bytes('event-queue', 'utf-8'), bytes(market), to_uint8_bytes(outcome_id)], program_id
+        )
+
+
+    def derive_bids(market: PublicKey, outcome_id: int, program_id: PublicKey):
+        """
+        Derives PDA (Program Derived Account) for Bids public key.
+        Bids account addresses are derived deterministically using the market's pubkey and outcome id
+
+        Args:
+            market_pubkey (PublicKey): Market public key
+            outcome_id (int): Outcome ID
+            program_id (PublicKey): Program public key
+
+        Returns:
+            Bids Public Key (PublicKey): Bids Public Key
+        """
+        return PublicKey.find_program_address(
+            [bytes('bids', 'utf-8'), bytes(market), to_uint8_bytes(outcome_id)], program_id
+        )
+
+
+    def derive_asks(market: PublicKey, outcome_id: int, program_id: PublicKey):
+        """
+        Derives PDA (Program Derived Account) for Bids public key.
+        Bids account addresses are derived deterministically using the market's pubkey and outcome id
+
+        Args:
+            market_pubkey (PublicKey): Market public key
+            outcome_id (int): Outcome ID
+            program_id (PublicKey): Program public key
+
+        Returns:
+            Bids Public Key (PublicKey): Bids Public Key
+        """
+        return PublicKey.find_program_address(
+            [bytes('asks', 'utf-8'), bytes(market), to_uint8_bytes(outcome_id)], program_id
+        )
+
     def get_bids_L3(self):
         """
         Gets level 1 market information for bids.
@@ -405,38 +476,43 @@ class Orderbook:
             return asks[0]
         return None
     
-    def get_bid_price_by_order_id(self, order_id: int):
+    def get_bid_price_by_order_id(self, order: UmaOrder):
         """
-        Gets bid Price object by order_id
+        Gets bid Price object by UMA Order
 
         Args:
-            order_id (int): Order ID
+            UMA Order (UmaOrder): UMA Order
 
         Returns:
             Price: Price object (size and price)
         """
+        order_id = order.aaob_order_id if order.aaob_order_id else order.order_id
         bid = self.slab_bids.get(order_id)
         if(bid is None):
             return None
         
+        exp = 10 ** self.decimals
         bid_price = Price(price=bid.key >> 64, size=bid.base_quantity)
-        bid_price = Orderbook.convert_price(bid_price, self.decimals)
+        #bid_price = Orderbook.convert_price(bid_price, self.decimals)
+        bid_price.price = round((bid_price.price / 2 ** 32) * exp) / exp
+        bid_price.size = bid_price.size / exp
 
         if(self.is_inverted):
             bid_price = Orderbook.invert_price(bid_price)
         
         return bid_price
 
-    def get_ask_price_by_order_id(self, order_id: int):
+    def get_ask_price_by_order_id(self, order: UmaOrder):
         """
-        Gets ask Price object by order_id
+        Gets ask Price object by UMA Order
 
         Args:
-            order_id (int): Order ID
+            UMA Order (UmaOrder): UMA Order
 
         Returns:
             Price: Price object (size and price)
         """
+        order_id = order.aaob_order_id if order.aaob_order_id else order.order_id
         ask = self.slab_asks.get(order_id)
         if(ask is None):
             return None

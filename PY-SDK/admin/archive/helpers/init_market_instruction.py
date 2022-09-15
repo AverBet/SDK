@@ -5,7 +5,6 @@ from typing import NamedTuple
 from solana.publickey import PublicKey
 from solana.keypair import Keypair
 from solana.rpc.commitment import Processed
-from pyaver.constants import AVER_PROGRAM_ID
 from solana.system_program import SYS_PROGRAM_ID
 # from constants import DEFAULT_QUOTE_TOKEN_DEVNET
 # from constants import AVER_PROGRAM_ID_DEVNET_2 as AVER_PROGRAM_ID_DEVNET
@@ -40,9 +39,9 @@ async def init_market(
   program: Program,
   args: InitMarketArgs,
   accs: InitMarketAccounts,
-  program_id: PublicKey = AVER_PROGRAM_ID
 ):
-  market_store_pubkey, market_store_bump = derive_market_store(accs.market.public_key)
+  program_id = program.program_id
+  market_store_pubkey, market_store_bump = derive_market_store(accs.market.public_key, program_id)
   vault_authority, vault_bump = PublicKey.find_program_address(
     [bytes(accs.market.public_key)], program_id
   )

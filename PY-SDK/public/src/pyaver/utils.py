@@ -1,11 +1,16 @@
+from asyncio import gather
+from anchorpy import Program
 from .aver_client import AverClient
 from spl.token.instructions import get_associated_token_address
 from spl.token._layouts import ACCOUNT_LAYOUT
 from spl.token.constants import ACCOUNT_LEN
 from .data_classes import UserBalanceState, MarketStatus
+from .constants import AVER_PROGRAM_IDS
 from solana.publickey import PublicKey
 from .errors import parse_error
+from hashlib import sha256
 from .slab import Slab
+from .enums import AccountTypes
 from solana.keypair import Keypair
 from solana.rpc.types import RPCResponse, TxOpts
 import base64
@@ -124,6 +129,7 @@ async def sign_and_send_transaction_instructions(
         fee_payer (Keypair): Keypair to pay fee for transaction
         tx_instructions (list[TransactionInstruction]): List of transaction instructions to pack into transaction to be sent
         send_options (TxOpts, optional): Options to specify when broadcasting a transaction. Defaults to None.
+        manual_max_retry (int, optional): Number of times to retry a transaction if it fails. Defaults to 0
 
     Raises:
         error: COMING SOON
@@ -138,13 +144,12 @@ async def sign_and_send_transaction_instructions(
     if(send_options == None):
         send_options = client.provider.opts
     
-
     attempts = 0
     while attempts <= manual_max_retry:
         try:
             return await client.provider.connection.send_transaction(tx, *signers, opts=send_options)
         except Exception as e:
-            error = parse_error(e, client.program)
+            error = parse_error(e, client.programs[0])
             if(isinstance(error, ProgramError)):
                 raise error
             else:
@@ -186,7 +191,7 @@ def calculate_tick_size_for_price(limit_price: float):
         raise Exception('Limit price too high')
     return limit_price
 
-def round_price_to_nearest_tick_size(limit_price: float):
+def round_price_to_nearest_tick_size(limit_price: float, is_binary: bool = False):
     """
     Rounds price to the nearest tick size available
 
@@ -196,69 +201,79 @@ def round_price_to_nearest_tick_size(limit_price: float):
     Returns:
         float: Rounded limit price
     """
-    limit_price_to_6dp = limit_price * (10 ** 6)
-    tick_size  = calculate_tick_size_for_price(limit_price_to_6dp)
+    factor = 10 ** 6
+    limit_price_to_6dp = limit_price * factor
+    tick_size  = calculate_tick_size_for_price(factor - limit_price_to_6dp if is_binary else limit_price_to_6dp)
     rounded_limit_price_to_6dp = round(limit_price_to_6dp/tick_size) * tick_size
-    rounded_limit_price = rounded_limit_price_to_6dp / (10 ** 6)
+    rounded_limit_price = rounded_limit_price_to_6dp / factor
 
     return rounded_limit_price
 
-def parse_user_market_state(buffer: bytes, aver_client: AverClient):
+def parse_user_market_state(buffer: bytes, aver_client: AverClient, program: Program = None):
         """
         Parses raw onchain data to UserMarketState object        
         Args:
             buffer (bytes): Raw bytes coming from onchain
             aver_client (AverClient): AverClient object
+            program (Program, optional): Anchor Program. Defaults to first program in client.
 
         Returns:
             UserMarket: UserMarketState object
         """
-        #uma_parsed = USER_MARKET_STATE_LAYOUT.parse(buffer)
-        uma_parsed = aver_client.program.account['UserMarket'].coder.accounts.decode(buffer)
-        return uma_parsed
+        if(program is None):
+            program = aver_client.programs[0]
+        return parse_with_version(program, AccountTypes.USER_MARKET, buffer)
 
-def parse_market_state(buffer: bytes, aver_client: AverClient):
+
+def parse_market_state(buffer: bytes, aver_client: AverClient, program: Program = None):
         """
         Parses raw onchain data to MarketState object        
         Args:
             buffer (bytes): Raw bytes coming from onchain
             aver_client (AverClient): AverClient object
+            program (Program, optional): Anchor Program. Defaults to first program in client.
 
         Returns:
             MarketState: MarketState object
         """
-        
-        market_account_info = aver_client.program.account['Market'].coder.accounts.decode(buffer)
-        return market_account_info
+        if(program is None):
+            program = aver_client.programs[0]
+        return parse_with_version(program, AccountTypes.MARKET, buffer)
 
-def parse_market_store(buffer: bytes, aver_client: AverClient):
+
+def parse_market_store(buffer: bytes, aver_client: AverClient, program = None):
         """
         Parses onchain data for a MarketStore State
 
         Args:
             buffer (bytes): Raw bytes coming from onchain
             aver_client (AverClient): AverClient
+            program (Program, optional): Anchor Program. Defaults to first program in client.
 
         Returns:
             MarketStore: MarketStore object
         """
-        market_store_account_info = aver_client.program.account['MarketStore'].coder.accounts.decode(buffer)
-        return market_store_account_info  
+        if(program is None):
+            program = aver_client.programs[0]
+        return parse_with_version(program, AccountTypes.MARKET_STORE, buffer)
 
 
-def parse_user_host_lifetime_state(aver_client: AverClient, buffer):
+
+def parse_user_host_lifetime_state(aver_client: AverClient, buffer, program: Program=None):
         """
         Parses raw onchain data to UserHostLifetime object
 
         Args:
             aver_client (AverClient): AverClient object
             buffer (bytes): Raw bytes coming from onchain
+            program (Program, optional): Anchor Program. Defaults to first program in client.
 
         Returns:
             UserHostLifetime: UserHostLifetime object
         """
-        user_host_lifetime_info = aver_client.program.account['UserHostLifetime'].coder.accounts.decode(buffer)
-        return user_host_lifetime_info
+        if(program is None):
+            program = aver_client.programs[0]
+        return parse_with_version(program, AccountTypes.USER_HOST_LIFETIME, buffer)
 
 async def load_multiple_account_states(
         aver_client: AverClient,
@@ -281,20 +296,21 @@ async def load_multiple_account_states(
             slab_pubkeys (list[PublicKey]): List of Slab public keys for orderbooks
             user_market_pubkeys (list[PublicKey], optional): List of UserMarketState object public keys. Defaults to [].
             user_pubkeys (list[PublicKey], optional): List of UserMarket owners' public keys. Defaults to [].
-            uhl_pubkeuys(list[PublicKey], optional): List of UserHostLifetime public keys. Defaults to []
+            uhl_pubkeys(list[PublicKey], optional): List of UserHostLifetime public keys. Defaults to []
 
         Returns:
-            dict[str, list]: Dictionary containing `market_states`, `market_stores`, `slabs`, `user_market_states`, `user_balance_sheets`
+            dict[str, list]: Dictionary containing `market_states`, `market_stores`, `slabs`, `user_market_states`, `user_balance_sheets`, `program_ids`
         """
         all_ata_pubkeys = [get_associated_token_address(u, aver_client.quote_token) for u in user_pubkeys]
 
-        all_pubkeys = market_pubkeys + market_store_pubkeys + slab_pubkeys + user_market_pubkeys + user_pubkeys + all_ata_pubkeys + uhl_pubkeys
+        all_pubkeys = market_pubkeys + market_store_pubkeys + user_market_pubkeys + uhl_pubkeys +  slab_pubkeys + user_pubkeys + all_ata_pubkeys 
         data = await load_multiple_bytes_data(aver_client.provider.connection, all_pubkeys, [], False)
-
+        programs = await gather(*[aver_client.get_program_from_program_id(PublicKey(d['owner'] if d else AVER_PROGRAM_IDS[0])) for d in data[0: len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]])
+       
         deserialized_market_state = []
         for index, m in enumerate(market_pubkeys):
             buffer = data[index]
-            deserialized_market_state.append(parse_market_state(buffer['data'], aver_client))
+            deserialized_market_state.append(parse_market_state(buffer['data'], aver_client, programs[index]))
         
         deserialized_market_store = []
         for index, m in enumerate(market_pubkeys):
@@ -302,35 +318,44 @@ async def load_multiple_account_states(
             if(buffer is None):
                 deserialized_market_store.append(None)
                 continue
-            deserialized_market_store.append(parse_market_store(buffer['data'], aver_client))
+            deserialized_market_store.append(parse_market_store(buffer['data'], aver_client, programs[index]))
+
+        deserialized_uma_data = []
+        if(user_market_pubkeys is not None):
+            for index, u in enumerate(user_market_pubkeys):
+                buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys)]
+                if(buffer is None):
+                    deserialized_uma_data.append(None)
+                    continue
+                deserialized_uma_data.append(parse_user_market_state(buffer['data'], aver_client, programs[index]))
+        
+        uhl_states = []
+        for index, pubkey in enumerate(uhl_pubkeys):
+            buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys)]
+            if(buffer is None):
+                uhl_states.append(None)
+                continue
+            uhl_state = parse_user_host_lifetime_state(aver_client, buffer['data'], programs[index])
+            uhl_states.append(uhl_state)
 
         deserialized_slab_data = []
         for index, s in enumerate(slab_pubkeys):
-            buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys)]
+            buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys) + len(uhl_pubkeys)]
             if(buffer is None):
                 deserialized_slab_data.append(None)
                 continue
             deserialized_slab_data.append(Slab.from_bytes(buffer['data']))
 
-        deserialized_uma_data = []
-        if(user_market_pubkeys is not None):
-            for index, u in enumerate(user_market_pubkeys):
-                buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(slab_pubkeys)]
-                if(buffer is None):
-                    deserialized_uma_data.append(None)
-                    continue
-                deserialized_uma_data.append(parse_user_market_state(buffer['data'], aver_client))
-
         lamport_balances = []
         if(user_pubkeys is not None):
             for index, pubkey in enumerate(user_pubkeys):
-                balance = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(slab_pubkeys) + len(user_market_pubkeys)]
+                balance = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys) + len(uhl_pubkeys) + len(slab_pubkeys)]
                 lamport_balances.append(balance['lamports'] if balance and balance['lamports'] is not None else 0)
 
         token_balances = []
         if(all_ata_pubkeys is not None):
             for index, pubkey in enumerate(all_ata_pubkeys):
-                buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(slab_pubkeys) + len(user_market_pubkeys) + len(user_pubkeys)]
+                buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys) + len(uhl_pubkeys) + len(slab_pubkeys) + len(user_pubkeys)]
                 if(len(buffer['data']) == ACCOUNT_LEN):
                     token_balances.append(ACCOUNT_LAYOUT.parse(buffer['data'])['amount'])
                 else:
@@ -341,22 +366,14 @@ async def load_multiple_account_states(
             user_balance_state = UserBalanceState(lamport_balances[index], token_balances[index])
             user_balance_states.append(user_balance_state)
 
-        uhl_states = []
-        for index, pubkey in enumerate(uhl_pubkeys):
-            buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(slab_pubkeys) + len(user_market_pubkeys) + len(user_pubkeys) + len(all_ata_pubkeys)]
-            if(buffer is None):
-                uhl_states.append(None)
-                continue
-            uhl_state = parse_user_host_lifetime_state(aver_client, buffer['data'])
-            uhl_states.append(uhl_state)
-
         return {
             'market_states': deserialized_market_state,
             'market_stores': deserialized_market_store,
             'slabs': deserialized_slab_data,
             'user_market_states': deserialized_uma_data,
             'user_balance_states': user_balance_states,
-            'user_host_lifetime_states': uhl_states
+            'user_host_lifetime_states': uhl_states,
+            'program_ids': [p.program_id for p in programs[0: len(market_pubkeys)]]
         }
 
 def is_market_tradeable(market_status: MarketStatus):
@@ -387,3 +404,104 @@ def can_cancel_order_in_market(market_status: MarketStatus):
         MarketStatus.HALTED_IN_PLAY,
         MarketStatus.HALTED_PRE_EVENT
     ]
+
+async def fetch_with_version(conn: AsyncClient, program: Program, account_type: AccountTypes, pubkey: PublicKey):
+    """
+    Fetches from onchain taking into account Aver Version
+
+    Args:
+        conn (AsyncClient): Solana AysyncClient object
+        program (Program): AnchorPy Program
+        account_type (AccountTypes): Account Type (e.g., MarketStore)
+        pubkey (PublicKey): Public key to fetch
+
+    Returns:
+        Container: Parsed and fetched object
+    """
+    bytes = await load_bytes_data(conn, pubkey)
+    #9th byte contains version
+    return parse_with_version(program, account_type, bytes)
+
+
+async def fetch_multiple_with_version(conn: AsyncClient, program: Program, account_type: AccountTypes, pubkeys: list[PublicKey]):
+    """
+    Fetches from onchain taking into account Aver Version
+
+    Args:
+        conn (AsyncClient): Solana AysyncClient object
+        program (Program): AnchorPy Program
+        account_type (AccountTypes): Account Type (e.g., MarketStore)
+        pubkeys (list[PublicKey]): Public key to fetch
+
+    Returns:
+        list[Container]: Parsed and fetched objects
+    """
+    bytes = await load_multiple_bytes_data(conn, pubkeys)
+
+    accounts = []
+    for i, d in enumerate(bytes):
+        accounts.append(parse_with_version(program, account_type, d))
+    
+    return accounts
+
+def parse_with_version(program: Program, account_type: AccountTypes, bytes: bytes):
+    """
+    Parses objects taking into account the Aver Version.
+
+    Rewrites first 8 bytes of discriminator
+
+    Args:
+        program (Program): AnchorPy Program
+        account_type (AccountTypes): Account Type (e.g., MarketStore)
+        bytes (bytes): Raw bytes data
+
+    Returns:
+        Container: Parsed object
+    """
+    #Version is 9th byte
+    version = bytes[8]
+
+    #Latest version according to program
+    latest_version = get_version_of_account_type_in_program(account_type, program)
+    
+    #Checks if this is reading the correct version OR if it is not possible to read an old version
+    if(version == latest_version or program.account.get(f'{account_type.value}V{version}') is None):
+        return program.account[f'{account_type.value}'].coder.accounts.decode(bytes)
+    else:
+        #Reads old version
+        print(f'THE {account_type} BEING READ HAS NOT BEEN UPDATED TO THE LATEST VERSION')
+        print('PLEASE CALL THE UPDATE INSTRUCTION FOR THE CORRESPONDING ACCOUNT TYPE TO RECTIFY, IF POSSIBLE')
+        #We need to replace the discriminator on the bytes data to prevent anchor errors
+        account_discriminator = get_account_discriminator(account_type, version, latest_version)
+        new_bytes = bytearray(bytes)
+        for i, a in enumerate(account_discriminator):
+            new_bytes[i] = a
+        return program.account[f'{account_type.value}V{version}'].coder.accounts.decode(new_bytes)
+
+
+def get_account_discriminator(account_type: AccountTypes, version: int, latest_version: int):
+    """
+    Gets the account discriminator (8 bytes) for a specific account type
+
+    Args:
+        account_type (AccountTypes): Account Type (e.g., MarketStore)
+        version (int): Version 
+
+    Returns:
+        bytes: Discriminator bytes
+    """
+    name = account_type.value if version == latest_version else f'{account_type.value}V{version}'
+    return sha256(bytes(f'account:{name}', 'utf-8')).digest()[0:8]
+
+#Latest version according to the program
+def get_version_of_account_type_in_program(account_type: AccountTypes, program: Program):
+    version = 0
+    while True:
+        account = program.account.get(f'{account_type.value}V{version}')
+        if(account is None):
+            break
+        else:
+            version = version + 1
+    
+    return version
+

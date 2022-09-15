@@ -4,15 +4,9 @@ import { bs58 } from "@project-serum/anchor/dist/cjs/utils/bytes"
 import { Connection, Keypair, ConfirmOptions, PublicKey } from "@solana/web3.js"
 import axios from "axios"
 import { AverClient } from "./aver-client"
-import { AVER_PROGRAM_ID, getAverApiEndpoint, getSolanaEndpoint } from "./ids"
+import { AVER_PROGRAM_IDS, getSolanaEndpoint } from "./ids"
 import { Market } from "./market"
-import {
-  MarketStatus,
-  OrderType,
-  Side,
-  SizeFormat,
-  SolanaNetwork,
-} from "./types"
+import { MarketStatus, Side, SizeFormat, SolanaNetwork } from "./types"
 import { UserMarket } from "./user-market"
 
 // ----------------------------------------------------
@@ -55,7 +49,7 @@ async function main() {
     SolanaNetwork.Devnet,
     ownerKeypair,
     opts,
-    AVER_PROGRAM_ID
+    AVER_PROGRAM_IDS
   )
 
   // ----------------------------------------------------
@@ -177,7 +171,8 @@ async function main() {
   //  while a market maker may wish to have capacity to place
   //  several orders per outcome and side.)
 
-  const uma = await UserMarket.getOrCreateUserMarketAccount(
+  //@ts-ignore
+  const uma: UserMarket = await UserMarket.getOrCreateUserMarketAccount(
     client,
     ownerKeypair,
     market,
@@ -314,3 +309,9 @@ async function main() {
 }
 
 main()
+
+function getAverApiEndpoint(network: SolanaNetwork) {
+  return network == SolanaNetwork.Devnet
+    ? "https://dev.api.aver.exchange"
+    : "https://api.aver.exchange"
+}

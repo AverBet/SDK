@@ -6,6 +6,7 @@ from asyncio import gather
 from .init_market_instruction import InitMarketAccounts, InitMarketArgs
 from .init_market_instruction import init_market
 import time
+from solana.publickey import PublicKey
 from .supplement_init_market import SupplementInitMarketAccounts, supplement_init_market, SupplementInitMarketArgs
 
 async def create_init_market_smoke_tests(
@@ -13,7 +14,8 @@ async def create_init_market_smoke_tests(
     owner: Keypair,
     outcome_length: int,
     market: Keypair,
-    market_authority: Keypair
+    market_authority: Keypair,
+    program_id: PublicKey
 ):
     #CREATE MARKET
     init_market_args = InitMarketArgs(
@@ -40,7 +42,9 @@ async def create_init_market_smoke_tests(
         payer=owner
     )
 
-    sig = await init_market(client, client.program, init_market_args, init_market_accs)
+    program = await client.get_program_from_program_id(program_id)
+
+    sig = await init_market(client, program, init_market_args, init_market_accs)
     con = await client.provider.connection.confirm_transaction(sig, Confirmed)
     assert(con['result']['value'][0]['err'] is None), 'Init market'
     
@@ -66,7 +70,7 @@ async def create_init_market_smoke_tests(
         )
 
         print(f'creating supplement init market: {i}')
-        coroutines.append(supplement_init_market(client.program, supplement_init_market_args, supplement_init_market_accs))
+        coroutines.append(supplement_init_market(program, supplement_init_market_args, supplement_init_market_accs))
     sigs = await gather(*coroutines)
     time.sleep(10)
     cons = await gather(*[client.provider.connection.confirm_transaction(sig, Confirmed) for sig in sigs])
@@ -76,7 +80,7 @@ async def create_init_market_smoke_tests(
 
     #LOAD CREATED MARKET
     market_object = await AverMarket.load(client, market.public_key)
-    [expected_market_store_pubkey, _] = AverMarket.derive_market_store_pubkey_and_bump(market.public_key)
+    [expected_market_store_pubkey, _] = AverMarket.derive_market_store_pubkey_and_bump(market.public_key, program_id)
     assert(market_object.market_pubkey == market.public_key), 'Loaded market matching'
     assert(market_object.market_state.market_authority == market_authority.public_key), 'Loaded matching market authority'
     assert(market_object.market_state.market_store == expected_market_store_pubkey), 'Loaded market store'

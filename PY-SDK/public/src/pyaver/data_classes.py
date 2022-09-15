@@ -20,15 +20,14 @@ class MarketState():
     decimals: int 
     cranker_reward: int 
     matched_count: int
-    prize_balance: int
-    withdrawable_quote_token_balance: int
+    stable_quote_token_balance: int
     winning_outcome: int
     permissioned_market_flag: bool
     going_in_play_flag: bool
     max_quote_tokens_in: int
     max_quote_tokens_in_permission_capped: str
     outcome_names: list[str]
-    version: float
+    version: int
     number_of_umas: int
     vault_bump: int
     trading_cease_time: int
@@ -37,7 +36,15 @@ class MarketState():
     open_interest: int
     oracle_feed: PublicKey
     fee_tier_collection_bps_rates: list[int]
-    inplay_start_time: int = None
+    category: int 
+    sub_category: int
+    series: int
+    event: int
+    rounding_format: int
+    vault_authority: PublicKey
+    market_name: str
+    in_play_queue: PublicKey
+    in_play_start_time: int = None
    
    
 
@@ -68,23 +75,60 @@ class MarketStoreState():
     min_new_order_base_size: int
     min_new_order_quote_size: int
     version: float
-    init_counter: float
+    init_counter: int
+    re_init_counter: int
+    order_id_counter: int
+    in_play_delay_seconds: int or None
 
 @dataclass
 class Price():
+    """
+    Price object
+
+    Holds data on an order in the Orderbook (L2 or L3)
+    """
     price: float
     size: float
 
 @dataclass
 class OutcomePosition():
+    """
+    OutcomePosition object
+
+    Holds data on a user's position
+    """
     free: int
     locked: int
 
 @dataclass
 class UmaOrder():
+    """
+    UmaOrder object
+
+    Holds data on a particular user's orders
+    """
     order_id: int
     outcome_id: int
     base_qty: int
+    is_pre_event: bool
+    aaob_order_id: int
+
+@dataclass
+class InPlayOrder():
+    order_id: int
+    outcome_id: int
+    side: int
+    limit_price: float
+    size_format: int
+    size: int
+    order_type: int
+    self_trade_behavior: int
+    fee_tier: FeeTier
+    total_quote_qty: int
+    total_base_qty: int
+    post_only: bool
+    post_allowed: bool
+    neutralize: bool
 
 @dataclass
 class UserMarketState():
@@ -108,6 +152,7 @@ class UserMarketState():
     version: int
     user_verification_account: PublicKey or None
     user_host_lifetime: PublicKey
+    in_play_orders: list[InPlayOrder]
 
 @dataclass
 class ReferrerState():

@@ -27,6 +27,7 @@ export enum MarketStatus {
   CeasedCrankedClosed,
   Resolved,
   Voided,
+  InPlayTransition,
 }
 
 /**
@@ -63,7 +64,7 @@ export type MarketState = {
   averAccumulatedFees: BN
   thirdPartyAccumulatedFees: BN
   openInterest: BN
-  withdrawableQuoteTokenBalance: BN
+  stableQuoteTokenBalance: BN
   permissionedMarketFlag: boolean
   goingInPlayFlag: boolean
   quoteTokenMint: PublicKey
@@ -75,6 +76,13 @@ export type MarketState = {
   feeTierCollectionBpsRates: [BN, BN, BN, BN, BN, BN, BN]
   marketName: string
   outcomeNames: string[]
+  category: number
+  subCategory: number
+  series: number
+  event: number
+  roundingFormat: number
+  inPlayQueue: PublicKey
+  inPlayStartTime?: number
 }
 
 export type MarketStoreState = {
@@ -86,6 +94,9 @@ export type MarketStoreState = {
   minNewOrderQuoteSize: BN
   orderbookAccounts: OrderbookAccountsState[]
   initCounter: number
+  reInitCounter: number
+  orderIdCounter: BN
+  inPlayDelaySeconds?: number
 }
 
 export type UserMarketState = {
@@ -104,6 +115,24 @@ export type UserMarketState = {
   accumulatedTakerBaseVolume: BN
   outcomePositions: OutcomePosition[]
   orders: UmaOrder[]
+  inPlayOrders: InPlayOrder[]
+}
+
+export type InPlayOrder = {
+  order_id: BN
+  outcome_id: number
+  side: number
+  limit_price: BN // NOT fp32
+  size_format: number
+  size: BN
+  order_type: number
+  self_trade_behavior: number
+  fee_tier: FeeTier
+  total_quote_qty: number
+  total_base_qty: number
+  post_only: boolean
+  post_allowed: boolean
+  neutralize: boolean
 }
 
 export type UserBalanceState = {
@@ -170,6 +199,8 @@ export type UmaOrder = {
   orderId: BN
   outcomeId: number
   baseQty: BN
+  isPreEvent: boolean
+  aaobOrderId: BN
 }
 
 /**
@@ -235,4 +266,11 @@ export type SlabOrder = {
   base_quantity_ui: number
   // user_market: PublicKey
   // fee_tier: number
+}
+
+export enum AccountType {
+  MARKET = "market",
+  MARKET_STORE = "marketStore",
+  USER_MARKET = "userMarket",
+  USER_HOST_LIFETIME = "userHostLifetime",
 }

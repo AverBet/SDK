@@ -1,3 +1,4 @@
+import { Program } from "@project-serum/anchor"
 import { Idl, IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl"
 import {
   IdlTypes,
@@ -5,6 +6,7 @@ import {
 } from "@project-serum/anchor/dist/cjs/program/namespace/types"
 import { getOrCreateAssociatedTokenAccount } from "@solana/spl-token"
 import {
+  AccountInfo,
   AccountMeta,
   Keypair,
   PublicKey,
@@ -13,10 +15,13 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js"
 import { AverClient } from "./aver-client"
-import { AVER_PROGRAM_ID, AVER_HOST_ACCOUNT } from "./ids"
-import { FeeTier, UserHostLifetimeState } from "./types"
+import { AVER_PROGRAM_IDS, getAverHostAccount } from "./ids"
+import { AccountType, FeeTier, UserHostLifetimeState } from "./types"
 import {
+  chunkAndFetchMultiple,
   getBestDiscountToken,
+  getVersionOfAccountTypeInProgram,
+  parseWithVersion,
   signAndSendTransactionInstructions,
 } from "./utils"
 
@@ -46,20 +51,29 @@ export class UserHostLifetime {
   private _averClient: AverClient
 
   /**
+   * @private
+   * Program ID of the UHL
+   */
+  private _programId: PublicKey
+
+  /**
    * Initialise an UserHostLifetime object. Do not use this function; use load() instead
    *
    * @param {AverClient} averClient - AverClient object
    * @param {PublicKey} pubkey - UserHostLifetime public key
    * @param {UserHostLifetimeState} userHostLifetimeState - UserHostLifetimeState public key
+   * @param {PublicKey} programId - Program ID of the UHL
    */
   constructor(
     averClient: AverClient,
     pubkey: PublicKey,
-    userHostLifetimeState: UserHostLifetimeState
+    userHostLifetimeState: UserHostLifetimeState,
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     this._averClient = averClient
     this._pubkey = pubkey
     this._userHostLifetimeState = userHostLifetimeState
+    this._programId = programId
   }
 
   /**
@@ -76,15 +90,7 @@ export class UserHostLifetime {
    * @returns {Promise<UserHostLifetime>} UserHostLifetime object
    */
   static async load(averClient: AverClient, pubkey: PublicKey) {
-    const program = averClient.program
-    const userHostLifetimeResult = await program.account[
-      "userHostLifetime"
-    ].fetch(pubkey.toBase58())
-    const userHostLifetimeState = UserHostLifetime.parseHostState(
-      userHostLifetimeResult
-    )
-
-    return new UserHostLifetime(averClient, pubkey, userHostLifetimeState)
+    return (await UserHostLifetime.loadMultiple(averClient, [pubkey]))[0]
   }
 
   /**
@@ -98,22 +104,44 @@ export class UserHostLifetime {
    * @param {AverClient} averClient - AverClient object
    * @param {PublicKey[]} pubkeys - UserHostLifetime public keys
    *
-   * @returns {Promise<UserHostLifetime[]>} UserHostLifetime objects
+   * @returns {Promise<UserHostLifetime[] | undefined>} UserHostLifetime objects
    */
   static async loadMultiple(averClient: AverClient, pubkeys: PublicKey[]) {
-    const program = averClient.program
-    const userHostLifetimeResult = await program.account[
-      "userHostLifetime"
-    ].fetchMultiple(pubkeys.map((p) => p.toBase58()))
-
-    const userHostLifetimeStates = userHostLifetimeResult.map((r) =>
-      r ? UserHostLifetime.parseHostState(r) : null
+    const program = averClient.programs[0]
+    const uhld = await chunkAndFetchMultiple(averClient.connection, pubkeys)
+    const programs = await Promise.all(
+      uhld.map((d) => averClient.getProgramFromProgramId(d?.owner))
     )
 
+    const userHostLifetimeStates =
+      UserHostLifetime.deserializeMultipleUserHostLifetimesData(
+        uhld,
+        programs
+      ).map((r) => (r ? UserHostLifetime.parseHostState(r) : null))
+
     return userHostLifetimeStates.map((s, i) => {
-      if (!s) throw new Error("User Host Lifetime account is null")
-      return new UserHostLifetime(averClient, pubkeys[i], s)
+      if (!s) return undefined
+      return new UserHostLifetime(averClient, pubkeys[i], s, program.programId)
     })
+  }
+
+  /**
+   * Parses onchain data for multiple UserMarketState objects
+   *
+   * @param {AverClient} averClient - AverClient object
+   * @param {AccountInfo<Buffer | null>[]} userMarketStoresData - Raw bytes coming from onchain
+   *
+   * @returns {(UserMarketState | null)[]} - UserMarketState objects
+   */
+  static deserializeMultipleUserHostLifetimesData(
+    userHostLifetimeStateData: (AccountInfo<Buffer> | null)[],
+    programs: Program[]
+  ): (UserHostLifetimeState | null)[] {
+    return userHostLifetimeStateData.map((uhld, i) =>
+      uhld
+        ? parseWithVersion(programs[i], AccountType.USER_HOST_LIFETIME, uhld)
+        : null
+    )
   }
 
   /**
@@ -134,11 +162,11 @@ export class UserHostLifetime {
     averClient: AverClient,
     userQuoteTokenAta: PublicKey,
     owner?: PublicKey,
-    host: PublicKey = AVER_HOST_ACCOUNT,
+    host: PublicKey = getAverHostAccount(averClient.solanaNetwork),
     referrer: PublicKey = SystemProgram.programId,
-    programId = AVER_PROGRAM_ID
+    programId = AVER_PROGRAM_IDS[0]
   ) {
-    const program = averClient.program
+    const program = await averClient.getProgramFromProgramId(programId)
     const userHostLifetimeOwner = owner || averClient.owner
     const [userHostLifetime, bump] = await UserHostLifetime.derivePubkeyAndBump(
       userHostLifetimeOwner,
@@ -160,7 +188,7 @@ export class UserHostLifetime {
       pubkey: referrer,
     } as AccountMeta
 
-    return program.instruction["initUserHostLifetime"](bump, {
+    return program.instruction["initUserHostLifetime"]({
       accounts: {
         user: userHostLifetimeOwner,
         userHostLifetime: userHostLifetime,
@@ -190,14 +218,16 @@ export class UserHostLifetime {
    */
   static async createUserHostLifetime(
     averClient: AverClient,
-    owner: Keypair = averClient.keypair,
+    owner: Keypair | undefined = averClient.keypair,
     userQuoteTokenAta: PublicKey,
     sendOptions?: SendOptions,
     manualMaxRetry?: number,
-    host: PublicKey = AVER_HOST_ACCOUNT,
+    host: PublicKey = getAverHostAccount(averClient.solanaNetwork),
     referrer: PublicKey = SystemProgram.programId,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
+    if (!owner) throw new Error("Owner keypair not given")
+
     const ix = await UserHostLifetime.makeCreateUserHostLifetimeInstruction(
       averClient,
       userQuoteTokenAta,
@@ -232,13 +262,14 @@ export class UserHostLifetime {
    */
   static async getOrCreateUserHostLifetime(
     averClient: AverClient,
-    owner: Keypair = averClient.keypair,
+    owner: Keypair | undefined = averClient.keypair,
     sendOptions?: SendOptions,
     quoteTokenMint: PublicKey = averClient.quoteTokenMint,
-    host: PublicKey = AVER_HOST_ACCOUNT,
+    host: PublicKey = getAverHostAccount(averClient.solanaNetwork),
     referrer: PublicKey = SystemProgram.programId,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
+    if (!owner) throw new Error("Owner keypair not given")
     const userHostLifetime = (
       await UserHostLifetime.derivePubkeyAndBump(
         owner.publicKey,
@@ -248,9 +279,18 @@ export class UserHostLifetime {
     )[0]
 
     // check if account exists first, and if so return it
-    const userHostLifetimeResult = await averClient.program.account[
-      "userHostLifetime"
-    ].fetchNullable(userHostLifetime)
+    const userHostLifetimeResultUnparsed =
+      await averClient.connection.getAccountInfo(userHostLifetime)
+
+    const program = await averClient.getProgramFromProgramId(programId)
+
+    const userHostLifetimeResult = userHostLifetimeResultUnparsed?.data
+      ? parseWithVersion(
+          program,
+          AccountType.USER_HOST_LIFETIME,
+          userHostLifetimeResultUnparsed
+        )
+      : null
 
     if (userHostLifetimeResult) {
       const userHostLifetimeState = UserHostLifetime.parseHostState(
@@ -259,7 +299,8 @@ export class UserHostLifetime {
       return new UserHostLifetime(
         averClient,
         userHostLifetime,
-        userHostLifetimeState
+        userHostLifetimeState,
+        program.programId
       )
     }
 
@@ -316,7 +357,7 @@ export class UserHostLifetime {
   static async derivePubkeyAndBump(
     owner: PublicKey,
     host: PublicKey,
-    programId = AVER_PROGRAM_ID
+    programId = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [
@@ -416,6 +457,71 @@ export class UserHostLifetime {
 
   get nftPfp() {
     return this._userHostLifetimeState.nftPfp
+  }
+
+  get version() {
+    return this._userHostLifetimeState.version
+  }
+
+  /**
+   * Function coming soon
+   *
+   */
+  async makeUpdateUserHostLifetimeStateInstruction() {
+    const program = await this._averClient.getProgramFromProgramId(
+      this._programId
+    )
+    // TODO
+    //@ts-ignore
+    return new TransactionInstruction(undefined)
+  }
+
+  /**
+   * Function coming soon
+   *
+   *
+   * @param {Keypair | undefined} payer - Pays transaction fees. Defaults to AverClient wallet
+   * @param {SendOptions} sendOptions - Options to specify when broadcasting a transaction
+   * @param {number} manualMaxRetry - Max no. of times to retry a transaction incase it fails
+   * @returns {Promise<string>} - Transaction Signature
+   */
+  async updateUserHostLifetimeState(
+    payer: Keypair | undefined = this._averClient.keypair,
+    sendOptions?: SendOptions,
+    manualMaxRetry?: number
+  ) {
+    if (!payer) throw new Error("Payer keypair not given")
+    const ix = await this.makeUpdateUserHostLifetimeStateInstruction()
+
+    return signAndSendTransactionInstructions(
+      this._averClient,
+      [],
+      payer,
+      [ix],
+      sendOptions,
+      manualMaxRetry
+    )
+  }
+
+  /**
+   * Returns true if UHL does not need to be updated (using update_user_host_lifetime_state)
+   *
+   * Returns false if update required
+   *
+   * @returns {Promise<boolean>} - Is update required
+   */
+  async checkIfUhlLatestVersion() {
+    const program = await this._averClient.getProgramFromProgramId(
+      this._programId
+    )
+    if (
+      this.version <
+      getVersionOfAccountTypeInProgram(AccountType.USER_HOST_LIFETIME, program)
+    ) {
+      console.log("UHL needs to be upgraded")
+      return false
+    }
+    return true
   }
 
   /**

@@ -5,3 +5,8 @@ TS-SDK/public/dist
 *.ignore.ts
 *./ignore.py
 ignore.py
+venv/
+__pycache__/
+*.pyc
+*.DS_Store
+.idea/

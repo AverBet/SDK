@@ -1,4 +1,4 @@
-import { ProgramError } from "@project-serum/anchor"
+import { Program, ProgramError, Wallet } from "@project-serum/anchor"
 import {
   Keypair,
   Connection,
@@ -7,15 +7,20 @@ import {
   PublicKey,
   SendOptions,
   SystemProgram,
+  AccountInfo,
 } from "@solana/web3.js"
 import { chunk } from "lodash"
 import { AverClient } from "./aver-client"
+import { sha256 } from "js-sha256"
+import camelcase from "camelcase"
 import { parseError } from "./errors"
 import {
   AVER_COMMUNITY_REWARDS_NFT,
   AVER_TOKEN,
+  AVER_VERSION,
   getAverLaunchZeroFeesToken,
 } from "./ids"
+import { AccountType } from "./types"
 
 /**
  * Cryptographically signs transaction and sends onchain
@@ -32,23 +37,30 @@ import {
 export const signAndSendTransactionInstructions = async (
   client: AverClient,
   signers: Array<Keypair>,
-  feePayer: Keypair,
+  feePayer: Keypair | Wallet,
   txInstructions: Array<TransactionInstruction>,
   sendOptions?: SendOptions,
   manualMaxRetry?: number
 ): Promise<string> => {
-  const tx = new Transaction()
-  tx.feePayer = feePayer.publicKey
-  signers.push(feePayer)
-  tx.add(...txInstructions)
+  let tx = new Transaction()
+  if (!(feePayer instanceof Wallet)) {
+    tx.feePayer = feePayer.publicKey
+    signers.push(feePayer)
+    tx.add(...txInstructions)
+  }
   let attempts = 0
   let errorThrown = new Error("Transaction failed")
+
+  if (feePayer instanceof Wallet) {
+    tx = await feePayer.signTransaction(tx)
+  }
 
   while (attempts <= (manualMaxRetry || 0)) {
     try {
       return await client.connection.sendTransaction(tx, signers, sendOptions)
     } catch (e) {
-      errorThrown = parseError(e, client.program)
+      console.log(e)
+      errorThrown = parseError(e, client.programs[0])
 
       // if its a program error, throw it
       if (errorThrown instanceof ProgramError) {
@@ -86,7 +98,7 @@ export function throwIfNull<T>(
 export const chunkAndFetchMultiple = async (
   connection: Connection,
   pubkeys: PublicKey[]
-): Promise<any> => {
+) => {
   const res = await Promise.all(
     chunk(pubkeys, 100).map((pubkeyChunk) =>
       connection.getMultipleAccountsInfo(pubkeyChunk)
@@ -166,40 +178,154 @@ export const getBestDiscountToken = async (
   const zeroFeesToken = getAverLaunchZeroFeesToken(averClient.solanaNetwork)
   const averToken = AVER_TOKEN
 
-  const zeroFeesTokenAccount =
-    await averClient.connection.getParsedTokenAccountsByOwner(owner, {
-      mint: zeroFeesToken,
-    })
-  if (
-    zeroFeesTokenAccount.value.length > 0 &&
-    zeroFeesTokenAccount.value[0].account.data.parsed.info.tokenAmount
-      .uiAmount > 0
-  ) {
-    return zeroFeesTokenAccount.value[0].pubkey
+  try {
+    const zeroFeesTokenAccount =
+      await averClient.connection.getParsedTokenAccountsByOwner(owner, {
+        mint: zeroFeesToken,
+      })
+    if (
+      zeroFeesTokenAccount.value.length > 0 &&
+      zeroFeesTokenAccount.value[0].account.data.parsed.info.tokenAmount
+        .uiAmount > 0
+    ) {
+      return zeroFeesTokenAccount.value[0].pubkey
+    }
+  } catch (e) {
+    console.log(
+      "Zero fees token mint does not exist on the network / program ID"
+    )
   }
 
-  const communityRewardsTokenAccount =
-    await averClient.connection.getParsedTokenAccountsByOwner(owner, {
-      mint: AVER_COMMUNITY_REWARDS_NFT,
-    })
-  if (
-    communityRewardsTokenAccount.value.length > 0 &&
-    communityRewardsTokenAccount.value[0].account.data.parsed.info.tokenAmount
-      .uiAmount > 0
-  ) {
-    return communityRewardsTokenAccount.value[0].pubkey
+  try {
+    const communityRewardsTokenAccount =
+      await averClient.connection.getParsedTokenAccountsByOwner(owner, {
+        mint: AVER_COMMUNITY_REWARDS_NFT,
+      })
+    if (
+      communityRewardsTokenAccount.value.length > 0 &&
+      communityRewardsTokenAccount.value[0].account.data.parsed.info.tokenAmount
+        .uiAmount > 0
+    ) {
+      return communityRewardsTokenAccount.value[0].pubkey
+    }
+  } catch (e) {
+    console.log(
+      "Community rewards token mint does not exist on the network / program ID"
+    )
   }
 
-  const averTokenAccount =
-    await averClient.connection.getParsedTokenAccountsByOwner(owner, {
-      mint: averToken,
-    })
-  if (
-    averTokenAccount.value.length > 0 &&
-    averTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount > 0
-  ) {
-    return averTokenAccount.value[0].pubkey
+  try {
+    const averTokenAccount =
+      await averClient.connection.getParsedTokenAccountsByOwner(owner, {
+        mint: averToken,
+      })
+    if (
+      averTokenAccount.value.length > 0 &&
+      averTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount >
+        0
+    ) {
+      return averTokenAccount.value[0].pubkey
+    }
+  } catch (e) {
+    console.log("Aver token mint does not exist on the network / program ID")
   }
 
   return SystemProgram.programId
+}
+
+/**
+ * Parses objects taking into account the Aver Version.
+ *
+ * Rewrites first 8 bytes of discriminator
+ *
+ * @param {Program} program - AnchorPy Program
+ * @param {AccountType} account_type - Account Type (e.g., MarketStore)
+ * @param {AccountInfo<Buffer | null>} bytes - Raw data from onchain
+ * @returns Parsed object
+ */
+export function parseWithVersion(
+  program: Program,
+  account_type: AccountType,
+  bytes: AccountInfo<Buffer> | null
+) {
+  if (!bytes?.data) throw new Error("Buffer not found")
+  //Version is 9th byte
+  const version = bytes && bytes.data ? bytes.data[8] : null
+  if (version == null) throw new Error(`Error parsing ${account_type}`)
+
+  const latestVersion = getVersionOfAccountTypeInProgram(account_type, program)
+
+  //Checks if this is reading the correct version OR if it is not possible to read an old version
+  if (
+    version === latestVersion ||
+    !program.account[`${account_type}V${version}`]
+  ) {
+    const firstLetterUppercase = `${account_type}`[0].toUpperCase()
+    return program.account[`${account_type}`].coder.accounts.decode(
+      firstLetterUppercase + `${account_type}`.substring(1),
+      bytes.data
+    )
+  } else {
+    //Reads old version
+    console.log(
+      `THE ${account_type} BEING READ HAS NOT BEEN UPDATED TO THE LATEST VERSION`
+    )
+    console.log(
+      "PLEASE CALL THE UPDATE INSTRUCTION FOR THE CORRESPONDING ACCOUNT TYPE TO RECTIFY, IF POSSIBLE"
+    )
+    //We need to replace the discriminator on the bytes data to prevent anchor errors
+    const account_discriminator = accountDiscriminator(
+      account_type,
+      version,
+      latestVersion
+    )
+    account_discriminator.map((v, i, a) => {
+      //@ts-ignore
+      bytes.data[i] = v
+      return 1
+    })
+
+    const firstLetterUppercase = `${account_type}V${version}`[0].toUpperCase()
+    return program.account[`${account_type}V${version}`].coder.accounts.decode(
+      firstLetterUppercase + `${account_type}V${version}`.substring(1),
+      bytes.data
+    )
+  }
+}
+
+/**
+ * Calculates and returns a unique 8 byte discriminator prepended to all anchor accounts.
+ *
+ * @param {AccountType} account_type - The name of the account to calculate the discriminator.
+ * @param {number} version - Version of account
+ * @param {number} latest_version - Most up to date version of Aver
+ */
+function accountDiscriminator(
+  account_type: AccountType,
+  version: number,
+  latestVersion: number
+): Buffer {
+  const name =
+    version == latestVersion ? account_type : `${account_type}V${version}`
+  return Buffer.from(
+    sha256.digest(`account:${camelcase(`${name}`, { pascalCase: true })}`)
+  ).slice(0, 8)
+}
+
+// Latest version according to the program
+export function getVersionOfAccountTypeInProgram(
+  accountType: AccountType,
+  program: Program
+) {
+  let version = 0
+  while (true) {
+    const account = program.account[`${accountType}V${version}`]
+    if (account == null) {
+      break
+    } else {
+      version = version + 1
+    }
+  }
+
+  return version
 }

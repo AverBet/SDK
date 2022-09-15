@@ -1,15 +1,16 @@
+from requests import get
+from asyncio import gather
 import base64
 import datetime
 from anchorpy import Provider, Wallet, Program
 from solana.rpc import types
+from .version_checks import check_idl_has_same_instructions_as_sdk
 from solana.rpc.async_api import AsyncClient
 from solana.publickey import PublicKey
 from solana.transaction import Transaction
 from solana.rpc.api import Client
-# from constants import AVER_API_URL_DEVNET, DEVNET_SOLANA_URL, DEFAULT_QUOTE_TOKEN_DEVNET, AVER_PROGRAM_ID_DEVNET_2
-from .constants import SYS_VAR_CLOCK, get_aver_api_endpoint, get_quote_token, get_solana_endpoint, AVER_PROGRAM_ID
+from .constants import AVER_PROGRAM_IDS, SYS_VAR_CLOCK, get_quote_token, get_solana_endpoint
 from solana.keypair import Keypair
-from requests import get
 from spl.token.instructions import get_associated_token_address, create_associated_token_account
 from .enums import SolanaNetwork
 from .layouts import CLOCK_STRUCT
@@ -23,12 +24,10 @@ class AverClient():
 
     connection: AsyncClient
     """Solana AsyncClient"""
-    program: Program
-    """AnchorPy Program"""
+    programs: list[Program]
+    """AnchorPy Programs"""
     provider: Provider
     """AnchorPy Provider"""
-    aver_api_endpoint: str
-    """Endpoint is used to make requests to Aver"""
     solana_network: SolanaNetwork
     """Devnet or Mainnet - must correspond to the network provided in the connection AsyncClient"""
     quote_token: PublicKey
@@ -40,8 +39,7 @@ class AverClient():
 
     def __init__(
             self, 
-            program: Program,
-            aver_api_endpoint: str,
+            programs: list[Program],
             solana_network: SolanaNetwork,
         ):
         """
@@ -49,25 +47,23 @@ class AverClient():
 
         Args:
             program (Program): Aver program AnchorPy
-            aver_api_endpoint (str): Endpoint for Aver API (to be removed soon)
             solana_network (SolanaNetwork): Solana network
         """
-        self.connection = program.provider.connection
-        self.program = program
-        self.provider = program.provider
-        self.aver_api_endpoint = aver_api_endpoint
+        self.connection = programs[0].provider.connection
+        self.programs = programs
+        self.provider = programs[0].provider
         self.solana_network = solana_network
         self.quote_token = get_quote_token(solana_network)
         self.solana_client = Client(get_solana_endpoint(solana_network))
-        self.owner = program.provider.wallet.payer
+        self.owner = programs[0].provider.wallet.payer
 
     @staticmethod
     async def load(
             connection: AsyncClient,
-            owner: Keypair or Wallet, 
-            opts: types.TxOpts,
-            network: SolanaNetwork,
-            program_id: PublicKey = AVER_PROGRAM_ID,
+            owner: Keypair or Wallet = None, 
+            opts: types.TxOpts = None,
+            network: SolanaNetwork = SolanaNetwork.DEVNET,
+            program_ids: list[PublicKey] = AVER_PROGRAM_IDS,
         ):
             """
             Initialises an AverClient object
@@ -79,9 +75,6 @@ class AverClient():
                 network (SolanaNetwork): Solana network
                 program_id (PublicKey, optional): Program public key. Defaults to latest AVER_PROGRAM_ID specified in constants.py.
 
-            Raises:
-                Exception: Invalid owner argument
-
             Returns:
                 AverClient: AverClient
             """
@@ -89,31 +82,33 @@ class AverClient():
                 wallet = owner
             elif(isinstance(owner, Keypair)):
                 wallet = Wallet(owner)
-            else:
-                raise Exception('Invalid Owner Passed. Must be Wallet or Keypair')
+            elif(owner is None):
+                wallet = Wallet(Keypair()) # create random keypair if none
 
             provider = Provider(
                 connection,
                 wallet,
-                opts
+                opts if opts else types.TxOpts(
+                    preflight_commitment=connection.commitment,
+                    skip_confirmation=False,
+                    skip_preflight=False
+                )
             )
-            api_endpoint = get_aver_api_endpoint(network)
-            program = await AverClient.load_program(provider, program_id)
+            programs = await gather(*[AverClient.load_program(provider, p) for  p in program_ids])
 
-            aver_client = AverClient(program, api_endpoint, network)    
-            return aver_client
+            return AverClient(programs, network)    
 
     @staticmethod
     async def load_program(
             provider: Provider,
-            program_id: PublicKey = AVER_PROGRAM_ID
+            program_id: PublicKey
         ):
         """
         Loads Aver Program
 
         Args:
             provider (Provider): Provider
-            program_id (PublicKey, optional): Program public key. Defaults to AVER_PROGRAM_ID.
+            program_id (PublicKey, optional): Program public key.
 
         Raises:
             Exception: Program IDL not loaded
@@ -124,10 +119,42 @@ class AverClient():
         idl = await Program.fetch_idl(program_id,provider)
         if(idl):
             program = Program(idl, program_id, provider)
+            check_idl_has_same_instructions_as_sdk(program)
             return program
         else:
             raise Exception('Program IDL not loaded')
 
+    async def add_program(self, program_id: PublicKey):
+        """
+        Loads and adds a program to the list of programs
+
+        Args:
+            program_id (PublicKey): Program public key
+
+        Returns:
+            Program: Program
+        """
+        program = await AverClient.load_program(self.provider, program_id)
+        self.programs.append(program)
+        return program
+    
+    async def get_program_from_program_id(self, program_id: PublicKey):
+        """
+        Checks if a program is already loaded and returns it. If not, it loads it, saves it and returns it.
+
+        Args:
+            program_id (PublicKey): Program public key
+
+        Returns:
+            Program: Program
+        """
+        for p in self.programs:
+            if(p.program_id.to_base58() == program_id.to_base58()):
+                return p
+        return await self.add_program(program_id)
+
+    ####
+## IDL Checks
 
     async def close(self):
         """
@@ -136,15 +163,6 @@ class AverClient():
         Call this in your program's clean-up function(s)
         """
         await self.provider.close()
-
-    #TODO - Move to admin
-    async def check_health(self):
-        url = self.aver_api_endpoint + '/health?format=json'
-        aver_health_response = get(url)
-
-        solana_health_response = await self.provider.connection.get_version()
-
-        return {'api': aver_health_response.json(), 'solana': solana_health_response}
 
 
     async def get_or_create_associated_token_account(
@@ -285,10 +303,12 @@ class AverClient():
         return datetime.datetime.utcfromtimestamp(parsed_data['unix_timestamp'])
         
 
+    # DEPRECATED
+    async def check_health(self):
+        url = "https://dev.api.aver.exchange" + '/health?format=json'
+        aver_health_response = get(url)
 
+        solana_health_response = await self.provider.connection.get_version()
 
-
-
-
-
+        return {'api': aver_health_response.json(), 'solana': solana_health_response}
 

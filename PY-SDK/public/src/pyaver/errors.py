@@ -1,5 +1,4 @@
 from anchorpy import Program
-from anchorpy.error import ProgramError, _ExtendedRPCError
 from solana.rpc.core import RPCException
 import ast
 
@@ -32,13 +31,24 @@ def parse_error(e: RPCException, program: Program):
         (ProgramError | RPCException): Program Error or RPC Excpeption
     """
     error_json = ast.literal_eval(e.__str__())
-    error_extended = _ExtendedRPCError(code=error_json['code'], message=error_json['message'], data=error_json['data'])
-    p = ProgramError.parse(error_extended, get_idl_errors(program))
-    print(isinstance(e, RPCException))
-    print(p)
-    if(p is not None):
-        return p
-    else:
+    try:
+        idl_errors = get_idl_errors(program)
+        code = error_json['code']
+        error = idl_errors[code]
+        print(f'ERROR {code}: {error}')
         return e
+    except:
+        print(e)
+        return e
+
+    # error_extended = _ExtendedRPCError(code=error_json['code'], message=error_json['message'], data=error_json['data'])
+    # print(error_extended)
+    # p = ProgramError.parse(error_extended, get_idl_errors(program))
+    # print(isinstance(e, RPCException))
+    # print(p) #TODO this always comes up as None
+    # if(p is not None):
+    #     return p
+    # else:
+    #     return e
 
 

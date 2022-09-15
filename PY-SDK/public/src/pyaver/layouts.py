@@ -2,6 +2,8 @@ from enum import IntEnum
 from construct import Switch, Bytes, Int8ul, Int32ul, Int64ul, Padding, Int64sl
 from construct import Struct as cStruct
 
+### This file is used to parse AAOB Orderbooks
+
 PUBLIC_KEY_LAYOUT = Bytes(32)
 
 KEY_LAYOUT = Bytes(16)

@@ -18,13 +18,12 @@ class SupplementInitMarketAccounts(NamedTuple):
   market_authority: Keypair
 
 async def supplement_init_market(program: Program, args: SupplementInitMarketArgs, accs: SupplementInitMarketAccounts):
-  [market_store, _] = derive_market_store(accs.market)
-  [orderbook, orderbook_bump] = derive_orderbook(accs.market, args.outcome_id)
-  [bids, bids_bump] = derive_bids(accs.market, args.outcome_id)
-  [asks, asks_bump] = derive_asks(accs.market, args.outcome_id)
-  [event_queue, event_queue_bump] = derive_event_queue(accs.market, args.outcome_id)
+  [market_store, _] = derive_market_store(accs.market, program.program_id)
+  [orderbook, orderbook_bump] = derive_orderbook(accs.market, args.outcome_id, program.program_id)
+  [bids, bids_bump] = derive_bids(accs.market, args.outcome_id, program.program_id)
+  [asks, asks_bump] = derive_asks(accs.market, args.outcome_id, program.program_id)
+  [event_queue, event_queue_bump] = derive_event_queue(accs.market, args.outcome_id, program.program_id)
 
-  print(orderbook)
 
   return await program.rpc['supplement_init_market']({
     "outcome_id": args.outcome_id,
