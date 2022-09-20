@@ -112,16 +112,16 @@ export class AverClient {
       wallet = new NodeWallet(owner)
       keypair = owner
       pubkey = owner.publicKey
-    } else if (owner instanceof Wallet) {
-      // create a dummy wallet
-      keypair = new Keypair()
-      wallet = owner
-      pubkey = wallet.publicKey
-    } else {
+    } else if (!owner) {
       // create a dummy wallet
       keypair = new Keypair()
       wallet = new NodeWallet(keypair)
       pubkey = keypair.publicKey
+    } else {
+      // create a dummy wallet
+      keypair = new Keypair()
+      wallet = owner
+      pubkey = wallet.publicKey
     }
 
     const provider = new Provider(
