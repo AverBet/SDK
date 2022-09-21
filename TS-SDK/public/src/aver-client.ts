@@ -99,7 +99,7 @@ export class AverClient {
   static async loadAverClient(
     connection: Connection,
     solanaNetwork: SolanaNetwork = SolanaNetwork.Devnet,
-    owner: null | Wallet | Keypair,
+    owner: null | PublicKey | Keypair,
     opts?: ConfirmOptions,
     programIds: PublicKey[] = AVER_PROGRAM_IDS
   ) {
@@ -112,15 +112,15 @@ export class AverClient {
       wallet = new NodeWallet(owner)
       keypair = owner
       pubkey = owner.publicKey
-    } else if (!owner) {
+    } else if (owner instanceof PublicKey) {
       // create a dummy wallet
       keypair = new Keypair()
       wallet = new NodeWallet(keypair)
-      pubkey = keypair.publicKey
+      pubkey = owner
     } else {
       // create a dummy wallet
       keypair = new Keypair()
-      wallet = owner
+      wallet = new NodeWallet(keypair)
       pubkey = wallet.publicKey
     }
 
