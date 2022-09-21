@@ -1,6 +1,6 @@
 import { Price } from "@bonfida/aaob"
 import { BN } from "@project-serum/anchor"
-import { PublicKey } from "@solana/web3.js"
+import { PublicKey, Transaction } from "@solana/web3.js"
 
 export type AverDbMint = {
   pubkey: string
@@ -273,4 +273,10 @@ export enum AccountType {
   MARKET_STORE = "marketStore",
   USER_MARKET = "userMarket",
   USER_HOST_LIFETIME = "userHostLifetime",
+}
+
+export interface Wallet {
+  signTransaction(tx: Transaction): Promise<Transaction>;
+  signAllTransactions(txs: Transaction[]): Promise<Transaction[]>;
+  publicKey: PublicKey;
 }
