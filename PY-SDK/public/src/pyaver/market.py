@@ -642,7 +642,7 @@ class AverMarket():
 
         return sig
 
-    async def settle_market(self, host: PublicKey = AVER_HOST_ACCOUNT, reward_target: PublicKey = SYS_PROGRAM_ID):
+    async def settle_market(self, remaining_accounts: list[AccountMeta] = [], host: PublicKey = AVER_HOST_ACCOUNT, reward_target: PublicKey = SYS_PROGRAM_ID):
         program = await self.aver_client.get_program_from_program_id(self.program_id)
 
         return await program.rpc["settle"](
@@ -655,6 +655,7 @@ class AverMarket():
                 'spl_token_program': TOKEN_PROGRAM_ID,
                 "host": host,
             },
+            remaining_accounts=remaining_accounts
         ),
     )
 
