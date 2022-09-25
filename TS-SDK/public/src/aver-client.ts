@@ -5,9 +5,9 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
-  Signer,
+  Signer
 } from "@solana/web3.js"
-import { Program, Provider, Wallet } from "@project-serum/anchor"
+import { Program, Provider } from "@project-serum/anchor"
 import NodeWallet from "@project-serum/anchor/dist/cjs/nodewallet"
 import {
   getOrCreateAssociatedTokenAccount,
@@ -17,7 +17,7 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token"
 import { AVER_PROGRAM_IDS, getQuoteToken } from "./ids"
-import { SolanaNetwork } from "./types"
+import { SolanaNetwork, Wallet } from "./types"
 import { checkIdlHasSameInstructionsAsSdk } from "./checks"
 
 export class AverClient {
@@ -99,11 +99,11 @@ export class AverClient {
   static async loadAverClient(
     connection: Connection,
     solanaNetwork: SolanaNetwork = SolanaNetwork.Devnet,
-    owner: null | Wallet | Keypair,
+    owner: null | PublicKey | Keypair,
     opts?: ConfirmOptions,
     programIds: PublicKey[] = AVER_PROGRAM_IDS
   ) {
-    let wallet: NodeWallet
+    let wallet: Wallet
     let keypair: Keypair
     let pubkey: PublicKey | undefined = undefined
 
@@ -112,16 +112,16 @@ export class AverClient {
       wallet = new NodeWallet(owner)
       keypair = owner
       pubkey = owner.publicKey
-    } else if (owner instanceof Wallet) {
+    } else if (owner instanceof PublicKey) {
       // create a dummy wallet
       keypair = new Keypair()
-      wallet = owner
-      pubkey = wallet.publicKey
+      wallet = new NodeWallet(keypair)
+      pubkey = owner
     } else {
       // create a dummy wallet
       keypair = new Keypair()
       wallet = new NodeWallet(keypair)
-      pubkey = keypair.publicKey
+      pubkey = wallet.publicKey
     }
 
     const provider = new Provider(

@@ -636,6 +636,10 @@ export class Market {
     return this._marketState.quoteVault
   }
 
+  get openInterest() {
+    return this._marketState.openInterest
+  }
+
   get marketStatus() {
     return this._marketState.marketStatus
   }
@@ -914,9 +918,8 @@ export class Market {
    * @returns {Promise<MarketStatus>}
    */
   async getImpliedMarketStatus(): Promise<MarketStatus> {
-    const solanaDatetime = await this._averClient.getSystemClockDatetime()
+    const solanaDatetime = Date.now()
     if (!solanaDatetime) return this.marketStatus
-
     if (solanaDatetime > this.tradingCeaseTime.getTime())
       return MarketStatus.TradingCeased
     if (this.inplayStartTime && solanaDatetime > this.inplayStartTime.getTime())

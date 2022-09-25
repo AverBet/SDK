@@ -874,7 +874,8 @@ export class UserMarket {
     size: number,
     sizeFormat: SizeFormat,
     orderType: OrderType = OrderType.Limit,
-    selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide
+    selfTradeBehavior: SelfTradeBehavior = SelfTradeBehavior.CancelProvide,
+    averClient: AverClient
   ) {
     const sizeU64 = new BN(Math.floor(size * Math.pow(10, market.decimals)))
     const limitPriceU64 = new BN(
@@ -892,7 +893,7 @@ export class UserMarket {
       user
     )
 
-    const program = await this._averClient.getProgramFromProgramId(
+    const program = await averClient.getProgramFromProgramId(
       market.programId
     )
     const inPlayQueue =

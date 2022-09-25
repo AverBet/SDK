@@ -1,7 +1,7 @@
 from anchorpy import Context, Program, Wallet
 from .data_classes import UserMarketState
 from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
-from .utils import load_multiple_bytes_data
+from .utils import load_multiple_bytes_data, parse_with_version
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
 from spl.token.constants import TOKEN_PROGRAM_ID
@@ -9,7 +9,7 @@ from solana.transaction import AccountMeta
 from spl.token.instructions import get_associated_token_address
 from solana.keypair import Keypair
 from typing import List, Tuple, Union, Container
-from .enums import Fill, Out, Side
+from .enums import AccountTypes, Fill, Out, Side
 from solana.rpc.async_api import AsyncClient
 from .layouts import EVENT_QUEUE_HEADER_LAYOUT, EVENT_QUEUE_HEADER_LEN, REGISTER_SIZE, EVENT_LAYOUT
 
@@ -123,7 +123,8 @@ async def consume_events(
         program: Program = await market.aver_client.get_program_from_program_id(market.program_id)
 
         sorted_user_accounts = sorted(user_accounts, key=lambda account: bytes(account))
-        sorted_loaded_umas: list[UserMarketState] = await program.account['UserMarket'].fetch_multiple(sorted_user_accounts)
+        umas = await load_multiple_bytes_data(market.aver_client.connection, sorted_user_accounts, [])
+        sorted_loaded_umas = [parse_with_version(program, AccountTypes.USER_MARKET, u) for u in umas]
         user_atas =  [get_associated_token_address(u.user, quote_token) for u in sorted_loaded_umas]
 
         remaining_accounts  = [AccountMeta(pk, False, True) for pk in sorted_user_accounts + user_atas]
