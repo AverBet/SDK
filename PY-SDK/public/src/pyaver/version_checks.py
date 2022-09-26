@@ -26,8 +26,9 @@ def camel_to_snake(name: str):
 def load_idl_from_json(program_id: str):
     file_path = os.path.join(os.path.dirname(__file__), f'idl/{program_id}.json')
     try:
-        file_idl = json.load(open(file_path))
-        return file_idl
+        with open(file_path) as file:
+            file_idl = json.load(file)
+            return file_idl
     except:
         print(f'THE LOADED PROGRAM ID {program_id} DOES NOT MATCH ANY KNOWN PROGRAM_ID')
         print('THIS IS LIKELY EITHER DUE TO AN OUT OF DATE SDK OR USING AN UNKNOWN PROGRAM_ID')

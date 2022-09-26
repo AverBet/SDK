@@ -2,14 +2,14 @@ from .aver_client import AverClient
 from solana.publickey import PublicKey
 from .data_classes import UserHostLifetimeState
 from .constants import AVER_HOST_ACCOUNT, AVER_PROGRAM_IDS
-from .utils import sign_and_send_transaction_instructions
+from .utils import get_version_of_account_type_in_program, sign_and_send_transaction_instructions
 from solana.system_program import SYS_PROGRAM_ID
 from solana.rpc.commitment import Finalized
 from anchorpy import Context
 from solana.transaction import AccountMeta
 from solana.keypair import Keypair
 from solana.rpc.types import TxOpts
-from .enums import FeeTier
+from .enums import AccountTypes, FeeTier
 
 class UserHostLifetime():
     """
@@ -28,7 +28,7 @@ class UserHostLifetime():
     UserHostLifetimeState object
     """
 
-    def __init__(self, pubkey: PublicKey, user_host_lifetime_state: UserHostLifetimeState):
+    def __init__(self, aver_client: AverClient, pubkey: PublicKey, user_host_lifetime_state: UserHostLifetimeState, program_id: PublicKey = AVER_PROGRAM_IDS[0]):
         """
         Initialise an UserHostLifetime object. Do not use this function; use UserHostLifetime.load() instead
 
@@ -38,6 +38,8 @@ class UserHostLifetime():
         """
         self.pubkey = pubkey
         self.user_host_lifetime_state = user_host_lifetime_state
+        self.program_id = program_id
+        self.aver_client = aver_client
 
     @staticmethod
     async def load(aver_client: AverClient, pubkey: PublicKey):
@@ -54,8 +56,9 @@ class UserHostLifetime():
         Returns:
             UserHostLifetime: UserHostLifetime object
         """
+        # TODO get by program ID
         user_host_lifetime_result = await aver_client.programs[0].account['UserHostLifetime'].fetch(pubkey)
-        return UserHostLifetime(pubkey, user_host_lifetime_result)
+        return UserHostLifetime(aver_client, pubkey, user_host_lifetime_result, aver_client.programs[0].program_id)
 
     @staticmethod
     async def load_multiple(aver_client: AverClient, pubkeys: list[PublicKey]):
@@ -69,10 +72,12 @@ class UserHostLifetime():
         Returns:
             list[UserHostLifetime]: List of UserHostLifetime objects
         """
-        res = await aver_client.program.account['UserHostLifetime'].fetch_multiple(pubkeys)
+        # TODO get program correctly
+        program = aver_client.programs[0]
+        res = await program.account['UserHostLifetime'].fetch_multiple(pubkeys)
         uhls: list[UserHostLifetime] = []
         for i, pubkey in enumerate(pubkeys):
-            uhls.append(UserHostLifetime(pubkey, res[i]))
+            uhls.append(UserHostLifetime(aver_client, pubkey, res[i]))
         return uhls
 
     @staticmethod
@@ -175,8 +180,7 @@ class UserHostLifetime():
         #Just use the first program as they will all have init_user_host_lifetime
         #TODO - review
         program = await aver_client.get_program_from_program_id(program_id)
-        return program.instruction['init_user_host_lifetime']( 
-            bump,
+        return program.instruction['init_user_host_lifetime'](
             ctx=Context(
                 accounts={
                 "user": owner.public_key,
@@ -263,6 +267,32 @@ class UserHostLifetime():
             [bytes('user-host-lifetime', 'utf-8'), bytes(owner), bytes(host)],
             program_id
         )
+
+    async def make_update_user_host_lifetime_state_instruction(self):
+        program = await self.aver_client.get_program_from_program_id(self.program_id)
+        # TODO
+        return None
+
+    async def update_user_host_lifetime_state(self, fee_payer: Keypair = None, send_options: TxOpts = None):
+        if(fee_payer == None):
+            fee_payer = self.aver_client.owner
+
+        ix = await self.make_update_user_host_lifetime_state_instruction()
+
+        return await sign_and_send_transaction_instructions(
+            self.aver_client,
+            [],
+            fee_payer,
+            [ix],
+            send_options
+        )
+
+    async def check_if_uhl_latest_version(self):
+        program = await self.aver_client.get_program_from_program_id(self.program_id)
+        if(self.user_host_lifetime_state.version < get_version_of_account_type_in_program(AccountTypes.USER_HOST_LIFETIME, program)):
+            print("User host lifetime needs to be upgraded")
+            return False
+        return True
 
 
     def get_fee_tier_postion(self):

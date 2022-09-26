@@ -24,6 +24,7 @@ export enum MarketStatus {
   HaltedPreEvent,
   HaltedInPlay,
   TradingCeased,
+  InPlayTransition,
   CeasedCrankedClosed,
   Resolved,
   Voided,
@@ -80,6 +81,9 @@ export type MarketState = {
   series: number
   event: number
   roundingFormat: number
+  vault_authority: PublicKey
+  inPlayQueue: PublicKey
+  inPlayStartTime?: number
 }
 
 export type MarketStoreState = {
@@ -175,6 +179,8 @@ export type UmaOrder = {
   orderId: BN
   outcomeId: number
   baseQty: BN
+  isPreEvent: boolean
+  aaobOrderId: BN
 }
 
 /**

@@ -1,8 +1,8 @@
 import { Slab, Price, Side, LeafNode } from "@bonfida/aaob"
 import { BN } from "@project-serum/anchor"
 import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
-import { AVER_PROGRAM_ID, CALLBACK_INFO_LEN } from "./ids"
-import { PriceAndSide, SlabOrder } from "./types"
+import { AVER_PROGRAM_IDS, CALLBACK_INFO_LEN } from "./ids"
+import { PriceAndSide, SlabOrder, UmaOrder } from "./types"
 import { chunkAndFetchMultiple, throwIfNull } from "./utils"
 
 /**
@@ -63,7 +63,7 @@ export class Orderbook {
     slabBidsPubkey: PublicKey,
     slabAsksPubkey: PublicKey,
     decimals: number,
-    isInverted: boolean = false
+    isInverted = false
   ) {
     this._pubkey = pubkey
     this._decimals = decimals
@@ -187,7 +187,7 @@ export class Orderbook {
     bids: PublicKey,
     asks: PublicKey,
     decimals: number,
-    isInverted: boolean = false
+    isInverted = false
   ) {
     const slabBids = await Orderbook.loadSlab(connection, bids)
     const slabAsks = await Orderbook.loadSlab(connection, asks)
@@ -311,7 +311,7 @@ export class Orderbook {
   static async deriveOrderbookPubkeyAndBump(
     market: PublicKey,
     outcomeId: number,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [
@@ -336,7 +336,7 @@ export class Orderbook {
   static async deriveEventQueuePubkeyAndBump(
     market: PublicKey,
     outcomeId: number,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [
@@ -361,7 +361,7 @@ export class Orderbook {
   static async deriveBidsPubkeyAndBump(
     market: PublicKey,
     outcomeId: number,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [Buffer.from("bids", "utf-8"), market.toBuffer(), Buffer.of(outcomeId)],
@@ -382,7 +382,7 @@ export class Orderbook {
   static async deriveAsksPubkeyAndBump(
     market: PublicKey,
     outcomeId: number,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [Buffer.from("asks", "utf-8"), market.toBuffer(), Buffer.of(outcomeId)],
@@ -560,10 +560,12 @@ export class Orderbook {
   /**
    * Gets Price object by orderId
    *
-   * @param {BN} orderId - Order ID
+   * @param {UmaOrder} order - the order
    * @returns {PriceAndSide | undefined} - PriceAndSide object
    */
-  getPriceByOrderId(orderId: BN): PriceAndSide | undefined {
+  getPriceByOrder(order: UmaOrder): PriceAndSide | undefined {
+    const orderId = order.aaobOrderId || order.orderId
+
     for (const node of this._slabBids.items()) {
       if (orderId.eq(node.key)) {
         let bidPriceRaw = {
@@ -575,7 +577,7 @@ export class Orderbook {
           ? Orderbook.invertPrice(bidPriceRaw)
           : bidPriceRaw
 
-        let bidPrice = {
+        const bidPrice = {
           ...this.convertPrice(bidPriceRaw),
         }
 
@@ -594,7 +596,7 @@ export class Orderbook {
           ? Orderbook.invertPrice(askPriceRaw)
           : askPriceRaw
 
-        let askPrice = {
+        const askPrice = {
           ...this.convertPrice(askPriceRaw),
         }
 

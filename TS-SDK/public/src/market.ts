@@ -15,11 +15,13 @@ import {
   Keypair,
   PublicKey,
   AccountMeta,
+  SystemProgram,
+  SendOptions,
 } from "@solana/web3.js"
 import { AverClient } from "./aver-client"
 import { loadAllEventQueues, prepareUserAccountsList } from "./event-queue"
 import {
-  AVER_PROGRAM_ID,
+  AVER_PROGRAM_IDS,
   getQuoteToken,
   MAX_ITERATIONS_FOR_CONSUME_EVENTS,
 } from "./ids"
@@ -36,7 +38,8 @@ import {
 } from "./types"
 import { UserHostLifetime } from "./user-host-lifetime"
 import { UserMarket } from "./user-market"
-import { chunkAndFetchMultiple, parseWithVersion } from "./utils"
+import { chunkAndFetchMultiple, getVersionOfAccountTypeInProgram, parseWithVersion, signAndSendTransactionInstructions } from "./utils"
+import { Program } from "@project-serum/anchor"
 
 export class Market {
   /**
@@ -80,11 +83,18 @@ export class Market {
   private _averClient: AverClient
 
   /**
+   * @private
+   * Program ID for this market
+   */
+  private _programId: PublicKey
+
+  /**
    * Initialise an AverMarket object. Do not use this function; use Market.load() instead.
    *
    * @param {AverClient} averClient - AverClient object
    * @param {PublicKey} pubkey - Market public key
    * @param {MarketState} marketState - MarketState object
+   * @param {PublicKey} programId - Program ID Public Key
    * @param {MarketStoreState} marketStoreState - MarketStoreState object
    * @param {Orderbook[]} orderbooks - List of Orderbook objects
    */
@@ -92,6 +102,7 @@ export class Market {
     averClient: AverClient,
     pubkey: PublicKey,
     marketState: MarketState,
+    programId: PublicKey,
     marketStoreState?: MarketStoreState,
     orderbooks?: Orderbook[]
   ) {
@@ -99,6 +110,7 @@ export class Market {
     this._marketState = marketState
     this._marketStoreState = marketStoreState
     this._averClient = averClient
+    this._programId = programId
 
     // Store 2 orderbooks for binary markets
     this._orderbooks =
@@ -118,44 +130,48 @@ export class Market {
    * @returns {Promise<Market>} - AverMarket object
    */
   static async load(averClient: AverClient, pubkey: PublicKey) {
-    const program = averClient.program
-    const [marketStorePubkey, marketStoreBump] =
-      await Market.deriveMarketStorePubkeyAndBump(pubkey)
+    return (await Market.loadMultiple(averClient, [pubkey]))[0]
+    // // get programId of market
+    // const programId = (await averClient.connection.getAccountInfo(pubkey)).owner
+    // const program = await averClient.getProgramFromProgramId(programId)
+    // const [marketStorePubkey, marketStoreBump] =
+    //   await Market.deriveMarketStorePubkeyAndBump(pubkey)
 
-    const marketResultAndMarketStoreResult = await Promise.all([
-      program.account["market"].fetch(pubkey.toBase58()),
-      program.account["marketStore"].fetchNullable(
-        marketStorePubkey.toBase58()
-      ),
-    ])
-    const marketState = Market.parseMarketState(
-      marketResultAndMarketStoreResult[0]
-    )
+    // const marketResultAndMarketStoreResult = await Promise.all([
+    //   program.account["market"].fetch(pubkey.toBase58()),
+    //   program.account["marketStore"].fetchNullable(
+    //     marketStorePubkey.toBase58()
+    //   ),
+    // ])
+    // const marketState = Market.parseMarketState(
+    //   marketResultAndMarketStoreResult[0]
+    // )
 
-    // market store and orderbooks do not exist for closed markets
-    const marketStoreResult = marketResultAndMarketStoreResult[1]
+    // // market store and orderbooks do not exist for closed markets
+    // const marketStoreResult = marketResultAndMarketStoreResult[1]
 
-    if (!marketStoreResult) {
-      return new Market(averClient, pubkey, marketState)
-    }
+    // if (!marketStoreResult) {
+    //   return new Market(averClient, pubkey, marketState, programId)
+    // }
 
-    const marketStoreState = Market.parseMarketStoreState(marketStoreResult)
+    // const marketStoreState = Market.parseMarketStoreState(marketStoreResult)
 
-    const orderbooks = await Market.getOrderbooksFromOrderbookAccounts(
-      program.provider.connection,
-      marketStoreState.orderbookAccounts,
-      Array.from({ length: marketState.numberOfOutcomes }).map(
-        () => marketState.decimals
-      )
-    )
+    // const orderbooks = await Market.getOrderbooksFromOrderbookAccounts(
+    //   program.provider.connection,
+    //   marketStoreState.orderbookAccounts,
+    //   Array.from({ length: marketState.numberOfOutcomes }).map(
+    //     () => marketState.decimals
+    //   )
+    // )
 
-    return new Market(
-      averClient,
-      pubkey,
-      marketState,
-      marketStoreState,
-      orderbooks
-    )
+    // return new Market(
+    //   averClient,
+    //   pubkey,
+    //   marketState,
+    //   programId,
+    //   marketStoreState,
+    //   orderbooks
+    // )
   }
 
   /**
@@ -174,9 +190,12 @@ export class Market {
     averClient: AverClient,
     pubkeys: PublicKey[]
   ): Promise<(Market | null)[]> {
-    const program = averClient.program
+    // get programId of market
+    const programIds = (await averClient.connection.getMultipleAccountsInfo(pubkeys)).map((m: any) => m.owner)
+    const programs = await Promise.all(programIds.map(p => averClient.getProgramFromProgramId(p)))
+
     const marketStorePubkeys = (
-      await Market.deriveMarketStorePubkeysAndBump(pubkeys)
+      await Market.deriveMarketStorePubkeysAndBump(pubkeys, programIds)
     ).map(([pubkey, bump]) => {
       return pubkey
     })
@@ -188,15 +207,15 @@ export class Market {
 
     const marketStateResults = marketResultsAndMarketStoreResults
       .slice(0, pubkeys.length)
-      .map((v) =>
-        v ? parseWithVersion(averClient.program, AccountType.MARKET, v) : null
+      .map((v, i) =>
+        v ? parseWithVersion(programs[i], AccountType.MARKET, v) : null
       )
 
     const marketStoreStateResults = marketResultsAndMarketStoreResults
       .slice(pubkeys.length, marketResultsAndMarketStoreResults.length)
-      .map((v) =>
+      .map((v, i) =>
         v
-          ? parseWithVersion(averClient.program, AccountType.MARKET_STORE, v)
+          ? parseWithVersion(programs[i], AccountType.MARKET_STORE, v)
           : null
       )
 
@@ -209,7 +228,7 @@ export class Market {
 
     const nestedOrderbooks =
       await Market.getOrderbooksFromOrderbookAccountsMultipleMarkets(
-        program.provider.connection,
+        averClient.connection,
         marketStates,
         marketStoreStates
       )
@@ -220,6 +239,7 @@ export class Market {
             averClient,
             pubkeys[i],
             marketState,
+            programIds[i],
             marketStoreStates[i] || undefined,
             nestedOrderbooks[i] || undefined
           )
@@ -263,7 +283,8 @@ export class Market {
       markets.map((m) => m.pubkey),
       multipleAccountStates.marketStates,
       multipleAccountStates.marketStoreStates,
-      multipleAccountStates.slabs
+      multipleAccountStates.slabs,
+      markets.map(m => m._programId)
     )
   }
 
@@ -272,7 +293,8 @@ export class Market {
     marketPubkeys: PublicKey[],
     marketStates: (MarketState | null)[],
     marketStoreStates: (MarketStoreState | null)[],
-    slabs: (Slab | null)[]
+    slabs: (Slab | null)[],
+    programIds: PublicKey[]
   ) {
     // creates orderbooks for each market
     let slabPositionCounter = 0
@@ -304,6 +326,7 @@ export class Market {
           averClient,
           m,
           marketStates[i] as MarketState,
+          programIds[i],
           marketStoreStates[i] || undefined,
           allOrderbooks[i]
         )
@@ -338,7 +361,7 @@ export class Market {
     slabs: (Slab | null)[]
     userMarketStates: (UserMarketState | null)[]
     userBalanceStates: UserBalanceState[]
-    userHostLifetimes: UserHostLifetime[]
+    userHostLifetimes: (UserHostLifetime | null)[]
   }> {
     const connection = averClient.connection
 
@@ -358,12 +381,12 @@ export class Market {
 
     const accountsData = await chunkAndFetchMultiple(connection, allPubkeys)
 
-    const deserializedMarketData = Market.deserializeMultipleMarketData(
+    const deserializedMarketData = await Market.deserializeMultipleMarketData(
       averClient,
       accountsData.slice(0, marketPubkeys.length)
     )
     const deserializedMarketStoreData =
-      Market.deserializeMultipleMarketStoreData(
+      await Market.deserializeMultipleMarketStoreData(
         averClient,
         accountsData.slice(
           marketPubkeys.length,
@@ -410,12 +433,13 @@ export class Market {
     const userHostLifetimes = accountsData
       .slice(-userHostLifetimePubkeys.length)
       .map(
-        (info, i) =>
+        (info, i) => !!info ? 
           new UserHostLifetime(
             averClient,
             userHostLifetimePubkeys[i],
-            UserHostLifetime.parseHostState(info.data)
-          )
+            UserHostLifetime.parseHostState(info.data),
+            info.owner
+          ) : null
       )
 
     const userBalanceStates: UserBalanceState[] = lamportBalances.map(
@@ -442,12 +466,13 @@ export class Market {
    * @param {AccountInfo<Buffer | null>[]} marketsData - Raw bytes coming from onchain
    * @returns {(MarketState | null)[]} - MarketStore objects
    */
-  private static deserializeMultipleMarketData(
+  private static async deserializeMultipleMarketData(
     averClient: AverClient,
     marketsData: AccountInfo<Buffer | null>[]
-  ): (MarketState | null)[] {
-    return marketsData.map((marketData) =>
-      parseWithVersion(averClient.program, AccountType.MARKET, marketData)
+  ): Promise<(MarketState | null)[]> {
+    const programs = await Promise.all(marketsData.map(m => averClient.getProgramFromProgramId(m.owner)))
+    return marketsData.map((marketData, i) =>
+      parseWithVersion(programs[i], AccountType.MARKET, marketData)
     )
   }
 
@@ -458,16 +483,17 @@ export class Market {
    * @param {AccountInfo<Buffer | null>[]} marketStoresData - Raw bytes coming from onchain
    * @returns {(MarketStoreState | null)[]} - MarketStoreState objects
    */
-  private static deserializeMultipleMarketStoreData(
+  private static async deserializeMultipleMarketStoreData(
     averClient: AverClient,
     marketStoresData: AccountInfo<Buffer | null>[]
-  ): (MarketStoreState | null)[] {
-    return marketStoresData.map((marketStoreData) =>
+  ): Promise<(MarketStoreState | null)[]> {
+    const programs = await Promise.all(marketStoresData.map(m => m ? averClient.getProgramFromProgramId(m.owner) : null))
+    return marketStoresData.map((marketStoreData, i) => marketStoreData ?
       parseWithVersion(
-        averClient.program,
+        programs[i],
         AccountType.MARKET_STORE,
         marketStoreData
-      )
+      ) : null
     )
   }
 
@@ -501,12 +527,12 @@ export class Market {
    * MarketStore account addresses are derived deterministically using the market's pubkey.
    *
    * @param {PublicKey} marketPubkey - Market public key
-   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   * @param {PublicKey} programIds - Program public keys. Defaults to AVER_PROGRAM_ID.
    * @returns {PublicKey} - MarketStore public key
    */
   static async deriveMarketStorePubkeyAndBump(
     marketPubkey: PublicKey,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress(
       [Buffer.from("market-store", "utf-8"), marketPubkey.toBuffer()],
@@ -520,18 +546,18 @@ export class Market {
    * MarketStore account addresses are derived deterministically using the market's pubkey.
    *
    * @param {PublicKey[]} marketPubkeys - Markets' public keys
-   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   * @param {PublicKey} s - Program public keys. Defaults to AVER_PROGRAM_ID.
    * @returns {PublicKey[]} - MarketStore public key
    */
   private static async deriveMarketStorePubkeysAndBump(
     marketPubkeys: PublicKey[],
-    programId: PublicKey = AVER_PROGRAM_ID
+    programIds: PublicKey[]
   ) {
     return await Promise.all(
-      marketPubkeys.map((marketPubkey) => {
+      marketPubkeys.map((marketPubkey, i) => {
         return PublicKey.findProgramAddress(
           [Buffer.from("market-store", "utf-8"), marketPubkey.toBuffer()],
-          programId
+          programIds[i]
         )
       })
     )
@@ -543,12 +569,12 @@ export class Market {
    * Quote Vault Authority account addresses are derived deterministically using the market's pubkey.
    *
    * @param {PublicKey} marketPubkey - Market public key
-   * @param {PublicKey} programId - Program public key. Defaults to AVER_PROGRAM_ID.
+   * @param {PublicKey} programIds - Program public keys. Defaults to AVER_PROGRAM_ID.
    * @returns {PublicKey} - Quote Vault Authority public key
    */
   private static async deriveQuoteVaultAuthorityPubkeyAndBump(
     marketPubkey: PublicKey,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     return PublicKey.findProgramAddress([marketPubkey.toBuffer()], programId)
   }
@@ -565,7 +591,7 @@ export class Market {
   static async deriveQuoteVaultPubkey(
     marketPubkey: PublicKey,
     network: SolanaNetwork,
-    programId: PublicKey = AVER_PROGRAM_ID
+    programId: PublicKey = AVER_PROGRAM_IDS[0]
   ) {
     const [vaultAuthority, _] =
       await Market.deriveQuoteVaultAuthorityPubkeyAndBump(
@@ -636,8 +662,15 @@ export class Market {
     return this._marketState.crankerReward
   }
 
+  /**
+   * DEPRECATED
+   */
   get withdrawableQuoteTokenBalance() {
-    return this._marketState.withdrawableQuoteTokenBalance
+    return this._marketState.stableQuoteTokenBalance
+  }
+
+  get stableQuoteTokenBalance() {
+    return this._marketState.stableQuoteTokenBalance
   }
 
   get permissionedMarketFlag() {
@@ -694,6 +727,18 @@ export class Market {
     return this._marketState.matchedCount.toNumber()
   }
 
+  get averClient() {
+    return this._averClient
+  }
+
+  get programId() {
+    return this._programId
+  }
+
+  get inPlayQueue() {
+    return this._marketState.inPlayQueue
+  }
+
   /**
    * Refresh all data for an AverMarket quickly
    *
@@ -717,7 +762,8 @@ export class Market {
    * @returns
    */
   async loadMarketListener(callback: (marketState: MarketState) => void) {
-    const ee = this._averClient.program.account["market"].subscribe(this.pubkey)
+    const program = await this._averClient.getProgramFromProgramId(this._programId)
+    const ee = program.account["market"].subscribe(this.pubkey)
     ee.on("change", callback)
     return ee
   }
@@ -729,7 +775,8 @@ export class Market {
    * @returns
    */
   async loadMarketStoreListener(callback: (marketState: MarketState) => void) {
-    const ee = this._averClient.program.account["marketStore"].subscribe(
+    const program = await this._averClient.getProgramFromProgramId(this._programId)
+    const ee = program.account["marketStore"].subscribe(
       this.marketStore
     )
     ee.on("change", callback)
@@ -750,7 +797,6 @@ export class Market {
     decimals: number[]
   ): Promise<Orderbook[]> {
     const allBidsAndAsksAccounts = orderbookAccounts
-      //@ts-expect-error
       .map((o) => [o.bids, o.asks])
       .flat()
     const allSlabs = await Orderbook.loadMultipleSlabs(
@@ -761,7 +807,6 @@ export class Market {
     return orderbookAccounts.map(
       (o, i) =>
         new Orderbook(
-          //@ts-expect-error
           o?.orderbook,
           allSlabs[i * 2],
           allSlabs[i * 2 + 1],
@@ -823,14 +868,12 @@ export class Market {
       }
       if (numberOfOutcomes === 2 && allOrderbooks.length >= 1) {
         //We check for this error above
-        //@ts-expect-error
         orderbooks.push(allOrderbooks.shift())
       } else if (
         numberOfOutcomes !== 2 &&
         allOrderbooks.length >= numberOfOutcomes
       ) {
         Array.from({ length: numberOfOutcomes }).map(() => {
-          //@ts-expect-error
           orderbooks.push(allOrderbooks.shift())
         })
       } else {
@@ -852,6 +895,45 @@ export class Market {
       return MarketStatus.ActiveInPlay
 
     return this.marketStatus
+  }
+
+  async makeUpdateMarketStateInstruction(feePayer: PublicKey) {
+    const program = await this._averClient.getProgramFromProgramId(this._programId)
+    return program.instruction['updateMarketState'](
+      {
+        accounts: {
+          payer: feePayer,
+          marketAuthority: this.marketAuthority,
+          market: this.pubkey,
+          marketStore: this.marketStore,
+          systemProgram: SystemProgram.programId
+        }
+      })
+  }
+
+  async updateMarketState(
+    feePayer: Keypair = this._averClient.keypair,
+    sendOptions?: SendOptions,
+    manualMaxRetry?: number) {
+    const ix = await this.makeUpdateMarketStateInstruction(feePayer.publicKey)
+
+    return signAndSendTransactionInstructions(
+      this._averClient,
+      [],
+      feePayer,
+      [ix],
+      sendOptions,
+      manualMaxRetry
+    )
+  }
+
+  async checkIfMarketLatestVersion() {
+    const program = await this._averClient.getProgramFromProgramId(this._programId)
+    if (this._marketState.version < getVersionOfAccountTypeInProgram(AccountType.MARKET, program)) {
+      console.log("UMA needs to be upgraded")
+      return false
+    }
+    return true
   }
 
   /**
@@ -877,12 +959,14 @@ export class Market {
     if (!max_iterations || max_iterations > MAX_ITERATIONS_FOR_CONSUME_EVENTS)
       max_iterations = MAX_ITERATIONS_FOR_CONSUME_EVENTS
 
+    const program = await this._averClient.getProgramFromProgramId(this._programId)
+
     const sortedUserAccounts = user_accounts.sort((a, b) =>
       a.toString().localeCompare(b.toString())
     )
     //@ts-ignore
     const userMarketAccounts: UserMarketState[] =
-      await this._averClient.program.account["userMarket"].fetchMultiple(
+      await program.account["userMarket"].fetchMultiple(
         sortedUserAccounts
       )
     const userAtas = await Promise.all(
@@ -901,7 +985,7 @@ export class Market {
 
     if (!this.orderbookAccounts) throw new Error("No orderbook accounts")
 
-    return await this._averClient.program.rpc["consumeEvents"](
+    return await program.rpc["consumeEvents"](
       max_iterations,
       outcome_idx,
       {

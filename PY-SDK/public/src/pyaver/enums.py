@@ -49,8 +49,9 @@ class MarketStatus(IntEnum):
     HALTED_IN_PLAY = 5
     TRADING_CEASED = 6
     CEASED_CRANKED_CLOSED = 7
-    RESOLVED = 8
-    VOIDED = 9
+    IN_PLAY_TRANSITION = 8
+    RESOLVED = 9
+    VOIDED = 10
 
 class TransactionType(IntEnum):
     """
