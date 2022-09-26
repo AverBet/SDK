@@ -1,4 +1,4 @@
-import { Slab, Price, Side, LeafNode } from "@bonfida/aaob"
+import { Slab, Price, Side } from "@bonfida/aaob"
 import { BN } from "@project-serum/anchor"
 import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
 import { AVER_PROGRAM_IDS, CALLBACK_INFO_LEN } from "./ids"

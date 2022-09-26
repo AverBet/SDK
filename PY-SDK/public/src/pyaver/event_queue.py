@@ -1,5 +1,4 @@
-from anchorpy import Context, Program, Wallet
-from .data_classes import UserMarketState
+from anchorpy import Context, Program
 from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .utils import load_multiple_bytes_data, parse_with_version
 from solana.publickey import PublicKey

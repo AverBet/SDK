@@ -23,7 +23,6 @@ import {
   OrderType,
   Side,
   SizeFormat,
-  UmaOrder,
   UserBalanceState,
   UserMarketState,
 } from "./types"
@@ -40,7 +39,6 @@ import {
   AVER_PROGRAM_IDS,
   getAverHostAccount,
   CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE,
-  AVER_VERSION,
 } from "./ids"
 import { UserHostLifetime } from "./user-host-lifetime"
 import { chunk } from "lodash"
@@ -893,9 +891,7 @@ export class UserMarket {
       user
     )
 
-    const program = await averClient.getProgramFromProgramId(
-      market.programId
-    )
+    const program = await averClient.getProgramFromProgramId(market.programId)
     const inPlayQueue =
       !market.inPlayQueue || market.inPlayQueue.equals(SystemProgram.programId)
         ? new Keypair().publicKey
