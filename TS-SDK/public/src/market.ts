@@ -5,7 +5,10 @@ import {
   IdlTypes,
   TypeDef,
 } from "@project-serum/anchor/dist/cjs/program/namespace/types"
-import { TOKEN_PROGRAM_ID, ASSOCIATED_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token"
+import {
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_PROGRAM_ID,
+} from "@project-serum/anchor/dist/cjs/utils/token"
 import {
   AccountLayout,
   ACCOUNT_SIZE,
@@ -19,7 +22,6 @@ import {
   AccountMeta,
   SystemProgram,
   SendOptions,
-  TransactionInstruction,
   SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js"
 import { AverClient } from "./aver-client"
@@ -1187,9 +1189,9 @@ export class Market {
         system_program: SystemProgram.programId,
         associated_token_program: ASSOCIATED_PROGRAM_ID,
         quote_token_mint: quoteTokenMint,
-        rent: SYSVAR_RENT_PUBKEY
+        rent: SYSVAR_RENT_PUBKEY,
       },
-      remainingAccounts: remainingAccounts
+      remainingAccounts: remainingAccounts,
     })
   }
 }

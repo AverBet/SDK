@@ -17,7 +17,6 @@ import { parseError } from "./errors"
 import {
   AVER_COMMUNITY_REWARDS_NFT,
   AVER_TOKEN,
-  AVER_VERSION,
   getAverLaunchZeroFeesToken,
 } from "./ids"
 import { AccountType } from "./types"

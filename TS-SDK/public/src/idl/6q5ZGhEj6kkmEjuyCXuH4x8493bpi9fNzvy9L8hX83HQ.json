@@ -1049,6 +1049,16 @@
           "name": "targetLamportsAccount",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "averQuoteTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "splTokenProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": []
@@ -1283,6 +1293,54 @@
         {
           "name": "newSelfExclusionTime",
           "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "updateMarketBalance",
+      "accounts": [
+        {
+          "name": "vaultAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "quoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "market",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "payer",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payerQuoteTokenAta",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "splTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     }
@@ -3297,8 +3355,5 @@
         }
       ]
     }
-  ],
-  "metadata": {
-    "address": "6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ"
-  }
+  ]
 }
