@@ -5,7 +5,7 @@ import {
   IdlTypes,
   TypeDef,
 } from "@project-serum/anchor/dist/cjs/program/namespace/types"
-import { TOKEN_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token"
+import { TOKEN_PROGRAM_ID, ASSOCIATED_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token"
 import {
   AccountLayout,
   ACCOUNT_SIZE,
@@ -20,6 +20,7 @@ import {
   SystemProgram,
   SendOptions,
   TransactionInstruction,
+  SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js"
 import { AverClient } from "./aver-client"
 import { loadAllEventQueues, prepareUserAccountsList } from "./event-queue"
@@ -1167,11 +1168,14 @@ export class Market {
 
   async settleMarket(
     rewardTarget: PublicKey = SystemProgram.programId,
-    host: PublicKey
+    host: PublicKey,
+    remainingAccounts: AccountMeta[] = []
   ) {
     const program = await this.averClient.getProgramFromProgramId(
       this.programId
     )
+    const quoteTokenMint = getQuoteToken(this._averClient.solanaNetwork)
+
     return await program.rpc["settle"]({
       accounts: {
         market: this.pubkey,
@@ -1180,7 +1184,12 @@ export class Market {
         vaultAuthority: this.vaultAuthority,
         splTokenProgram: TOKEN_PROGRAM_ID,
         host: host,
+        system_program: SystemProgram.programId,
+        associated_token_program: ASSOCIATED_PROGRAM_ID,
+        quote_token_mint: quoteTokenMint,
+        rent: SYSVAR_RENT_PUBKEY
       },
+      remainingAccounts: remainingAccounts
     })
   }
 }

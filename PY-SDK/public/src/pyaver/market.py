@@ -1,6 +1,6 @@
 from solana.rpc.async_api import AsyncClient
 from solana.transaction import AccountMeta
-from .constants import AVER_HOST_ACCOUNT, MAX_ITERATIONS_FOR_CONSUME_EVENTS
+from .constants import AVER_HOST_ACCOUNT, MAX_ITERATIONS_FOR_CONSUME_EVENTS, SYSVAR_RENT_PUBKEY, get_quote_token
 from .event_queue import load_all_event_queues, prepare_user_accounts_list
 from .aver_client import AverClient
 from solana.publickey import PublicKey
@@ -16,7 +16,7 @@ from .orderbook import Orderbook
 from .slab import Slab
 from anchorpy import Context
 from spl.token.instructions import get_associated_token_address
-from spl.token.constants import TOKEN_PROGRAM_ID
+from spl.token.constants import TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
 from solana.rpc.types import TxOpts
 
 class AverMarket():
@@ -644,16 +644,21 @@ class AverMarket():
 
     async def settle_market(self, remaining_accounts: list[AccountMeta] = [], host: PublicKey = AVER_HOST_ACCOUNT, reward_target: PublicKey = SYS_PROGRAM_ID):
         program = await self.aver_client.get_program_from_program_id(self.program_id)
+        quote_token_mint = get_quote_token(self.aver_client.solana_network)
 
         return await program.rpc["settle"](
         ctx=Context(
             accounts={
-                "market": self.market_pubkey,
-                "reward_target": reward_target,
-                "vault_authority": self.market_state.vault_authority,
-                "quote_vault": self.market_state.quote_vault,
+                'market': self.market_pubkey,
+                'reward_target': reward_target,
+                'vault_authority': self.market_state.vault_authority,
+                'quote_vault': self.market_state.quote_vault,
                 'spl_token_program': TOKEN_PROGRAM_ID,
-                "host": host,
+                'host': host,
+                'system_program': SYS_PROGRAM_ID,
+                'associated_token_program': ASSOCIATED_TOKEN_PROGRAM_ID,
+                'quote_token_mint': quote_token_mint,
+                'rent': SYSVAR_RENT_PUBKEY
             },
             remaining_accounts=remaining_accounts
         ),

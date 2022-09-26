@@ -63,6 +63,9 @@ AVER_MAINNET_LAUNCH_NFT_MAINNET = PublicKey(
   'BqSFP5CbfBfZeQqGbzYEipfzTDptTYHFL9AzZA8TBXjn'
 )
 
+SYSVAR_RENT_PUBKEY = PublicKey("SysvarRent111111111111111111111111111111111")
+"""Public key of the synthetic account that serves the network fee resource consumption."""
+
 ##### OTHER CONSTANTS
 
 SYS_VAR_CLOCK = PublicKey('SysvarC1ock11111111111111111111111111111111')
