@@ -41,6 +41,7 @@ class AverClient():
             self, 
             programs: list[Program],
             solana_network: SolanaNetwork,
+            connection: AsyncClient
         ):
         """
         Initialises AverClient object. Do not use this function; use AverClient.load() instead
@@ -49,12 +50,12 @@ class AverClient():
             program (Program): Aver program AnchorPy
             solana_network (SolanaNetwork): Solana network
         """
-        self.connection = programs[0].provider.connection
+        self.connection = connection
         self.programs = programs
         self.provider = programs[0].provider
         self.solana_network = solana_network
         self.quote_token = get_quote_token(solana_network)
-        self.solana_client = Client(get_solana_endpoint(solana_network))
+        self.solana_client = Client(connection._provider.endpoint_uri)
         self.owner = programs[0].provider.wallet.payer
 
     @staticmethod
@@ -96,7 +97,7 @@ class AverClient():
             )
             programs = await gather(*[AverClient.load_program(provider, p) for  p in program_ids])
 
-            return AverClient(programs, network)    
+            return AverClient(programs, network, connection)    
 
     @staticmethod
     async def load_program(
