@@ -131,7 +131,7 @@ def check_user_permission_and_quote_token_limit_exceeded(market: AverMarket, use
         raise Exception(f'This wallet does not have the required permissions to interact with this market.')
 
     if((balance_required + user_market_state.net_quote_tokens_in) > quote_tokens_limit):
-        raise Exception(f'This order would lead to the maximum number of tokens for this market being exceeded. Please adjust your order to remain within market limits. Tokens required for this order {balance_required}; Remaining tokens until limit reached: {quote_token_limit - user_market_state.net_quote_tokens_in}')
+        raise Exception(f'This order would lead to the maximum number of tokens for this market being exceeded. Please adjust your order to remain within market limits. Tokens required for this order {balance_required}; Remaining tokens until limit reached: {quote_tokens_limit - user_market_state.net_quote_tokens_in}')
 
 #####
 ## Cancel order
