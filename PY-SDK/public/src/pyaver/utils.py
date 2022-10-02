@@ -356,7 +356,7 @@ async def load_multiple_account_states(
         if(all_ata_pubkeys is not None):
             for index, pubkey in enumerate(all_ata_pubkeys):
                 buffer = data[index + len(market_pubkeys) + len(market_store_pubkeys) + len(user_market_pubkeys) + len(uhl_pubkeys) + len(slab_pubkeys) + len(user_pubkeys)]
-                if(len(buffer['data']) == ACCOUNT_LEN):
+                if(buffer is not None and len(buffer['data']) == ACCOUNT_LEN):
                     token_balances.append(ACCOUNT_LAYOUT.parse(buffer['data'])['amount'])
                 else:
                     token_balances.append(0)
