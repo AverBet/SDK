@@ -1324,6 +1324,7 @@ export class UserMarket {
         splTokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         vaultAuthority: this.market.vaultAuthority,
+        inPlayQueue: this.market.inPlayQueue
       },
     })
   }
