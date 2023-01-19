@@ -1250,6 +1250,26 @@
           "name": "splTokenProgram",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "quoteTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": []
@@ -1340,6 +1360,66 @@
           "name": "amount",
           "type": {
             "option": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancelOrdersOom",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "user",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "userMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "market",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "host",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateNftPfpDisplayName",
+      "accounts": [
+        {
+          "name": "user",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "userHostLifetime",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "nftPfp",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "displayName",
+          "type": {
+            "option": "string"
           }
         }
       ]
@@ -1544,7 +1624,10 @@
           {
             "name": "feeTierCollectionBpsRates",
             "type": {
-              "array": ["u64", 7]
+              "array": [
+                "u64",
+                7
+              ]
             }
           },
           {
@@ -1702,7 +1785,10 @@
           {
             "name": "feeTierCollectionBpsRates",
             "type": {
-              "array": ["u64", 7]
+              "array": [
+                "u64",
+                7
+              ]
             }
           },
           {
@@ -2222,7 +2308,10 @@
           {
             "name": "feeTierCollectionBpsRates",
             "type": {
-              "array": ["u64", 7]
+              "array": [
+                "u64",
+                7
+              ]
             }
           },
           {
@@ -2717,9 +2806,6 @@
             "name": "NoOp"
           },
           {
-            "name": "StateVersionError"
-          },
-          {
             "name": "MarketUMAsNeedSettlement"
           },
           {
@@ -2838,6 +2924,9 @@
           },
           {
             "name": "NewOrdersLessThanActiveOrdersError"
+          },
+          {
+            "name": "StateVersionError"
           },
           {
             "name": "InvalidAnchorDiscriminator"
