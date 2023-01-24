@@ -280,3 +280,8 @@ export interface Wallet {
   signAllTransactions(txs: Transaction[]): Promise<Transaction[]>;
   publicKey: PublicKey;
 }
+
+export enum RoundingFormat {
+  Probability = 0,
+  Decimal = 1
+}

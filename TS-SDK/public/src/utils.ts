@@ -164,6 +164,92 @@ export const roundPriceToNearestTickSize = (
 }
 
 /**
+ * Returns the tick size interval for the given limit price
+ *
+ * @param {number} limitPrice 1000 < limitPrice <= 990000 where limit price is in 6dp
+ *
+ * @returns {number} tick size for the given price
+ */
+export const calculateTickSizeForDecimalPrice = (limitPriceDecimal: number) => {
+  switch (true) {
+    case limitPriceDecimal < 1.01:
+      throw new Error("Limit price too low")
+    case limitPriceDecimal <= 2:
+      return 0.01
+    case limitPriceDecimal <= 3:
+      return 0.02
+    case limitPriceDecimal <= 4:
+      return 0.05
+    case limitPriceDecimal <= 6:
+      return 0.1
+    case limitPriceDecimal <= 10:
+      return 0.2
+    case limitPriceDecimal <= 20:
+      return 0.5
+    case limitPriceDecimal <= 30:
+      return 1
+    case limitPriceDecimal <= 50:
+      return 2
+    case limitPriceDecimal <= 100:
+      return 5
+    case limitPriceDecimal < 1000:
+      return 10
+    case limitPriceDecimal >= 1000:
+      throw new Error("Limit price too high")
+    default:
+      return limitPriceDecimal
+  }
+}
+
+const roundPriceDecimal = (tickSize: number, limitPrice: number) => {
+  return Math.round(limitPrice / tickSize) * tickSize
+}
+
+/**
+ * Rounds price to the nearest tick size available
+ *
+ * @param {number} limitPrice - Limit price
+ * @param {boolean} isBinary - True for markets with exactly 2 outcomes
+ * @returns {number} Rounded price
+ */
+export const roundDecimalPriceToNearestTickSize = (
+  limitPrice: number,
+  isBinary?: boolean
+) => {
+  const limitPriceDecimal = 1 / limitPrice
+  const oneInMarketDecimals = Math.pow(10, 6)
+
+  let minValueForMarket = 1.01
+  let maxValueForMarket = 1000
+
+  if (limitPriceDecimal < minValueForMarket) {
+    return (1.0 / minValueForMarket)
+  } else if (limitPriceDecimal > maxValueForMarket) {
+    return (1.0 / maxValueForMarket)
+  } else {
+    let limitPriceDecimalRounded
+
+    if (isBinary && limitPriceDecimal > 2.0) {
+      limitPriceDecimalRounded = roundPriceDecimal(
+        calculateTickSizeForDecimalPrice(
+          1.0 / ((oneInMarketDecimals - limitPrice)
+            / oneInMarketDecimals),
+        ),
+        limitPriceDecimal,
+      )
+    } else {
+      const tickSize = calculateTickSizeForDecimalPrice(limitPriceDecimal)
+
+      limitPriceDecimalRounded = roundPriceDecimal(
+        tickSize,
+        limitPriceDecimal,
+      )
+    }
+    return (1.0 / limitPriceDecimalRounded)
+  }
+}
+
+/**
  * Obtains public key of best available discount token
  *
  * @param {AverClient} averClient - AverClient object
@@ -221,7 +307,7 @@ export const getBestDiscountToken = async (
     if (
       averTokenAccount.value.length > 0 &&
       averTokenAccount.value[0].account.data.parsed.info.tokenAmount.uiAmount >
-        0
+      0
     ) {
       return averTokenAccount.value[0].pubkey
     }
