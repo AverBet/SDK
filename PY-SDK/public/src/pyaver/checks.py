@@ -1,6 +1,6 @@
-from .utils import round_price_to_nearest_tick_size
+from .utils import round_price_to_nearest_tick_size, round_price_to_nearest_decimal_tick_size
 from .market import AverMarket
-from .enums import MarketStatus, OrderType, Side, SizeFormat
+from .enums import MarketStatus, OrderType, Side, SizeFormat, PriceRoundingFormat
 from .user_host_lifetime import UserHostLifetime
 from .data_classes import UserBalanceState, UserMarketState
 
@@ -52,6 +52,7 @@ def check_stake_noop(size_format: SizeFormat, limit_price: float, side: Side):
         raise Exception('Market orders are currently not supports for orders specified in STAKE.')
 
 def check_is_order_valid(
+    market: AverMarket,
     outcome_index: int,
     side: Side,
     limit_price: float,
@@ -76,7 +77,7 @@ def check_is_order_valid(
         Returns:
             bool: True if order is valid
         """
-        limit_price = round_price_to_nearest_tick_size(limit_price)
+        limit_price = round_price_to_nearest_tick_size(limit_price) if market.market_state.rounding_format == PriceRoundingFormat.PROBABILITY else round_price_to_nearest_decimal_tick_size(limit_price)
 
         balance_required = size * limit_price if size_format == SizeFormat.PAYOUT else size
         current_balance = tokens_available_to_sell if side == Side.SELL else tokens_available_to_buy
@@ -86,7 +87,7 @@ def check_is_order_valid(
 
 def check_quote_and_base_size_too_small(market: AverMarket, side: Side, size_format: SizeFormat, outcome_id: int, limit_price: float, size: float):
     binary_second_outcome = market.market_state.number_of_outcomes == 2 and outcome_id == 1
-    limit_price_rounded = round_price_to_nearest_tick_size(limit_price)
+    limit_price_rounded = round_price_to_nearest_tick_size(limit_price) if market.market_state.rounding_format == PriceRoundingFormat.PROBABILITY else round_price_to_nearest_decimal_tick_size(limit_price)
 
     if(size_format == SizeFormat.PAYOUT):
         max_base_qty = size

@@ -268,6 +268,41 @@ class UserHostLifetime():
             [bytes('user-host-lifetime', 'utf-8'), bytes(owner), bytes(host)],
             program_id
         )
+    
+    async def make_update_nft_pfp_instruction(
+        self,
+        display_name: str,
+        nft_pubkey: PublicKey
+    ):
+        program = await self.aver_client.get_program_from_program_id(self.program_id)
+
+        return program.instruction['update_nft_pfp_display_name'](
+            nft_pubkey, 
+            display_name,
+            ctx=Context(
+                accounts={
+                    "user": self.user_host_lifetime_state.user,
+                    "user_host_lifetime": self.pubkey,
+                }
+            )
+        )
+  
+    async def update_nft_pfp_display_name(
+        self,
+        user: Keypair,
+        display_name: str,
+        nft_pubkey: PublicKey,
+        send_options: TxOpts = None
+    ):
+        ix = await self.make_update_nft_pfp_instruction(display_name = display_name, nft_pubkey = nft_pubkey)
+    
+        return await sign_and_send_transaction_instructions(
+            self.aver_client,
+            [user],
+            user,
+            [ix],
+            send_options = send_options
+        )
 
     async def make_update_user_host_lifetime_state_instruction(self):
         program = await self.aver_client.get_program_from_program_id(self.program_id)
