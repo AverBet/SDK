@@ -520,7 +520,7 @@ class UserMarket():
             check_stake_noop(size_format, limit_price, side)
             tokens_available_to_buy = self.calculate_tokens_available_to_buy(outcome_id, limit_price)
             tokens_available_to_sell = self.calculate_tokens_available_to_sell(outcome_id, limit_price)
-            check_is_order_valid(outcome_id, side, limit_price, size, size_format, tokens_available_to_sell, tokens_available_to_buy)
+            check_is_order_valid(self.market, outcome_id, side, limit_price, size, size_format, tokens_available_to_sell, tokens_available_to_buy)
             check_quote_and_base_size_too_small(self.market, side, size_format, outcome_id, limit_price, size)
             check_user_permission_and_quote_token_limit_exceeded(self.market, self.user_market_state, size, limit_price, size_format)
         

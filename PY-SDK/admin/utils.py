@@ -24,8 +24,7 @@ async def get_or_create_associated_token_address(client: AsyncClient, owner: Pub
         Transaction().add(ata_ix),
         *[fee_payer],
         opts=TxOpts(
-          skip_confirmation=False,
-          preflight_commitment=client.commitment
+          skip_confirmation=False
         )
       )
   return ata

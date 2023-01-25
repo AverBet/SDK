@@ -52,6 +52,8 @@ async function main() {
     AVER_PROGRAM_IDS
   )
 
+  if (!client) return
+
   // ----------------------------------------------------
   //   FUND THE WALLET WITH SOL AND TOKENS, IF NECESSARY
   // ----------------------------------------------------

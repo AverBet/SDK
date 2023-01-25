@@ -776,6 +776,7 @@ export class UserMarket {
         limitPrice
       )
       checkIsOrderValid(
+        this._market,
         outcomeIndex,
         side,
         limitPrice,

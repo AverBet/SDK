@@ -150,3 +150,7 @@ class AccountTypes(str, Enum):
     MARKET_STORE = 'MarketStore'
     USER_MARKET = 'UserMarket'
     USER_HOST_LIFETIME = 'UserHostLifetime'
+
+class PriceRoundingFormat(IntEnum):
+    PROBABILITY = 0
+    DECIMAL = 1

@@ -551,4 +551,43 @@ export class UserHostLifetime {
         return 0
     }
   }
+
+  async makeUpdateNftPfpInstruction(
+    displayName: string,
+    nftPubkey: PublicKey
+  ) {
+    const program = await this._averClient.getProgramFromProgramId(this._programId)
+  
+    return program.instruction['updateNftPfpDisplayName'](
+        nftPubkey,
+        displayName, 
+        {
+            accounts: {
+                user: this.user,
+                userHostLifetime: this.pubkey
+            }
+        }
+    )
+  }
+  
+  async updateNftPfpDisplayName(
+    user: Keypair,
+    displayName: string,
+    nftPubkey: PublicKey,
+    sendOptions?: SendOptions
+  ) {
+    const ix = await this.makeUpdateNftPfpInstruction(
+        displayName,
+        nftPubkey
+    )
+    
+    return await signAndSendTransactionInstructions(
+        this._averClient,
+        [user],
+        user,
+        [ix],
+        sendOptions
+    )
+  }
+  
 }

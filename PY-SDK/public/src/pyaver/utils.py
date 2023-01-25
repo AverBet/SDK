@@ -209,6 +209,89 @@ def round_price_to_nearest_tick_size(limit_price: float, is_binary: bool = False
 
     return rounded_limit_price
 
+def calculate_tick_size_for_decimal_price(limit_price_decimal: float):
+    """
+    Calculates tick size for specific price
+
+    Args:
+        limit_price (float): Limit price in decimal
+
+    Raises:
+        Exception: Limit price too low
+        Exception: Limit price too high
+
+    Returns:
+        int: Tick size
+    """
+    if(limit_price_decimal < 1.01):
+        raise Exception('Limit price too low')
+    if(limit_price_decimal <= 2):
+        return 0.01
+    if(limit_price_decimal <= 3):
+        return 0.02
+    if(limit_price_decimal <= 4):
+        return 0.05
+    if(limit_price_decimal <= 6):
+        return 0.1
+    if(limit_price_decimal <= 10):
+        return 0.2
+    if(limit_price_decimal <= 20):
+        return 0.5
+    if(limit_price_decimal <= 30):
+        return 1
+    if(limit_price_decimal <= 50):
+        return 2
+    if(limit_price_decimal <= 100):
+        return 5
+    if(limit_price_decimal <= 1000):
+        return 10
+    if(limit_price_decimal > 1000):
+        raise Exception('Limit price too high')
+    return limit_price_decimal
+
+def round_price_decimal(tickSize: float, limitPrice: float):
+  return round(limitPrice / tickSize) * tickSize
+
+def round_price_to_nearest_decimal_tick_size(limit_price: float, is_binary: bool = False):
+    """
+    Rounds price to the nearest tick size available
+
+    Args:
+        limit_price (float): Limit price
+
+    Returns:
+        float: Rounded limit price
+    """
+    limit_price_decimal = 1 / limit_price
+    one_in_market_decimals = pow(10, 6)
+
+    min_value_for_market = 1.01
+    max_value_for_market = 1000
+
+    if limit_price_decimal < min_value_for_market: 
+        return 1.0 / min_value_for_market
+    elif limit_price_decimal > max_value_for_market: 
+        return 1.0 / max_value_for_market
+    else:
+        limit_price_decimal_rounded = 0
+
+        if is_binary and limit_price_decimal > 2.0: 
+            limit_price_decimal_rounded = round_price_decimal(
+                calculate_tick_size_for_decimal_price(
+                    1.0 / ((one_in_market_decimals - limit_price) / one_in_market_decimals),
+                ),
+                limit_price_decimal,
+            )
+        else:
+            tick_size = calculate_tick_size_for_decimal_price(limit_price_decimal=limit_price_decimal)
+
+            limit_price_decimal_rounded = round_price_decimal(
+                tickSize=tick_size,
+                limitPrice=limit_price_decimal,
+            )
+
+        return 1.0 / limit_price_decimal_rounded
+
 def parse_user_market_state(buffer: bytes, aver_client: AverClient, program: Program = None):
         """
         Parses raw onchain data to UserMarketState object        

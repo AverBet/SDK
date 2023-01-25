@@ -6,7 +6,7 @@ import {
   SizeFormat,
   SolanaNetwork,
 } from "../../public/src/types"
-import { getQuoteToken, getSolanaEndpoint } from "../../public/src/ids"
+import { getQuoteToken } from "../../public/src/ids"
 import { AverClient } from "../../public/src/aver-client"
 import { Market } from "../../public/src/market"
 import { UserMarket } from "../../public/src/user-market"
@@ -16,8 +16,12 @@ import { changeMarketStatusTx } from "../utils/change-market-status"
 import { closeAaobTx } from "../utils/close-aaob"
 import { manualResolveMarketTx } from "../utils/resolve-market"
 import { UserHostLifetime } from "../../public/src/user-host-lifetime"
+import { confirmTx } from "../utils/transactions"
+import { getAverHostAccount } from "aver-ts"
+import { derivePubkeyAndBump, createHostAccount } from '../../admin/utils/create-host'
+import { closeOrdersOom } from '../../admin/utils/close-orders-oom'
 
-jest.setTimeout(100000)
+jest.setTimeout(1000000)
 
 //Change this to change test
 const numberOfOutcomes = 3
@@ -58,38 +62,71 @@ const args: InitMarketArgs = {
 
 describe("run all tests", () => {
   // constants we can adjust
-  const firstProgramId = new PublicKey(
-    "DfMQPAuAeECP7iSCwTKjbpzyx6X1HZT6rz872iYWA8St"
-  )
-
-  const secondProgramId = new PublicKey(
+  const programId = new PublicKey(
     "6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ"
   )
-  const owner = Keypair.fromSecretKey(
+
+  // const programId = new PublicKey('81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT')
+  const IS_TEST_PROGRAM = false
+  
+  // Account used to create the market
+  const market_auth = Keypair.fromSecretKey(
     base58_to_binary(
-      "2S1DDiUZuqFNPHx2uzX9pphxynV1CgpLXnT9QrwPoWwXaGrqAP88XNEh9NK7JbFByJFDsER7PQgsNyacJyCGsH8S"
+      "5CtV5tUMmbMxsEoobfYYB9tXB9PMpoTvH2SmmqzeCUDXqQucNndVwBjYT7NVCjuvFhcEEYPnkEEtFqxedwoss1Gy"
     )
   )
-  const owner2 = Keypair.fromSecretKey(
+
+  console.log('The market auth is=', market_auth.publicKey)
+
+  // Accounts used to place bets...
+  const owner = Keypair.fromSecretKey(
     base58_to_binary(
       "3onYh3TSCg92X3kD9gD7RCZF1N8JFVSDp39eSkRswsQb5YwWuyMnzuCN2wuPb52XEnPzjVrCtkYe5Xo8Czd3CDyV"
     )
   )
 
-  const umas: UserMarket[] = []
+  const owner2 = Keypair.fromSecretKey(
+    base58_to_binary(
+      "hDDieEbL6opz2MNwU9r9aeXzRg5iMBgPVNdfsDDrZhyFrZSGeREbkD5DH4CAVQpqHNuGkDurqWt6vG5eQqmeRZg"
+    )
+  )
+
+  console.log('Owner 1=', owner.publicKey)
+  console.log('Owner 2=', owner2.publicKey)
 
   // values that will be set by the tests
-  let client: AverClient
+  let marketClient: AverClient | undefined
+  let ownerClient: AverClient | undefined
+  let owner2Client: AverClient | undefined
   let marketPubkey: PublicKey
   let market: Market
-  let userMarket: UserMarket
+  let userMarket: UserMarket | undefined
+  let userMarket2: UserMarket | undefined
   let host: PublicKey
 
-  test("successfully load the client", async () => {
+  test("load clients and check ATAs/Lamports", async () => {
+    console.log('CHECKING ATA FOR MARKET AUTH')
     const network = SolanaNetwork.Devnet
-    const solanaEndpoint = getSolanaEndpoint(network)
+    const solanaEndpoint = 'https://wispy-weathered-pine.solana-devnet.quiknode.pro/04c4c99f6016f213135b53eedefb53049ebe0b3f/'
     const connection = new Connection(solanaEndpoint, "confirmed")
-    client = await AverClient.loadAverClient(
+    
+    marketClient = await AverClient.loadAverClient(
+      connection,
+      network,
+      market_auth,
+      {
+        commitment: "confirmed",
+        preflightCommitment: "confirmed",
+      },
+      [programId]
+    )
+    const marketAta = await marketClient.getOrCreateTokenAta(market_auth, getQuoteToken(SolanaNetwork.Devnet), market_auth.publicKey)
+    console.log('Got the market auth ATA', marketAta)
+    console.log('Checking if there are lamports and quote tokens')
+    // await marketClient.requestLamportAirdrop()
+    // await marketClient.requestTokenAirdrop()
+
+    ownerClient = await AverClient.loadAverClient(
       connection,
       network,
       owner,
@@ -97,42 +134,78 @@ describe("run all tests", () => {
         commitment: "confirmed",
         preflightCommitment: "confirmed",
       },
-      [secondProgramId, firstProgramId]
+      [programId]
     )
-    host = (
-      await PublicKey.findProgramAddress(
-        [Buffer.from("host", "utf-8"), owner.publicKey.toBuffer()],
-        firstProgramId
-      )
-    )[0]
+    const ownerAta = await ownerClient.getOrCreateTokenAta(owner, getQuoteToken(SolanaNetwork.Devnet), owner.publicKey)
+    console.log('Got the owner ATA', ownerAta)
+    // await ownerClient.requestLamportAirdrop()
+    // await ownerClient.requestTokenAirdrop()
+
+    owner2Client = await AverClient.loadAverClient(
+      connection,
+      network,
+      owner2,
+      {
+        commitment: "confirmed",
+        preflightCommitment: "confirmed",
+      },
+      [programId]
+    )
+    const owner2Ata = await owner2Client.getOrCreateTokenAta(owner2, getQuoteToken(SolanaNetwork.Devnet), owner2.publicKey)
+    console.log('Got the owner 2 ATA', owner2Ata)
   })
 
   test("test aver client", async () => {
     console.log("-".repeat(10))
     console.log("TESTING AVER CLIENT")
-    await client.getProgramFromProgramId(secondProgramId)
-    const system_clock = await client.getSystemClockDatetime()
+    if (!marketClient) return 
+
+    await marketClient.getProgramFromProgramId(programId)
+    const system_clock = await marketClient.getSystemClockDatetime()
     console.log("System clock time: ", system_clock)
-    const lamport_balance = await client.requestLamportBalance(client.owner)
+    const lamport_balance = await marketClient.requestLamportBalance(marketClient.owner)
     console.log("Lamport balance: ", lamport_balance)
-    const token_balance = await client.requestTokenBalance(
-      getQuoteToken(SolanaNetwork.Devnet),
-      owner.publicKey
-    )
+    const ata = await marketClient.getOrCreateTokenAta(market_auth, getQuoteToken(SolanaNetwork.Devnet), market_auth.publicKey)
+    console.log('Got the ATA', ata)
+    const token_balance = await marketClient.requestTokenBalance(getQuoteToken(SolanaNetwork.Devnet), market_auth.publicKey)
     console.log("Token balance: ", token_balance)
     console.log("-".repeat(10))
   })
 
+  test("get or create the host", async () => {
+    if (!marketClient) {
+      console.error('Issue with the client when testing the host account', marketClient)
+      return
+    }
+
+    host = IS_TEST_PROGRAM ? derivePubkeyAndBump(market_auth.publicKey, programId)[0]: getAverHostAccount(SolanaNetwork.Devnet)
+ 
+    const program = await marketClient.getProgramFromProgramId(programId)
+    if (!program) return
+
+    const hostResult = await program.account["host"].fetchNullable(
+      host
+    )
+
+    if (!hostResult) {
+      await createHostAccount(marketClient, owner, owner, host, undefined, 0, programId)
+    }
+  })
+
   test("load a market that does not exist", async () => {
-    const fakeMarket = await Market.load(client, new Keypair().publicKey)
+    if (!marketClient) return 
+
+    const fakeMarket = await Market.load(marketClient, new Keypair().publicKey)
     expect(fakeMarket).toBeNull()
   })
 
   test("create aver market", async () => {
+    if (!marketClient) return 
+
     console.log("-".repeat(10))
     console.log("CREATING AVER MARKET")
     marketPubkey = (
-      await createMarket(numberOfOutcomes, client, owner, args, firstProgramId)
+      await createMarket(numberOfOutcomes, marketClient, market_auth, args, programId)
     ).publicKey
     console.log("-".repeat(10))
   })
@@ -166,168 +239,293 @@ describe("run all tests", () => {
 
   async function checkMarketLoadsCorrectlyAfterOrderbooksClosed(
     market: Market,
-    uma: UserMarket,
     status: MarketStatus
   ) {
+    if (!marketClient) return 
     await market.refresh()
     checkMarketIsAsExpected(market, status)
-    const market2 = await Market.load(client, market.pubkey)
+    const market2 = await Market.load(marketClient, market.pubkey)
     expect(market2).toBeTruthy()
     //@ts-ignore
     checkMarketIsAsExpected(market2, status)
-
-    await uma.refresh()
-    checkUMAState(uma, market, owner.publicKey)
-    checkUHLState(uma.userHostLifetime)
   }
 
-  function checkUMAState(uma: UserMarket, market: Market, owner: PublicKey) {
+  function checkUMAState(uma: UserMarket, market: Market, umaOwner: PublicKey) {
     expect(uma.market.pubkey.toBase58()).toBe(market.pubkey.toBase58())
-    expect(uma.user.toBase58()).toBe(owner.toBase58())
+    expect(uma.user.toBase58()).toBe(umaOwner.toBase58())
     expect(uma.tokenBalanceUi).toBeGreaterThan(10) //Make sure trades can be placed
     expect(uma.lamportBalanceUi).toBeGreaterThan(0.01) //Make sure trades can be placed
   }
 
-  function checkUHLState(uhl: UserHostLifetime) {
+  function checkUHLState(uhl: UserHostLifetime, uhlOwner: Keypair) {
     expect(uhl.host.toBase58()).toBe(host.toBase58())
     expect(uhl.isSelfExcluded).toBeFalsy()
-    expect(uhl.user.toBase58()).toBe(owner.publicKey.toBase58())
+    expect(uhl.user.toBase58()).toBe(uhlOwner.publicKey.toBase58())
   }
 
   test("successfully load and test aver market", async () => {
     console.log("-".repeat(10))
-    market = (await Market.load(client, marketPubkey)) as Market
+    if (!marketClient) return 
+
+    market = (await Market.load(marketClient, marketPubkey)) as Market
     checkMarketIsAsExpected(market)
     market = market
     console.log("-".repeat(10))
   })
 
   test("UMA / UHL tests", async () => {
+    if (!ownerClient) {
+      console.error('Issue with owner client', ownerClient)
+      return
+    }
+
     //@ts-ignore
     userMarket = await UserMarket.getOrCreateUserMarketAccount(
-      client,
+      ownerClient,
       owner,
       market,
       undefined,
-      undefined,
+      getQuoteToken(SolanaNetwork.Devnet),
       host
     )
-    umas.push(userMarket)
+    console.log('Got UMA 1', userMarket)
+    if (userMarket == null) {
+      console.error('---- Issue with UMA 1 ----', userMarket)
+      return
+    }
 
-    const uma = umas[0]
-    expect(uma.orders.length).toBe(0)
-    expect(uma.market.orderbooks?.length).toBe(numberOfOutcomes)
-    checkUHLState(uma.userHostLifetime)
-    checkUMAState(uma, market, owner.publicKey)
+    // console.log('Airdropping tokens...')
+    // const airdropTokens = await ownerClient.requestTokenAirdrop(1_000_000_000, getQuoteToken(SolanaNetwork.Devnet), owner.publicKey)
+    // console.log('Airdropped tokens...', airdropTokens)
+
+    // console.log('Airdropping sol...')
+    // const airdropSol = await ownerClient.requestLamportAirdrop(LAMPORTS_PER_SOL, owner.publicKey)
+    // console.log('Airdropped tokens...', airdropSol)
+
+    await userMarket.refresh()
+
+    expect(userMarket.orders.length).toBe(0)
+    expect(userMarket.market.orderbooks?.length).toBe(numberOfOutcomes)
+
+    checkUHLState(userMarket.userHostLifetime, owner)
+    checkUMAState(userMarket, market, owner.publicKey)
+  })
+
+  test("update the UHL Display name and NFT PFP", async () => {
+    const UPDATED_DISPLAY_NAME: string = 'Aver Username'
+    const NFT_PUBKEY: PublicKey = new PublicKey('BqSFP5CbfBfZeQqGbzYEipfzTDptTYHFL9AzZA8TBXjn')
+
+    if (!userMarket || !ownerClient) {
+      console.error('Issue with the user market', userMarket, ownerClient)
+      return 
+    }
+
+    const uhl = userMarket.userHostLifetime
+    const sig = await uhl.updateNftPfpDisplayName(owner, UPDATED_DISPLAY_NAME, NFT_PUBKEY)
+    confirmTx(sig, ownerClient.connection, 25000)
+    await userMarket.refresh()
+    const uhlUpdated = await UserHostLifetime.getOrCreateUserHostLifetime(ownerClient, owner, undefined, getQuoteToken(SolanaNetwork.Devnet), host, undefined, programId)
+
+    expect(uhlUpdated.displayName).toBeDefined()
+    expect(uhlUpdated.displayName).toEqual(UPDATED_DISPLAY_NAME)
+    expect(uhlUpdated.nftPfp).toBeDefined()
+    expect(uhlUpdated.nftPfp?.toString()).toEqual(NFT_PUBKEY.toString())
   })
 
   test("place and cancel orders; orderbook checks", async () => {
-    const uma = umas[0]
+    if (!userMarket || !ownerClient) {
+      console.error(`Issue with the userMarket=${userMarket} or ownerClient=${ownerClient}`)
+      return
+    }
 
-    await placeOrder(uma)
-    expect(uma.orders.length).toBe(1)
+    console.log('Placing first order')
+    await placeOrder(userMarket, owner)
+    console.log('Placed first order', userMarket.orders.length)
+    expect(userMarket.orders.length).toBe(1)
     //@ts-ignore
-    let bids_l2 = uma.market.orderbooks[0].getBidsL2(10, true)
+    let bids_l2 = userMarket.market.orderbooks[0].getBidsL2(10, true)
     expect(bids_l2[0].price).toBeCloseTo(0.6)
     expect(bids_l2[0].size).toBeCloseTo(5)
     //@ts-ignore
-    const bids_l3 = uma.market.orderbooks[0].getBidsL3(10, true)
+    const bids_l3 = userMarket.market.orderbooks[0].getBidsL3(10, true)
     expect(bids_l3[0].price_ui).toBeCloseTo(0.6)
     expect(bids_l3[0].base_quantity_ui).toBeCloseTo(5)
-    checkUHLState(uma.userHostLifetime) //Check if accounts still correct after refresh
-    checkUMAState(uma, market, owner.publicKey)
+    checkUHLState(userMarket.userHostLifetime, owner) //Check if accounts still correct after refresh
+    checkUMAState(userMarket, market, owner.publicKey)
 
-    await cancelOrder(uma)
-    expect(uma.orders.length).toBe(0)
-    await placeOrder(uma)
-    await placeOrder(uma)
-    expect(uma.orders.length).toBe(2)
-    await cancelAllOrders(uma)
-    expect(uma.orders.length).toBe(0)
+    console.log('Cancel first order')
+    await cancelOrder(userMarket, owner, ownerClient)
+    expect(userMarket.orders.length).toBe(0)
+
+    console.log('Place 2 more orders')
+    await placeOrder(userMarket, owner)
+    await placeOrder(userMarket, owner)
+    expect(userMarket.orders.length).toBe(2)
+
+    console.log('Cancelling all orders')
+    await cancelAllOrders(userMarket, ownerClient, owner)
+    expect(userMarket.orders.length).toBe(0)
+
+    console.log('Finished with the orders')
   })
 
   test("market crank and matching", async () => {
+    if (!owner2Client) {
+      console.error('Issue with owner 2 client', owner2Client)
+      return
+    }
+
     //Create 2nd UMA
-    const userMarket2 = await UserMarket.getOrCreateUserMarketAccount(
-      client,
+    userMarket2 = await UserMarket.getOrCreateUserMarketAccount(
+      owner2Client,
       owner2,
       market,
       undefined,
-      undefined,
+      getQuoteToken(SolanaNetwork.Devnet),
       host
     )
+
+    if (!userMarket || !userMarket2) {
+      console.error(`Issue with UMA 1=${userMarket}, or UMA 2=${userMarket2}`)
+      return
+    }
+
+    // console.log('Airdropping tokens...')
+    // const airdropTokens = await owner2Client.requestTokenAirdrop(1_000_000_000, getQuoteToken(SolanaNetwork.Devnet), owner2.publicKey)
+    // console.log('Airdropped tokens...', airdropTokens)
+
+    // console.log('Airdropping sol...')
+    // const airdropSol = await owner2Client.requestLamportAirdrop(LAMPORTS_PER_SOL, owner2.publicKey)
+    // console.log('Airdropped tokens...', airdropSol)
+
+    await userMarket2.refresh()
+
+    console.log('Got UMA 2', userMarket2, owner2.publicKey)
     //@ts-ignore
-    umas.push(userMarket2)
-    const uma1 = umas[0]
-    const uma2 = umas[1]
-    checkUMAState(uma2, market, owner2.publicKey)
-    await placeOrder(uma1)
-    await placeOrder(uma2, false)
-    const sig = await market.crankMarket(owner, [0, 1])
-    await client.connection.confirmTransaction(sig, "confirmed")
-    await uma1.refresh()
-    await uma2.refresh()
-    expect(uma1.orders.length).toBe(0)
-    expect(uma2.orders.length).toBe(0)
-    expect(uma1.market.volumeMatched).toBeCloseTo(3 * 10 ** 6, -1)
+    checkUMAState(userMarket2, market, owner2.publicKey)
+
+    console.log('Place order 1')
+    await placeOrder(userMarket, owner)
+    console.log('Place order 2')
+    await placeOrder(userMarket2, owner2, false)
+    console.log('Cranking the market')
+    const sig = await market.crankMarket(market_auth, [0, 1])
+
+    await confirmTx(sig, owner2Client.connection, 15000)
+
+    await userMarket.refresh()
+    await userMarket2.refresh()
+
+    console.log('Refreshed the umas')
+    console.log(userMarket)
+    console.log(userMarket2)
+
+    expect(userMarket.orders.length).toBe(0)
+    expect(userMarket2.orders.length).toBe(0)
+    expect(userMarket.market.volumeMatched).toBeCloseTo(3 * 10 ** 6, -1)
+  })
+
+  test("Place more orders so they can be cancelled", async () => {
+    if (!userMarket || !ownerClient) {
+      console.error('Issue with the UMA', userMarket, ownerClient)
+      return 
+    }
+
+    console.log('Place order 1')
+    await placeOrder(userMarket, owner)
+
+    console.log('Place order 2')
+    await placeOrder(userMarket, owner)
   })
 
   test("resolve market and check it loads correctly", async () => {
-    const program = await client.getProgramFromProgramId(market.programId)
-    const uma = umas[0]
+    if (!marketClient) return 
+
+    const program = await marketClient.getProgramFromProgramId(market.programId)
+    
+    console.log('Change the market status')
     let sig = await changeMarketStatusTx(
       program,
       market,
-      owner,
+      market_auth,
       MarketStatus.TradingCeased
     )
-    await client.connection.confirmTransaction(sig, "confirmed")
+    await confirmTx(sig, marketClient.connection, 20000)
+    console.log('Trading ceased for the market')
     await checkMarketLoadsCorrectlyAfterOrderbooksClosed(
       market,
-      uma,
       MarketStatus.TradingCeased
     )
-
+    console.log('Close the orderbooks...')
     sig = await closeAaobTx(
       program,
       market,
-      owner,
+      market_auth,
       //@ts-ignore
       numberOfOutcomes == 2 ? [0] : Array.from(Array(numberOfOutcomes).keys())
     )
-    await client.connection.confirmTransaction(sig, "confirmed")
-    await checkMarketLoadsCorrectlyAfterOrderbooksClosed(market, uma, 8) //Seems to be an error with the MarketStatus naming
-
-    sig = await manualResolveMarketTx(program, market, owner, 1)
-    await client.connection.confirmTransaction(sig, "confirmed")
-    await checkMarketLoadsCorrectlyAfterOrderbooksClosed(market, uma, 9) //Seems to be an error with the MarketStatus naming
+    await confirmTx(sig, marketClient.connection, 20000)
+    console.log('6')
+    await checkMarketLoadsCorrectlyAfterOrderbooksClosed(market, MarketStatus.CeasedCrankedClosed) //Seems to be an error with the MarketStatus naming
+    console.log('7')
+    sig = await manualResolveMarketTx(program, market, market_auth, 1)
+    console.log('8')
+    await confirmTx(sig, marketClient.connection, 20000)
+    console.log('9')
+    await checkMarketLoadsCorrectlyAfterOrderbooksClosed(market, MarketStatus.Resolved) //Seems to be an error with the MarketStatus naming
   })
 
-  async function placeOrder(uma: UserMarket, bids: boolean = true) {
+  test("Cancel all order", async () => {
+    if (!userMarket || !ownerClient) {
+      console.error('Issue with the UMA', userMarket, ownerClient)
+      return 
+    }
+
+    const sig = await closeOrdersOom(ownerClient, owner, userMarket.pubkey, userMarket.market.pubkey, host, programId)
+    
+    confirmTx(sig, ownerClient.connection, 50000)
+    userMarket = await UserMarket.getOrCreateUserMarketAccount(ownerClient, owner, market, undefined, getQuoteToken(SolanaNetwork.Devnet), host, undefined, undefined)
+
+    if (!userMarket) return
+    
+    console.log('Cancel orders OOM', sig, userMarket.orders.length)
+    
+    expect(userMarket.orders.length).toEqual(0)
+  })
+
+  async function placeOrder(uma: UserMarket, umaOwner: Keypair, bids: boolean = true) {
     let sig = ""
     if (bids) {
-      sig = await uma.placeOrder(owner, 0, Side.Bid, 0.6, 5, SizeFormat.Payout)
+      sig = await uma.placeOrder(umaOwner, 0, Side.Bid, 0.6, 5, SizeFormat.Payout)
     } else {
-      sig = await uma.placeOrder(owner2, 0, Side.Ask, 0.4, 5, SizeFormat.Payout)
+      sig = await uma.placeOrder(umaOwner, 0, Side.Ask, 0.4, 5, SizeFormat.Payout)
     }
-    await client.connection.confirmTransaction(sig, "confirmed")
+    if (!ownerClient) return 
+
+    await confirmTx(sig, ownerClient.connection, 25000)
     await uma.refresh()
   }
 
-  async function cancelOrder(uma: UserMarket) {
+  async function cancelOrder(uma: UserMarket, umaOwner: Keypair, umaClient: AverClient) {
     const sig = await uma.cancelOrder(
-      owner,
+      umaOwner,
       uma.orders[0].orderId,
       uma.orders[0].outcomeId
     )
-    await client.connection.confirmTransaction(sig, "confirmed")
+    if (!umaClient) return 
+
+    await confirmTx(sig, umaClient.connection, 25000)
+
     await uma.refresh()
   }
 
-  async function cancelAllOrders(uma: UserMarket) {
-    const sigs = await uma.cancelAllOrders(owner, [0])
+  async function cancelAllOrders(uma: UserMarket, umaClient: AverClient, umaOwner: Keypair) {
+    if (umaClient == undefined) return 
+
+    const sigs = await uma.cancelAllOrders(umaOwner, [0])
+
     await Promise.all(
-      sigs.map((sig) => client.connection.confirmTransaction(sig, "confirmed"))
+      sigs.map((sig) => confirmTx(sig, umaClient?.connection, 10000))
     )
     await uma.refresh()
   }

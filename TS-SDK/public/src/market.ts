@@ -756,6 +756,10 @@ export class Market {
     return this._marketState.inPlayQueue
   }
 
+  get roundingFormat() {
+    return this._marketState.roundingFormat
+  }
+
   /**
    * Refresh all data for an AverMarket quickly
    *

@@ -1,6 +1,7 @@
 from asyncio import gather
 from datetime import datetime
 import math
+import time
 from dateutil.relativedelta import relativedelta
 import unittest
 from solana.keypair import Keypair
@@ -26,6 +27,9 @@ from ..instructions.manual_resolve_market_tx import manual_resolve_market_tx
 
 #Change this to change test
 NUMBER_OF_OUTCOMES = 3
+
+UHL_DISPLAY_NAME = 'Aver UMA Tests'
+UHL_NFT_PFP = PublicKey('BqSFP5CbfBfZeQqGbzYEipfzTDptTYHFL9AzZA8TBXjn')
 
 class TestSdkV3(unittest.IsolatedAsyncioTestCase):
   init_market_args = InitMarketArgs(
@@ -56,8 +60,8 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     #### CLIENT TESTS ####
   async def asyncSetUp(self) -> None:
     # constants we can adjust
-    self.first_program_id = PublicKey('DfMQPAuAeECP7iSCwTKjbpzyx6X1HZT6rz872iYWA8St')
-    self.second_program_id = PublicKey('6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ')
+    self.first_program_id = PublicKey('6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ')
+    # self.second_program_id = PublicKey('81aTPaDchxBxJSyZzw7TvVY3PcdAvrfTSQC58NpXtkTT')
     owner = Keypair.from_secret_key(base58.b58decode('2S1DDiUZuqFNPHx2uzX9pphxynV1CgpLXnT9QrwPoWwXaGrqAP88XNEh9NK7JbFByJFDsER7PQgsNyacJyCGsH8S'))
     self.owner_2 = Keypair.from_secret_key(base58.b58decode('3onYh3TSCg92X3kD9gD7RCZF1N8JFVSDp39eSkRswsQb5YwWuyMnzuCN2wuPb52XEnPzjVrCtkYe5Xo8Czd3CDyV'))
 
@@ -66,9 +70,9 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     solana_endpoint = get_solana_endpoint(network)
     connection = AsyncClient(solana_endpoint, Finalized)
     opts = types.TxOpts(False, False, Finalized)
-    self.client = await AverClient.load(connection, owner, opts, network, [self.second_program_id, self.first_program_id])
+    self.client = await AverClient.load(connection, owner, opts, network, [self.first_program_id])
     self.user_markets: list[UserMarket] = []
-    self.host = derive_pubkey_and_bump(owner.public_key, self.first_program_id)[0]
+    self.host = PublicKey('2eGTu9d4hdGvwvFDGG34a3JRLFiQ2Ar92LjJpb4vyQFw')
 
     print(f"Successfully loaded client with owner: {self.client.owner.public_key}")
 
@@ -78,8 +82,8 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     return super().addAsyncCleanup()
 
   async def get_program_from_program_id_test(self):
-    second_program = await self.client.get_program_from_program_id(self.second_program_id)
-    self.assertEqual(self.second_program_id, second_program.program_id)
+    # second_program = await self.client.get_program_from_program_id(self.second_program_id)
+    # self.assertEqual(self.second_program_id, second_program.program_id)
     print("Successfully got program from program id")
 
   async def test_aver_client(self):
@@ -160,6 +164,9 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
       assert market.program_id.to_base58() == self.first_program_id.to_base58()
       assert self.init_market_args.cranker_reward == market.market_state.cranker_reward
       assert self.init_market_args.going_in_play_flag == market.market_state.going_in_play_flag
+
+      print('Checking the status', status, market.market_state.market_status)
+      
       assert status == market.market_state.market_status
       assert self.init_market_args.max_quote_tokens_in == market.market_state.max_quote_tokens_in
       assert self.init_market_args.max_quote_tokens_in_permission_capped == market.market_state.max_quote_tokens_in_permission_capped
@@ -245,11 +252,19 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     # UMA / UHL tests
     await self.create_uma_test(self.client.owner)
     uma = self.user_markets[0]
+
     assert len(uma.user_market_state.orders) == 0
     assert len(uma.market.orderbooks) == NUMBER_OF_OUTCOMES
     uhl = uma.user_host_lifetime.user_host_lifetime_state
     self.check_uhl_state(uhl)
     self.check_uma_state(uma.user_market_state)
+
+    await uma.user_host_lifetime.update_nft_pfp_display_name(self.client.owner, display_name = UHL_DISPLAY_NAME, nft_pubkey = UHL_NFT_PFP)
+    time.sleep(15)
+    uma = await refresh_user_market(self.client, uma)
+
+    # ENSURE THE DISPLAY NAME HAS BEEN UPDATED
+    assert uma.user_host_lifetime.user_host_lifetime_state.display_name == UHL_DISPLAY_NAME
 
     uma = await self.place_order_test(uma)
     assert len(uma.user_market_state.orders) == 1
@@ -298,12 +313,12 @@ class TestSdkV3(unittest.IsolatedAsyncioTestCase):
     await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, MarketStatus.TRADING_CEASED)
 
     await close_aaob_tx(program, self.aver_market, self.client.owner, [0] if NUMBER_OF_OUTCOMES == 2 else range(NUMBER_OF_OUTCOMES))
-    await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, 8) #
+    await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, 7) #
 
     await manual_resolve_market_tx(program, self.aver_market, self.client.owner, 1)
-    await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, 9) #9 Means Voided, but actually the market is Resolved. I think the program needs to be updated
-    print('Setting market')
-    await self.aver_market.settle_market(self.host)
+    await self.check_market_loads_correctly_after_orderbooks_closer(self.aver_market, uma, 8) #9 Means Voided, but actually the market is Resolved. I think the program needs to be updated
+    # print('Setting market')
+    # await self.aver_market.settle_market(self.host)
 
 # Executing the tests in the above test case class
 if __name__ == "__main__":

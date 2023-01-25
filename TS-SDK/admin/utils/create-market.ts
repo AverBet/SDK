@@ -9,6 +9,7 @@ import { AverClient } from "../../public/src/aver-client"
 import { BN, Program } from "@project-serum/anchor"
 import { signAndSendTransactionInstructions } from "../../public/src/utils"
 import { Orderbook } from "../../public/src/orderbook"
+import { confirmTx } from './transactions'
 
 export async function createMarket(
   numberOfOutcomes: number,
@@ -20,15 +21,31 @@ export async function createMarket(
   console.log("Begin market creation")
   const market = new Keypair()
   const marketAuthority = owner
+  console.log('The market authority is', marketAuthority.publicKey)
 
+  console.log('MARKET STORE')
   const [marketStorePubkey, marketStoreBump] =
     await Market.deriveMarketStorePubkeyAndBump(market.publicKey, programId)
   const marketStore = marketStorePubkey
 
-  const [vaultAuthority, vaultBump] = await PublicKey.findProgramAddress(
+  console.log('MARKET STORE', marketStorePubkey)
+
+  const [vaultAuthority, vaultBump] = PublicKey.findProgramAddressSync(
     [market.publicKey.toBuffer()],
     programId
   )
+  console.log('VAULT AUTH', vaultAuthority)
+
+  try {
+    await client.getOrCreateTokenAta(
+      owner,
+      client.quoteTokenMint,
+      vaultAuthority
+    )
+  } catch (e) {
+    console.error('ERROR creating the ATA', e)
+  }
+
   const vaultQuoteAccount = (
     await client.getOrCreateTokenAta(
       owner,
@@ -36,6 +53,8 @@ export async function createMarket(
       vaultAuthority
     )
   ).address
+
+  console.log('VAULT QUOTE', vaultQuoteAccount)
 
   args.numberOfOutcomes = numberOfOutcomes
   args.vaultBump = vaultBump
@@ -55,8 +74,11 @@ export async function createMarket(
   }
 
   const program = await client.getProgramFromProgramId(programId)
-
+  console.log('INIT MARKET IX')
   const initMarketIx = makeInitMarketInstruction(args, accs, program)
+  console.log('INIT MARKET IX', initMarketIx)
+
+  await new Promise(done => setTimeout(() => done(undefined), 15000)); 
 
   const sig = await signAndSendTransactionInstructions(
     client,
@@ -65,7 +87,10 @@ export async function createMarket(
     [initMarketIx]
   )
 
-  const confirmedSig = await client.connection.confirmTransaction(sig)
+  console.log('The market has been initalised -> ', sig)
+
+  await confirmTx(sig, client.connection, 15000)
+
   console.log("Init market confirmed")
   console.log("Begin supplement init market")
 
@@ -85,12 +110,16 @@ export async function createMarket(
       outcomeId: i,
       outcomeNames: outcomeName,
     } as SupplementInitMarketArgs
+
     const accs = {
       market: market.publicKey,
       marketAuthority: marketAuthority.publicKey,
       marketStore: marketStore,
       payer: owner.publicKey,
     }
+
+    console.log('Got the ACCS', accs)
+
     const initSupplementMarketIx = await makeSupplementInitMarketInstruction(
       args,
       accs,
@@ -102,21 +131,19 @@ export async function createMarket(
 
   let aobsToInit = supplementIxs
 
-  do {
-    const sigs = await Promise.all(
-      aobsToInit.map((ix) =>
-        signAndSendTransactionInstructions(client, [marketAuthority], owner, [
-          ix,
-        ])
-      )
+ 
+  const sigs = await Promise.all(
+    aobsToInit.map((ix) =>
+      signAndSendTransactionInstructions(client, [marketAuthority], owner, [
+        ix,
+      ])
     )
+  )
 
-    const aobSigs = await Promise.all(
-      sigs.map((sig) => client.connection.confirmTransaction(sig))
-    )
+  await Promise.all(
+    sigs.map((sig) => confirmTx(sig, client.connection, 5000))
+  )
 
-    aobsToInit = aobsToInit.filter((_aob, i) => !!aobSigs[i].value.err)
-  } while (aobsToInit.length > 0)
   console.log("Supplement init market confirmed")
   return market
 }
