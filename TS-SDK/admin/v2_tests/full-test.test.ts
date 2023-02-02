@@ -20,6 +20,7 @@ import { confirmTx } from "../utils/transactions"
 import { getAverHostAccount } from "aver-ts"
 import { derivePubkeyAndBump, createHostAccount } from '../../admin/utils/create-host'
 import { closeOrdersOom } from '../../admin/utils/close-orders-oom'
+import { updateMarketAuthority } from '../../admin/utils/update-market-authority'
 
 jest.setTimeout(1000000)
 
@@ -72,7 +73,13 @@ describe("run all tests", () => {
   // Account used to create the market
   const market_auth = Keypair.fromSecretKey(
     base58_to_binary(
-      "5CtV5tUMmbMxsEoobfYYB9tXB9PMpoTvH2SmmqzeCUDXqQucNndVwBjYT7NVCjuvFhcEEYPnkEEtFqxedwoss1Gy"
+      ""
+    )
+  )
+
+  const market_auth_2 = Keypair.fromSecretKey(
+    base58_to_binary(
+      ""
     )
   )
 
@@ -491,6 +498,23 @@ describe("run all tests", () => {
     console.log('Cancel orders OOM', sig, userMarket.orders.length)
     
     expect(userMarket.orders.length).toEqual(0)
+  })
+
+  test("Update the market authority", async () => {
+    if (!userMarket || !ownerClient) {
+      console.error('Issue with the UMA', userMarket, ownerClient)
+      return 
+    }
+
+    expect(market.marketAuthority.toString()).toEqual(market_auth.publicKey.toString())
+    const sig = await updateMarketAuthority(ownerClient, market_auth, market_auth_2, userMarket.market.pubkey, programId)
+    
+    confirmTx(sig, ownerClient.connection, 50000)
+    
+    market = (await Market.load(ownerClient, marketPubkey)) as Market
+    console.log('Updated the market authority', market)
+
+    expect(market.marketAuthority.toString()).toEqual(market_auth_2.publicKey.toString())
   })
 
   async function placeOrder(uma: UserMarket, umaOwner: Keypair, bids: boolean = true) {
