@@ -10,7 +10,7 @@ export const AVER_TOKEN = new PublicKey(
   "AVERsCxn9wr9YZ4WVavPbjm13hrLTPAkdnu1QqK9ZL1y"
 )
 export const AVER_MARKET_AUTHORITY = new PublicKey(
-  "EEg375Q8wEsPTyaQ4jG4hmNsMojmMHs6gB58iVWUXSwF"
+  "6vV5GT5xZdNEsc4vLqPvVa1gVsHytz8gZGTprdSSYFva"
 )
 export const AVER_COMMUNITY_REWARDS_NFT = new PublicKey(
   "AVERojzZ8649E1oLPvcgG2SSbVECxs8PcG5JkpuK2Dvq"
@@ -27,7 +27,7 @@ export const AVER_HOST_ACCOUNT_DEVNET = new PublicKey(
 
 // ATA for market authority with USDC
 export const AVER_MARKET_AUTHORITY_VAULT_DEVNET = new PublicKey(
-  "TxyectLDHmkzidS6RCat6uuZ385xaNbxg7R7vrfhTAD"
+  "GnWB9jd6Dgv3uZXqi9Cuf6yYjWiT44ciXLKQeJZdLFGP"
 )
 
 // PDA derivation of 'third-party-token-vault' + USDC + AVER_PROGRAM_ID
@@ -57,7 +57,7 @@ export const AVER_HOST_ACCOUNT_MAINNET = new PublicKey(
 )
 
 export const AVER_MARKET_AUTHORITY_VAULT_MAINNET = new PublicKey(
-  "8M33TSnT9qDnTS2nSiECtfn7uhxNYZ9oJRVumYqgo2NX"
+  "HzAN13rsvWrPdPu1XG7HTcmWfmjKDtUbLSwAw3bUtnUP"
 )
 
 export const AVER_THIRD_PARTY_REWARD_VAULT_MAINNET = new PublicKey(

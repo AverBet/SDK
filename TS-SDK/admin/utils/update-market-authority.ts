@@ -7,52 +7,46 @@ import { AverClient } from "../../public/src/aver-client"
 import { AVER_PROGRAM_IDS } from "../../public/src/ids"
 import { signAndSendTransactionInstructions } from "../../public/src/utils"
 
-export async function makeCloseOrdersOomInstruction(
+export async function makeUpdateMarketAuthorityInstruction(
     averClient: AverClient,
-    user: Keypair,
-    uma: PublicKey,
+    marketAuthority: Keypair,
+    newMarketAuthority: Keypair,
     market: PublicKey,
-    host: PublicKey,
     programId = AVER_PROGRAM_IDS[0]
 ) {
     const program = await averClient.getProgramFromProgramId(programId)
 
-    return program.instruction['cancelOrdersOom'](
+    return program.instruction['updateMarketAuthority'](
         {
             accounts: {
-                payer: user.publicKey,
-                user: user.publicKey,
-                userMarket: uma,
+                marketAuthority: marketAuthority.publicKey,
                 market: market,
-                host: host
-
+                newMarketAuthority: newMarketAuthority.publicKey
             }
         }
     )
 }
 
-export async function closeOrdersOom(
+export async function updateMarketAuthority(
     averClient: AverClient,
-    user: Keypair,
-    uma: PublicKey,
+    marketAuthority: Keypair,
+    newMarketAuthority: Keypair,
     market: PublicKey,
-    host: PublicKey,
     programId = AVER_PROGRAM_IDS[0],
     sendOptions?: SendOptions
 ) {
-    const ix = await makeCloseOrdersOomInstruction(
+    const ix = await makeUpdateMarketAuthorityInstruction(
         averClient,
-        user,
-        uma,
+        marketAuthority,
+        newMarketAuthority,
         market,
-        host,
         programId
     )
     
     return await signAndSendTransactionInstructions(
         averClient,
-        [user],
-        user,
+        [marketAuthority, newMarketAuthority],
+        newMarketAuthority,
         [ix],
         sendOptions
     )

@@ -9,7 +9,7 @@ from solana.system_program import SYS_PROGRAM_ID
 from spl.token.instructions import get_associated_token_address
 from solana.keypair import Keypair
 from .enums import AccountTypes, Fill, MarketStatus
-from .constants import AVER_MARKET_AUTHORITY, AVER_PROGRAM_IDS
+from .constants import AVER_PROGRAM_IDS
 from .utils import get_version_of_account_type_in_program, load_multiple_bytes_data, parse_with_version, sign_and_send_transaction_instructions
 from .data_classes import MarketState, MarketStoreState, OrderbookAccountsState
 from .orderbook import Orderbook
@@ -429,7 +429,7 @@ class AverMarket():
             third_party_vault_authority, quote_token)
 
         aver_quote_token_account = get_associated_token_address(
-            AVER_MARKET_AUTHORITY, quote_token
+            self.market_state.market_authority, quote_token
         )
 
         program = await self.aver_client.get_program_from_program_id(self.program_id)

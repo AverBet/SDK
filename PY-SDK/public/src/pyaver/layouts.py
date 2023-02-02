@@ -61,8 +61,8 @@ UNINTIALIZED_LAYOUT = cStruct(
 )
 
 INNER_NODE_LAYOUT = cStruct(
-    "prefix_len" / Int64ul,         # 8
     "key" / KEY_LAYOUT,                # 16
+    "prefix_len" / Int64ul,         # 8
     "children" / Int32ul[2],           # 8
 )
 

@@ -1423,6 +1423,27 @@
           }
         }
       ]
+    },
+    {
+      "name": "updateMarketAuthority",
+      "accounts": [
+        {
+          "name": "marketAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "newMarketAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "market",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [

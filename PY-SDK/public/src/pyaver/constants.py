@@ -7,7 +7,7 @@ AVER_PROGRAM_IDS = [
   PublicKey('6q5ZGhEj6kkmEjuyCXuH4x8493bpi9fNzvy9L8hX83HQ'),
 ]
 AVER_TOKEN = PublicKey('AVERsCxn9wr9YZ4WVavPbjm13hrLTPAkdnu1QqK9ZL1y')
-AVER_MARKET_AUTHORITY = PublicKey('EEg375Q8wEsPTyaQ4jG4hmNsMojmMHs6gB58iVWUXSwF')
+AVER_MARKET_AUTHORITY = PublicKey('6vV5GT5xZdNEsc4vLqPvVa1gVsHytz8gZGTprdSSYFva')
 AVER_HOST_ACCOUNT = PublicKey('5xhmqK1Dh48TiqvHxoZi6WWWKL6THtsUjh3GoiVEbbR8')
 AVER_COMMUNITY_REWARDS_NFT = PublicKey(
   'AVERojzZ8649E1oLPvcgG2SSbVECxs8PcG5JkpuK2Dvq'
@@ -19,7 +19,7 @@ USDC_DEVNET = PublicKey('BWvbxUTAxevm1NG8RHe1LhKmca9nz5ym2xqafTxr6ybj')
 
 # ATA for market authority with USDC
 AVER_MARKET_AUTHORITY_VAULT_DEVNET = PublicKey(
-  'TxyectLDHmkzidS6RCat6uuZ385xaNbxg7R7vrfhTAD'
+  'GnWB9jd6Dgv3uZXqi9Cuf6yYjWiT44ciXLKQeJZdLFGP'
 )
 
 # PDA derivation of 'third-party-token-vault' + USDC + AVER_PROGRAM_ID
@@ -46,7 +46,7 @@ SOLANA_ENDPOINT_MAINNET = 'https://api.mainnet-beta.solana.com/'
 USDC_MAINNET = PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') # (USDC)
 
 AVER_MARKET_AUTHORITY_VAULT_MAINNET = PublicKey(
-  '8M33TSnT9qDnTS2nSiECtfn7uhxNYZ9oJRVumYqgo2NX'
+  'HzAN13rsvWrPdPu1XG7HTcmWfmjKDtUbLSwAw3bUtnUP'
 )
 
 AVER_THIRD_PARTY_REWARD_VAULT_MAINNET = PublicKey(
