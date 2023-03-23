@@ -29,7 +29,6 @@ import { loadAllEventQueues, prepareUserAccountsList } from "./event-queue"
 import {
   AVER_PROGRAM_IDS,
   getQuoteToken,
-  MAX_ITERATIONS_FOR_CONSUME_EVENTS,
 } from "./ids"
 import { Orderbook } from "./orderbook"
 import {
@@ -1033,12 +1032,10 @@ export class Market {
     outcome_idx: number,
     user_accounts: PublicKey[],
     payer: Keypair,
-    max_iterations?: number,
+    max_iterations: number = 3,
     reward_target?: PublicKey
   ) {
     if (!reward_target) reward_target = this._averClient.owner
-    if (!max_iterations || max_iterations > MAX_ITERATIONS_FOR_CONSUME_EVENTS)
-      max_iterations = MAX_ITERATIONS_FOR_CONSUME_EVENTS
 
     const program = await this._averClient.getProgramFromProgramId(
       this._programId
@@ -1105,7 +1102,8 @@ export class Market {
   async crankMarket(
     payer: Keypair,
     outcome_idxs?: number[],
-    reward_target?: PublicKey
+    reward_target?: PublicKey,
+    max_iterations: number = 3
   ) {
     //Refresh market before cranking
     //If no outcome_idx are passed, all outcomes are cranked if they meet the criteria to be cranked.
@@ -1143,7 +1141,7 @@ export class Market {
       )
       if (loadedEventQueues[idx].header.count > 0) {
         let userAccounts = loadedEventQueues[idx]
-          .parseFill(MAX_ITERATIONS_FOR_CONSUME_EVENTS)
+          .parseFill(max_iterations)
           .map((e) => {
             if (e instanceof EventFill) {
               return new PublicKey(e.makerCallbackInfo.slice(0, 32))
@@ -1156,7 +1154,7 @@ export class Market {
 
         userAccounts = prepareUserAccountsList(userAccounts)
         const eventsToCrank = Math.min(
-          MAX_ITERATIONS_FOR_CONSUME_EVENTS,
+          max_iterations,
           ...loadedEventQueues.map((e) => e.header.count)
         )
 

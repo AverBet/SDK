@@ -14,7 +14,7 @@ from .user_host_lifetime import UserHostLifetime
 from .aver_client import AverClient
 from .utils import get_version_of_account_type_in_program, load_multiple_bytes_data, sign_and_send_transaction_instructions, load_multiple_account_states, parse_user_market_state
 from solana.rpc.types import TxOpts
-from solana.rpc.commitment import Finalized
+from solana.rpc.commitment import Confirmed
 from .data_classes import UserHostLifetimeState, UserMarketState, UserBalanceState
 from .constants import AVER_HOST_ACCOUNT, AVER_PROGRAM_IDS, CANCEL_ALL_ORDERS_INSTRUCTION_CHUNK_SIZE
 from .enums import AccountTypes, OrderType, SelfTradeBehavior, Side, SizeFormat
@@ -375,7 +375,7 @@ class UserMarket():
             send_options = TxOpts(
                 skip_confirmation=send_options.skip_confirmation,
                 skip_preflight=send_options.skip_confirmation,
-                preflight_commitment=Finalized,
+                preflight_commitment=Confirmed,
                 max_retries=send_options.max_retries)
 
         return await sign_and_send_transaction_instructions(
@@ -451,7 +451,7 @@ class UserMarket():
 
             await client.provider.connection.confirm_transaction(
                 sig['result'],
-                commitment=Finalized
+                commitment=Confirmed
             )
 
             return await UserMarket.load(

@@ -1,5 +1,4 @@
 from anchorpy import Context, Program
-from .constants import MAX_ITERATIONS_FOR_CONSUME_EVENTS
 from .utils import load_multiple_bytes_data, parse_with_version
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
@@ -89,7 +88,7 @@ async def consume_events(
         market,
         outcome_idx: int,
         user_accounts: list[PublicKey],
-        max_iterations: int = None,
+        max_iterations: int,
         reward_target: PublicKey = None,
         payer: Keypair = None,
         quote_token: PublicKey = None
@@ -114,8 +113,6 @@ async def consume_events(
             reward_target = market.aver_client.owner.public_key
         if payer == None:
             payer = market.aver_client.owner
-        if max_iterations > MAX_ITERATIONS_FOR_CONSUME_EVENTS or max_iterations == None:
-            max_iterations = MAX_ITERATIONS_FOR_CONSUME_EVENTS
         if quote_token == None:
             quote_token = market.aver_client.quote_token
         

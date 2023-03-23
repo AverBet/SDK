@@ -1,6 +1,6 @@
 from solana.rpc.async_api import AsyncClient
 from solana.transaction import AccountMeta
-from .constants import AVER_HOST_ACCOUNT, MAX_ITERATIONS_FOR_CONSUME_EVENTS, SYSVAR_RENT_PUBKEY, get_quote_token
+from .constants import AVER_HOST_ACCOUNT, SYSVAR_RENT_PUBKEY, get_quote_token
 from .event_queue import load_all_event_queues, prepare_user_accounts_list
 from .aver_client import AverClient
 from solana.publickey import PublicKey
@@ -583,6 +583,7 @@ class AverMarket():
             outcome_idxs: list[int] = None,
             reward_target: PublicKey = None,
             payer: Keypair = None,
+            max_iterations_for_consume_events: int = 3
         ):
         """
         Refresh market before cranking
@@ -625,11 +626,11 @@ class AverMarket():
                         user_accounts += [event.maker_user_market]
                     else:  # Out
                         user_accounts += [event.user_market]
-                    if j == MAX_ITERATIONS_FOR_CONSUME_EVENTS:
+                    if j == max_iterations_for_consume_events:
                         break
                 user_accounts = prepare_user_accounts_list(user_accounts)
                 events_to_crank = min(
-                    loaded_event_queues[idx]['header'].count, MAX_ITERATIONS_FOR_CONSUME_EVENTS)
+                    loaded_event_queues[idx]['header'].count, max_iterations_for_consume_events)
 
                 sig = await consume_events(
                     market=self,
@@ -637,7 +638,7 @@ class AverMarket():
                     max_iterations=events_to_crank,
                     user_accounts=user_accounts,
                     reward_target=reward_target,
-                    payer=payer,
+                    payer=payer
                 )
 
         return sig
