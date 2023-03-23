@@ -15,7 +15,7 @@ class build_py(build_py_orig):
 
 setup(
     name='pyaver',
-    version='0.0.09',
+    version='0.0.11',
     license='MIT',
     author="Aver Ramanujan",
     author_email='email@example.com',

@@ -74,8 +74,6 @@ export const AVER_LAUNCH_ZERO_FEES_MAINNET = new PublicKey(
   "4QwFUyLKtHZqbHvxZQqLGPz8eMjXBgedaWvuQTdKwKJx"
 )
 
-export const MAX_ITERATIONS_FOR_CONSUME_EVENTS = 5
-
 // helpers
 /**
  * Returns URL for solana endpoint based on solana network
