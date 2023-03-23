@@ -638,8 +638,7 @@ class AverMarket():
                     max_iterations=events_to_crank,
                     user_accounts=user_accounts,
                     reward_target=reward_target,
-                    payer=payer,
-                    max_iterations_for_consume_events=max_iterations_for_consume_events
+                    payer=payer
                 )
 
         return sig
