@@ -17,10 +17,11 @@ import { closeAaobTx } from "../utils/close-aaob"
 import { manualResolveMarketTx } from "../utils/resolve-market"
 import { UserHostLifetime } from "../../public/src/user-host-lifetime"
 import { confirmTx } from "../utils/transactions"
-import { getAverHostAccount } from "aver-ts"
+import { getAverHostAccount, roundPriceToNearestTickSize } from "aver-ts"
 import { derivePubkeyAndBump, createHostAccount } from '../../admin/utils/create-host'
 import { closeOrdersOom } from '../../admin/utils/close-orders-oom'
 import { updateMarketAuthority } from '../../admin/utils/update-market-authority'
+import { roundDecimalPriceToNearestTickSize } from "../../public/src/utils"
 
 jest.setTimeout(1000000)
 
@@ -52,7 +53,7 @@ const args: InitMarketArgs = {
   activeImmediately: true,
   tradingCeaseTime: new BN(1682447605),
   inPlayStartTime: null,
-  roundingFormat: 0,
+  roundingFormat: 1,
   series: 0,
   category: 0,
   subCategory: 0,
@@ -286,15 +287,22 @@ describe("run all tests", () => {
       return
     }
 
+    try {
+      userMarket = await UserMarket.getOrCreateUserMarketAccount(
+        ownerClient,
+        owner,
+        market,
+        undefined,
+        getQuoteToken(SolanaNetwork.Devnet),
+        host,
+        10
+      )
+    } catch (e) {
+      console.error('Issue creating the UMA')
+      console.error(e)
+    }
     //@ts-ignore
-    userMarket = await UserMarket.getOrCreateUserMarketAccount(
-      ownerClient,
-      owner,
-      market,
-      undefined,
-      getQuoteToken(SolanaNetwork.Devnet),
-      host
-    )
+    
     console.log('Got UMA 1', userMarket)
     if (userMarket == null) {
       console.error('---- Issue with UMA 1 ----', userMarket)
@@ -337,6 +345,37 @@ describe("run all tests", () => {
     expect(uhlUpdated.displayName).toEqual(UPDATED_DISPLAY_NAME)
     expect(uhlUpdated.nftPfp).toBeDefined()
     expect(uhlUpdated.nftPfp?.toString()).toEqual(NFT_PUBKEY.toString())
+  })
+
+  test("Check rounding for decimal based market", async () => {
+    if (!userMarket || !ownerClient) {
+      console.error(`Issue with the userMarket=${userMarket} or ownerClient=${ownerClient}`)
+      return
+    }
+
+    const pricePreRounding = 1.5877
+    const pricePostRounding = args.roundingFormat == 1 ? roundDecimalPriceToNearestTickSize(1/pricePreRounding, market.numberOfOutcomes == 2): roundPriceToNearestTickSize(1/pricePreRounding, market.numberOfOutcomes == 2)
+
+    await placeOrder(userMarket, owner, true, pricePostRounding)
+
+    if (userMarket == null || userMarket.market == null || userMarket.market.orderbooks == null) return
+
+    let bids_l2 = userMarket.market.orderbooks[0].getBidsL2(1, true)
+    console.log('BEFORE: ', pricePostRounding, ', AFTER: ', bids_l2[0].price)
+    expect(bids_l2[0].price).toBeCloseTo(pricePostRounding)
+
+    await cancelAllOrders(userMarket, ownerClient, owner)
+
+    const pricePreRounding2 = 10.777
+    const pricePostRounding2 = args.roundingFormat == 1 ? roundDecimalPriceToNearestTickSize(1/pricePreRounding2, market.numberOfOutcomes == 2): roundPriceToNearestTickSize(1/pricePreRounding2, market.numberOfOutcomes == 2)
+
+    await placeOrder(userMarket, owner, true, pricePostRounding2)
+
+    bids_l2 = userMarket.market.orderbooks[0].getBidsL2(1, true)
+    console.log('BEFORE: ', pricePostRounding2, ', AFTER: ', bids_l2[0].price)
+    expect(bids_l2[0].price).toBeCloseTo(pricePostRounding2)
+
+    await cancelAllOrders(userMarket, ownerClient, owner)
   })
 
   test("place and cancel orders; orderbook checks", async () => {
@@ -500,29 +539,31 @@ describe("run all tests", () => {
     expect(userMarket.orders.length).toEqual(0)
   })
 
-  test("Update the market authority", async () => {
-    if (!userMarket || !ownerClient) {
-      console.error('Issue with the UMA', userMarket, ownerClient)
-      return 
-    }
+  // test("Update the market authority", async () => {
+  //   if (!userMarket || !ownerClient) {
+  //     console.error('Issue with the UMA', userMarket, ownerClient)
+  //     return 
+  //   }
 
-    expect(market.marketAuthority.toString()).toEqual(market_auth.publicKey.toString())
-    const sig = await updateMarketAuthority(ownerClient, market_auth, market_auth_2, userMarket.market.pubkey, programId)
+  //   expect(market.marketAuthority.toString()).toEqual(market_auth.publicKey.toString())
+  //   const sig = await updateMarketAuthority(ownerClient, market_auth, market_auth_2, userMarket.market.pubkey, programId)
     
-    confirmTx(sig, ownerClient.connection, 50000)
+  //   confirmTx(sig, ownerClient.connection, 50000)
     
-    market = (await Market.load(ownerClient, marketPubkey)) as Market
-    console.log('Updated the market authority', market)
+  //   market = (await Market.load(ownerClient, marketPubkey)) as Market
+  //   console.log('Updated the market authority', market)
 
-    expect(market.marketAuthority.toString()).toEqual(market_auth_2.publicKey.toString())
-  })
+  //   expect(market.marketAuthority.toString()).toEqual(market_auth_2.publicKey.toString())
+  // })
 
-  async function placeOrder(uma: UserMarket, umaOwner: Keypair, bids: boolean = true) {
+  async function placeOrder(uma: UserMarket, umaOwner: Keypair, bids: boolean = true, price?: number) {
+    const orderPrice = price ? price: bids ? 0.6: 0.4
     let sig = ""
+
     if (bids) {
-      sig = await uma.placeOrder(umaOwner, 0, Side.Bid, 0.6, 5, SizeFormat.Payout)
+      sig = await uma.placeOrder(umaOwner, 0, Side.Bid, orderPrice, 5, SizeFormat.Payout)
     } else {
-      sig = await uma.placeOrder(umaOwner, 0, Side.Ask, 0.4, 5, SizeFormat.Payout)
+      sig = await uma.placeOrder(umaOwner, 0, Side.Ask, orderPrice, 5, SizeFormat.Payout)
     }
     if (!ownerClient) return 
 

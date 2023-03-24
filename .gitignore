@@ -1,5 +1,7 @@
 TS-SDK/admin/node_modules
+TS-SDK/admin/package-lock.json
 TS-SDK/public/node_modules
+TS-SDK/public/package-lock.json
 TS-SDK/public/dist
 *ignore.py
 *.ignore.ts
@@ -10,3 +12,4 @@ __pycache__/
 *.pyc
 *.DS_Store
 .idea/
+node_modules

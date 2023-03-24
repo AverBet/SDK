@@ -10,6 +10,7 @@ from typing import List, Tuple, Union, Container
 from .enums import AccountTypes, Fill, Out, Side
 from solana.rpc.async_api import AsyncClient
 from .layouts import EVENT_QUEUE_HEADER_LAYOUT, EVENT_QUEUE_HEADER_LEN, REGISTER_SIZE, EVENT_LAYOUT
+from .compute_units import set_compute_unit_limit_ixn, set_compute_unit_price_ixn
 
 
 async def load_all_event_queues(conn: AsyncClient, event_queues: list[PublicKey]):
@@ -140,6 +141,10 @@ async def consume_events(
                         'spl_token_program': TOKEN_PROGRAM_ID
                     },
                     remaining_accounts=remaining_accounts,
+                    pre_instructions = [
+                        set_compute_unit_limit_ixn(units=1000000),
+                        set_compute_unit_price_ixn(micro_lamports=1)
+                    ],
                 ),
             )
 

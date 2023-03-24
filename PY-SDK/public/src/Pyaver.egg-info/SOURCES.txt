@@ -11,6 +11,7 @@ src/Pyaver.egg-info/top_level.txt
 src/pyaver/__init__.py
 src/pyaver/aver_client.py
 src/pyaver/checks.py
+src/pyaver/compute_units.py
 src/pyaver/constants.py
 src/pyaver/data_classes.py
 src/pyaver/enums.py
