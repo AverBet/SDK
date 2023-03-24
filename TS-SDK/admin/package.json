@@ -8,13 +8,14 @@
     "test-void": "jest void-market-flow.int.test.ts -i --config jestconfig.json",
     "test-close": "jest close-market-flow.int.test.ts -i --config jestconfig.json",
     "test-fees": "jest collect-fees-flow.int.test.ts -i --config jestconfig.json",
-    "quick-test": "jest quick-test.test.ts -i --config jestconfig.json"
+    "quick-test": "jest quick-test.test.ts -i --config jestconfig.json",
+    "test-full": "jest full-test.test.ts -i --config jestconfig.json"
   },
   "author": "Nash",
   "license": "ISC",
   "dependencies": {
     "@solana/web3.js": "^1.53.0",
-    "aver-ts": "file:../public",
+    "aver-ts": "^0.0.6",
     "base58-js": "^1.0.4"
   },
   "devDependencies": {
