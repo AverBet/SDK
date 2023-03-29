@@ -18,6 +18,8 @@ from anchorpy.error import ProgramError
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
 from solana.transaction import TransactionInstruction, Transaction
+import enum
+from math import ceil, floor
 
 def parse_bytes_data(res: RPCResponse) -> bytes:
     """
@@ -191,7 +193,16 @@ def calculate_tick_size_for_price(limit_price: float):
         raise Exception('Limit price too high')
     return limit_price
 
-def round_price_to_nearest_tick_size(limit_price: float, is_binary: bool = False):
+class RoundingDirection(enum.Enum):
+    UP = 'up',
+    DOWN = 'down',
+    ROUND = 'round'
+
+def approximate_price(tickSize: float, limitPrice: float, direction: RoundingDirection):
+  rounded = round(limitPrice / tickSize) if direction is RoundingDirection.ROUND else ceil(limitPrice / tickSize) if direction is RoundingDirection.UP else floor(limitPrice / tickSize)
+  return rounded * tickSize
+
+def round_price_to_nearest_tick_size(limit_price: float, is_binary: bool = False, direction: RoundingDirection = RoundingDirection.ROUND):
     """
     Rounds price to the nearest tick size available
 
@@ -204,7 +215,7 @@ def round_price_to_nearest_tick_size(limit_price: float, is_binary: bool = False
     factor = 10 ** 6
     limit_price_to_6dp = limit_price * factor
     tick_size  = calculate_tick_size_for_price(factor - limit_price_to_6dp if is_binary else limit_price_to_6dp)
-    rounded_limit_price_to_6dp = round(limit_price_to_6dp/tick_size) * tick_size
+    rounded_limit_price_to_6dp = approximate_price(tickSize=tick_size, limitPrice=limit_price_to_6dp, direction=direction)
     rounded_limit_price = rounded_limit_price_to_6dp / factor
 
     return rounded_limit_price
@@ -249,10 +260,7 @@ def calculate_tick_size_for_decimal_price(limit_price_decimal: float):
         raise Exception('Limit price too high')
     return limit_price_decimal
 
-def round_price_decimal(tickSize: float, limitPrice: float):
-  return round(limitPrice / tickSize) * tickSize
-
-def round_price_to_nearest_decimal_tick_size(limit_price: float, is_binary: bool = False):
+def round_price_to_nearest_decimal_tick_size(limit_price: float, is_binary: bool = False, direction: RoundingDirection = RoundingDirection.ROUND):
     """
     Rounds price to the nearest tick size available
 
@@ -276,18 +284,20 @@ def round_price_to_nearest_decimal_tick_size(limit_price: float, is_binary: bool
         limit_price_decimal_rounded = 0
 
         if is_binary and limit_price_decimal > 2.0: 
-            limit_price_decimal_rounded = round_price_decimal(
+            limit_price_decimal_rounded = approximate_price(
                 calculate_tick_size_for_decimal_price(
                     1.0 / ((one_in_market_decimals - limit_price) / one_in_market_decimals),
                 ),
                 limit_price_decimal,
+                direction
             )
         else:
             tick_size = calculate_tick_size_for_decimal_price(limit_price_decimal=limit_price_decimal)
 
-            limit_price_decimal_rounded = round_price_decimal(
+            limit_price_decimal_rounded = approximate_price(
                 tickSize=tick_size,
                 limitPrice=limit_price_decimal,
+                direction=direction
             )
 
         return 1.0 / limit_price_decimal_rounded
