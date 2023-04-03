@@ -271,7 +271,8 @@ def round_price_to_nearest_decimal_tick_size(limit_price: float, is_binary: bool
         float: Rounded limit price
     """
     limit_price_decimal = 1 / limit_price
-    one_in_market_decimals = pow(10, 6)
+    one_in_market_decimals = 10 ** 6
+    limit_price_6dp = one_in_market_decimals * limit_price
 
     min_value_for_market = 1.01
     max_value_for_market = 1000
@@ -283,11 +284,14 @@ def round_price_to_nearest_decimal_tick_size(limit_price: float, is_binary: bool
     else:
         limit_price_decimal_rounded = 0
 
-        if is_binary and limit_price_decimal > 2.0: 
+        if is_binary and limit_price_decimal > 2.0:
+            tick_size = calculate_tick_size_for_decimal_price(
+                    1.0 / ((one_in_market_decimals - limit_price_6dp)
+                        / one_in_market_decimals),
+                )
+
             limit_price_decimal_rounded = approximate_price(
-                calculate_tick_size_for_decimal_price(
-                    1.0 / ((one_in_market_decimals - limit_price) / one_in_market_decimals),
-                ),
+                tick_size,
                 limit_price_decimal,
                 direction
             )

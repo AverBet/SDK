@@ -71,5 +71,15 @@ class TestRoundingMethods(unittest.TestCase):
         rounded_price = round_price_to_nearest_decimal_tick_size(1 / price)
         self.assertEqual(1 / rounded_price, rounded)
 
+        price = 2.5111
+        rounded = 2.51
+        rounded_price = round_price_to_nearest_decimal_tick_size(1 / price, True)
+        self.assertAlmostEqual(1 / rounded_price, rounded)
+
+        price = 10.333
+        rounded = 10.33
+        rounded_price = round_price_to_nearest_decimal_tick_size(1 / price, True)
+        self.assertAlmostEqual(1 / rounded_price, rounded)
+
 if __name__ == '__main__':
     unittest.main()
