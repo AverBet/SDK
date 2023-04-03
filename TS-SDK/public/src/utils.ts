@@ -218,6 +218,7 @@ export const roundDecimalPriceToNearestTickSize = (
 ) => {
   const limitPriceDecimal = 1 / limitPrice
   const oneInMarketDecimals = Math.pow(10, 6)
+  const limitPrice6dp = oneInMarketDecimals * limitPriceDecimal
 
   let minValueForMarket = 1.01
   let maxValueForMarket = 1000
@@ -232,7 +233,7 @@ export const roundDecimalPriceToNearestTickSize = (
     if (isBinary && limitPriceDecimal > 2.0) {
       limitPriceDecimalRounded = roundPriceDecimal(
         calculateTickSizeForDecimalPrice(
-          1.0 / ((oneInMarketDecimals - limitPrice)
+          1.0 / ((oneInMarketDecimals - limitPrice6dp)
             / oneInMarketDecimals),
         ),
         limitPriceDecimal,
