@@ -1,6 +1,6 @@
 from solana.publickey import PublicKey
-from .enums import Side
-from .utils import load_bytes_data, load_multiple_bytes_data
+from .enums import Side, PriceRoundingFormat
+from .utils import RoundingDirection, load_bytes_data, load_multiple_bytes_data, round_price_to_nearest_probability_tick_size, round_price_to_nearest_decimal_tick_size
 from .data_classes import Price, SlabOrder, UmaOrder
 from .slab import Slab
 from solana.rpc.async_api import AsyncClient
@@ -209,21 +209,99 @@ class Orderbook:
         """
 
         l2_depth = Orderbook.__get_L2(slab, depth, decimals, increasing)
-        if(ui_amount):
-            l2_depth = [Orderbook.convert_price(p, decimals) for p in l2_depth]
-
+        
         if(is_inverted):
             l2_depth = [Orderbook.invert_price(p) for p in l2_depth]
 
+        if(ui_amount):
+            l2_depth = [Orderbook.convert_price(p, decimals) for p in l2_depth]
+
         return l2_depth
 
+    @staticmethod
+    def get_L2_for_slab_with_bucketing(
+        slab: Slab, 
+        depth: int, 
+        increasing : bool, 
+        decimals: int, 
+        price_schema: PriceRoundingFormat,
+        ui_amount=False, 
+        is_inverted=False
+    ):
+        """
+        Get Level 2 market information for a particular slab
+
+        This contains information on orders on the slab aggregated by price tick.
+
+        Args:
+            slab (Slab): Slab object
+            depth (int): Number of orders to return
+            increasing (bool): Sort orders increasing
+            decimals (int): Decimal precision for orderbook
+            ui_amount (bool, optional): Converts prices based on decimal precision if true. Defaults to False.
+            is_inverted (bool, optional): Whether the bids and asks have been switched with each other. Defaults to False.
+
+        Returns:
+            list[Price]: List of Price objects (size and price) corresponding to orders on the slab
+        """
+
+        l2_depth = Orderbook.__get_L2(slab, depth, decimals, increasing)
+        
+        if(is_inverted):
+            l2_depth = [Orderbook.invert_price(p) for p in l2_depth]
+
+        if price_schema == PriceRoundingFormat.DECIMAL:
+            # For DECIMAL, we want bids bucketed to the nearest UPPER (decimal) price
+            # bids => increasing=True and inverted==False, or increasing==False and inverted==True
+            if (increasing == True and is_inverted==False) or (increasing == False and is_inverted == True):
+                rounding_direction = RoundingDirection.UP
+            # .. and we want asks bucketed to the nearest LOWER (decimal) price
+            # asks => increasing=False and inverted==False, or increasing==True and inverted==True
+            else:
+                rounding_direction = RoundingDirection.DOWN
+        elif price_schema == PriceRoundingFormat.PROBABILITY:
+            # For PROBABILITY, we want bids bucketed to the nearest LOWER price
+            # bids => increasing=True and inverted==False, or increasing==False and inverted==True
+            if (increasing == True and is_inverted==False) or (increasing == False and is_inverted == True):
+                rounding_direction = RoundingDirection.DOWN
+            # .. and we want asks bucketed to the nearest UPPER price
+            # asks => increasing=False and inverted==False, or increasing==True and inverted==True
+            else:
+                rounding_direction = RoundingDirection.UP
+        else:
+            pass
+        
+        # Invert the rounding direction if the slab is_inverted
+        if is_inverted:
+            rounding_direction = RoundingDirection.UP if rounding_direction == RoundingDirection.DOWN else RoundingDirection.DOWN
+
+        # Bucket the prices to acceptable ticks
+        l2_depth = [
+            Orderbook.bucket_price(
+                p = p,
+                price_schema = price_schema,
+                direction = rounding_direction
+            )
+            for p in l2_depth
+        ]
+
+        # Remove any orders which returned None (because they were out of bounds)
+        l2_depth = [p for p in l2_depth if p is not None]
+
+        if(ui_amount):
+            l2_depth = [Orderbook.convert_price(p, decimals) for p in l2_depth]
+
+        return l2_depth
+        
     @staticmethod
     def __get_L2(slab: Slab, depth: int, decimals: int, increasing: bool):
         """Get the Level 2 market information."""
         # The first element of the inner list is price, the second is quantity.
         levels: list[list[int]] = []
         for node in slab.items(descending=not increasing):
+
             price = Orderbook.__get_price_from_slab(node, decimals)
+            
             if len(levels) > 0 and levels[len(levels) - 1][0] == price:
                 levels[len(levels) - 1][1] += node.base_quantity
             elif len(levels) == depth:
@@ -237,10 +315,11 @@ class Orderbook:
             )
             for price_lots, size_lots in levels
         ]
-    
+
+
     @staticmethod
     def __get_L3(slab: Slab, decimals: int, increasing: bool, is_inverted: bool):
-        """Get the Level 1 market information."""
+        """Get the Level 3 market information."""
         # The first element of the inner list is price, the second is quantity.
         orders: list[SlabOrder] = []
         for node in slab.items(descending = not increasing):
@@ -259,6 +338,35 @@ class Orderbook:
     @staticmethod
     def __get_price_from_slab(node, decimals: int):
         return float(round( ((node.key >> 64)/(2**32)) * 10**decimals))
+
+    @staticmethod
+    def bucket_price(
+        p: Price,
+        price_schema: PriceRoundingFormat,
+        direction: RoundingDirection
+    ):
+        """
+        Buckets prices 
+        """
+        if price_schema == PriceRoundingFormat.DECIMAL:
+            # For Decimal Schema, if the price is > 1000.0 and we're rounding up (bids) then we don't want to show these orders
+            # f the price is <1.01 and we're roudning down (asks), then we don't want to show these orders either
+            if (direction == RoundingDirection.UP and p < (1/1000)) or (direction == RoundingDirection.DOWN and p > (1/1.01)): 
+                return None # Out of bounds:
+            else:
+                bucketed_price = round_price_to_nearest_decimal_tick_size(p.price, direction)
+        else:
+            # For Probability Schema, if the price is < 0.001 and we're rounding down (bids) then we don't want to show these orders
+            # f the price is > 0.99 and we're roudning up (asks), then we don't want to show these orders either
+            if (direction == RoundingDirection.DOWN and p < 0.001) or (direction == RoundingDirection.UP and p > 0.99): 
+                return None # Out of bounds:
+            else:
+                bucketed_price = round_price_to_nearest_probability_tick_size(p.price, direction)
+
+        return Price(
+            price = bucketed_price, 
+            size = p.size
+        )
 
     @staticmethod
     def invert_price(p: Price):
@@ -280,7 +388,7 @@ class Orderbook:
         return Price(
             price=1-p.price, 
             size=p.size
-            )
+        )
 
     def derive_orderbook(market: PublicKey, outcome_id: int, program_id: PublicKey):
         """
