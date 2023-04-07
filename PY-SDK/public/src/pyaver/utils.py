@@ -252,9 +252,9 @@ def approximate_price(
     if direction is RoundingDirection.ROUND:
         rounded = round(limitPrice / tickSize)
     elif direction is RoundingDirection.UP:
-        ceil(limitPrice / tickSize) 
+        rounded = ceil(limitPrice / tickSize) 
     else: 
-        floor(limitPrice / tickSize)
+        rounded = floor(limitPrice / tickSize)
 
     return rounded * tickSize
 
