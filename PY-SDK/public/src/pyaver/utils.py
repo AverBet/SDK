@@ -274,7 +274,7 @@ def round_price_to_nearest_probability_tick_size(
     """
     if limit_price < 0.001:
         return 0.001
-    if limit_price > 0.99:
+    elif limit_price > 0.99:
         return 0.99
     else:
         factor = 10 ** 6

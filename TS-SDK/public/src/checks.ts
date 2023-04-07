@@ -10,7 +10,7 @@ import {
   UserMarketState,
 } from "./types"
 import { UserHostLifetime } from "./user-host-lifetime"
-import { roundDecimalPriceToNearestTickSize, roundPriceToNearestTickSize } from "./utils"
+import { roundDecimalPriceToNearestTickSize, roundPriceToNearestProbabilityTickSize } from "./utils"
 import * as fs from "fs"
 // import path from 'path'
 import { PublicKey } from "@solana/web3.js"
@@ -118,7 +118,7 @@ export function checkIsOrderValid(
   tokens_available_to_sell: number,
   tokens_available_to_buy: number
 ) {
-  limit_price = market.roundingFormat == RoundingFormat.Probability ? roundPriceToNearestTickSize(limit_price): roundDecimalPriceToNearestTickSize(limit_price)
+  limit_price = market.roundingFormat == RoundingFormat.Probability ? roundPriceToNearestProbabilityTickSize(limit_price): roundDecimalPriceToNearestTickSize(limit_price)
 
   const balance_required =
     size_format == SizeFormat.Payout ? size * limit_price : size
@@ -141,7 +141,7 @@ export function checkQuoteAndBaseSizeTooSmall(
 ) {
   market.marketStore
   const binary_second_outcome = market.numberOfOutcomes == 2 && outcome_id == 1
-  const limit_price_rounded = market.roundingFormat == RoundingFormat.Probability ? roundPriceToNearestTickSize(limit_price): roundDecimalPriceToNearestTickSize(limit_price)
+  const limit_price_rounded = market.roundingFormat == RoundingFormat.Probability ? roundPriceToNearestProbabilityTickSize(limit_price): roundDecimalPriceToNearestTickSize(limit_price)
 
   let max_base_qty
   let max_quote_qty
