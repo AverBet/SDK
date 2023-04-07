@@ -107,7 +107,7 @@ export const chunkAndFetchMultiple = async (
   return res
 }
 
-enum RoundingDirection {
+export enum RoundingDirection {
   UP = 'up',
   DOWN = 'down',
   ROUND = 'round'

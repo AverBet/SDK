@@ -2,8 +2,8 @@ import { Slab, Price, Side } from "@bonfida/aaob"
 import { BN } from "@project-serum/anchor"
 import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
 import { AVER_PROGRAM_IDS, CALLBACK_INFO_LEN } from "./ids"
-import { PriceAndSide, SlabOrder, UmaOrder } from "./types"
-import { chunkAndFetchMultiple, throwIfNull } from "./utils"
+import { PriceAndSide, RoundingFormat, SlabOrder, UmaOrder } from "./types"
+import { RoundingDirection, chunkAndFetchMultiple, roundPriceToNearestProbabilityTickSize, throwIfNull } from "./utils"
 
 /**
  * Orderbook class
@@ -100,6 +100,43 @@ export class Orderbook {
    */
   get slabBids(): Slab {
     return this._slabBids
+  }
+
+  static bucketPrice = (
+    p: Price,
+    priceSchema: RoundingFormat,
+    direction: RoundingDirection
+  ) => {
+    let bucketedPrice = p.price
+
+    if (priceSchema == RoundingFormat.Decimal) {
+      if ((direction == RoundingDirection.UP && p.price < (1 / 1000)) || (direction == RoundingDirection.DOWN && p.price > (1 / 1.01))) {
+        return null // OOB
+      }
+      else {
+        bucketedPrice = roundPriceToNearestProbabilityTickSize(p.price, direction)
+      }
+    }
+    else {
+      if ((direction == RoundingDirection.DOWN && p.price < 0.001) || (direction == RoundingDirection.UP && p.price > 0.99)) {
+        return null
+      }
+      else {
+        bucketedPrice = roundPriceToNearestProbabilityTickSize(p.price, direction)
+      }
+    }
+
+    if ((direction == RoundingDirection.DOWN && p.price < 0.001) || (direction == RoundingDirection.UP && p.price > 0.99)) {
+      return null // OOB
+    }
+    else {
+      bucketedPrice = roundPriceToNearestProbabilityTickSize(p.price, direction)
+    }
+
+    return {
+      price: bucketedPrice,
+      size: p.size
+    }
   }
 
   /**
@@ -254,15 +291,78 @@ export class Orderbook {
     uiAmount?: boolean,
     isInverted?: boolean
   ) {
-    const l2Depth = isInverted
-      ? slab
-          .getL2DepthJS(depth, increasing)
-          .map((p) => Orderbook.invertPrice(p))
-      : slab.getL2DepthJS(depth, increasing)
 
-    return uiAmount
-      ? l2Depth.map((p) => Orderbook.convertPrice(p, decimals))
-      : l2Depth
+    const l2Depth = slab.getL2DepthJS(depth, increasing)
+
+    if (isInverted) {
+      return l2Depth.map((p) => Orderbook.invertPrice(p, uiAmount))
+    }
+
+    if (uiAmount) {
+      return l2Depth.map((p) => Orderbook.convertPrice(p, decimals))
+    }
+
+    return l2Depth
+  }
+
+  static getL2ForSlabWithBucketing(
+    slab: Slab,
+    depth: number,
+    increasing: boolean,
+    decimals: number,
+    priceSchema: RoundingFormat,
+    uiAmount?: boolean,
+    isInverted?: boolean
+  ) {
+
+    let l2Depth = slab.getL2DepthJS(depth, increasing)
+
+    if (isInverted) {
+      l2Depth = l2Depth.map((p) => Orderbook.invertPrice(p, uiAmount))
+    }
+
+    let roundingDirection = RoundingDirection.ROUND
+
+    if (priceSchema == RoundingFormat.Decimal) {
+      if ((increasing && !isInverted) || (increasing && isInverted)) {
+        roundingDirection = RoundingDirection.UP
+      }
+      else {
+        roundingDirection = RoundingDirection.DOWN
+      }
+    }
+    else if (priceSchema == RoundingFormat.Probability) {
+      if ((increasing && !isInverted) || (!increasing && isInverted)) {
+        roundingDirection = RoundingDirection.DOWN
+      }
+      else {
+        roundingDirection = RoundingDirection.UP
+      }
+    } 
+    else {
+
+    }
+
+    if (isInverted) {
+      roundingDirection = roundingDirection == RoundingDirection.DOWN ? RoundingDirection.UP: RoundingDirection.DOWN
+    }
+
+    // BUCKET PRICES AND REMOVE ANY NULLs
+    const prices: Price[] = []
+    l2Depth = l2Depth.reduce((prev, curr, index, arr) => {
+      const bucketPrice = Orderbook.bucketPrice(curr, priceSchema, roundingDirection)
+      if (bucketPrice != null) {
+        arr.push(bucketPrice)
+      }
+
+      return arr
+    }, prices)
+
+    if (uiAmount) {
+      l2Depth = l2Depth.map((p) => Orderbook.convertPrice(p, decimals))
+    }
+
+    return l2Depth
   }
 
   /**
@@ -754,3 +854,4 @@ const weightedAverage = (nums, weights) => {
   )
   return sum / weightSum
 }
+
