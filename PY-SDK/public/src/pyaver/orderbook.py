@@ -348,20 +348,29 @@ class Orderbook:
         """
         Buckets prices 
         """
+        
+        # scale from atomic
+        factor = 2 ** 32
+        rounded_price = p.price / factor
+    
+        # Simple rounding to 8 DP for .7799999999...
+        EIGHT_DP = 10 ** 8
+        rounded_price = round(rounded_price * EIGHT_DP) / EIGHT_DP
+
         if price_schema == PriceRoundingFormat.DECIMAL:
             # For Decimal Schema, if the price is > 1000.0 and we're rounding up (bids) then we don't want to show these orders
             # f the price is <1.01 and we're roudning down (asks), then we don't want to show these orders either
-            if (direction == RoundingDirection.UP and p.price < (1/1000)) or (direction == RoundingDirection.DOWN and p.price > (1/1.01)): 
+            if (direction == RoundingDirection.UP and rounded_price < (1/1000)) or (direction == RoundingDirection.DOWN and rounded_price > (1/1.01)): 
                 return None # Out of bounds:
             else:
-                bucketed_price = round_price_to_nearest_decimal_tick_size(p.price, direction)
+                bucketed_price = round_price_to_nearest_decimal_tick_size(rounded_price, direction)
         else:
             # For Probability Schema, if the price is < 0.001 and we're rounding down (bids) then we don't want to show these orders
             # f the price is > 0.99 and we're roudning up (asks), then we don't want to show these orders either
-            if (direction == RoundingDirection.DOWN and p.price < 0.001) or (direction == RoundingDirection.UP and p.price > 0.99): 
+            if (direction == RoundingDirection.DOWN and rounded_price < 0.001) or (direction == RoundingDirection.UP and rounded_price > 0.99): 
                 return None # Out of bounds:
             else:
-                bucketed_price = round_price_to_nearest_probability_tick_size(p.price, direction)
+                bucketed_price = round_price_to_nearest_probability_tick_size(rounded_price, direction)
 
         return Price(
             price = bucketed_price, 
