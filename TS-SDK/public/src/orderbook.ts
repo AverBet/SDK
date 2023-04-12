@@ -3,7 +3,7 @@ import { BN } from "@project-serum/anchor"
 import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
 import { AVER_PROGRAM_IDS, CALLBACK_INFO_LEN } from "./ids"
 import { PriceAndSide, RoundingFormat, SlabOrder, UmaOrder } from "./types"
-import { RoundingDirection, chunkAndFetchMultiple, roundPriceToNearestProbabilityTickSize, throwIfNull } from "./utils"
+import { RoundingDirection, chunkAndFetchMultiple, roundDecimalPriceToNearestTickSize, roundPriceToNearestProbabilityTickSize, throwIfNull } from "./utils"
 
 /**
  * Orderbook class
@@ -108,14 +108,13 @@ export class Orderbook {
     direction: RoundingDirection
   ) => {
     let bucketedPrice = p.price
-    console.log('Price Before Bucketing', bucketedPrice)
 
     if (priceSchema == RoundingFormat.Decimal) {
       if ((direction == RoundingDirection.UP && p.price < (1 / 1000)) || (direction == RoundingDirection.DOWN && p.price > (1 / 1.01))) {
         return null // OOB
       }
       else {
-        bucketedPrice = roundPriceToNearestProbabilityTickSize(p.price, direction)
+        bucketedPrice = roundDecimalPriceToNearestTickSize(p.price, direction)
       }
     }
     else {
@@ -123,7 +122,7 @@ export class Orderbook {
         return null
       }
       else {
-        bucketedPrice = roundPriceToNearestProbabilityTickSize(p.price, direction)
+        bucketedPrice = roundDecimalPriceToNearestTickSize(p.price, direction)
       }
     }
 
@@ -158,7 +157,7 @@ export class Orderbook {
         return null // OOB
       }
       else {
-        bucketedPrice = roundPriceToNearestProbabilityTickSize(bucketedPrice, direction)
+        bucketedPrice = roundDecimalPriceToNearestTickSize(bucketedPrice, direction)
       }
     }
     else {
