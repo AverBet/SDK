@@ -159,9 +159,9 @@ async def sign_and_send_transaction_instructions(
                 
 
 
-def calculate_tick_size_for_price(limit_price: float):
+def calculate_probability_tick_size_for_price(limit_price: float):
     """
-    Calculates tick size for specific price
+    Calculates probabilitytick size for specific price
 
     Args:
         limit_price (float): Limit price
@@ -193,36 +193,12 @@ def calculate_tick_size_for_price(limit_price: float):
         raise Exception('Limit price too high')
     return limit_price
 
-class RoundingDirection(enum.Enum):
-    UP = 'up',
-    DOWN = 'down',
-    ROUND = 'round'
 
-def approximate_price(tickSize: float, limitPrice: float, direction: RoundingDirection):
-  rounded = round(limitPrice / tickSize) if direction is RoundingDirection.ROUND else ceil(limitPrice / tickSize) if direction is RoundingDirection.UP else floor(limitPrice / tickSize)
-  return rounded * tickSize
-
-def round_price_to_nearest_tick_size(limit_price: float, is_binary: bool = False, direction: RoundingDirection = RoundingDirection.ROUND):
+def calculate_decimal_tick_size_for_price(
+    limit_price_decimal: float
+):
     """
-    Rounds price to the nearest tick size available
-
-    Args:
-        limit_price (float): Limit price
-
-    Returns:
-        float: Rounded limit price
-    """
-    factor = 10 ** 6
-    limit_price_to_6dp = limit_price * factor
-    tick_size  = calculate_tick_size_for_price(factor - limit_price_to_6dp if is_binary else limit_price_to_6dp)
-    rounded_limit_price_to_6dp = approximate_price(tickSize=tick_size, limitPrice=limit_price_to_6dp, direction=direction)
-    rounded_limit_price = rounded_limit_price_to_6dp / factor
-
-    return rounded_limit_price
-
-def calculate_tick_size_for_decimal_price(limit_price_decimal: float):
-    """
-    Calculates tick size for specific price
+    Calculates decimal tick size for specific price
 
     Args:
         limit_price (float): Limit price in decimal
@@ -260,51 +236,94 @@ def calculate_tick_size_for_decimal_price(limit_price_decimal: float):
         raise Exception('Limit price too high')
     return limit_price_decimal
 
-def round_price_to_nearest_decimal_tick_size(limit_price: float, is_binary: bool = False, direction: RoundingDirection = RoundingDirection.ROUND):
+
+class RoundingDirection(enum.Enum):
+    UP = 'up',
+    DOWN = 'down',
+    ROUND = 'round'
+
+
+def approximate_price(
+    tickSize: float,
+    limitPrice: float,
+    direction: RoundingDirection
+):
+
+    if direction is RoundingDirection.ROUND:
+        rounded = round(limitPrice / tickSize)
+    elif direction is RoundingDirection.UP:
+        rounded = ceil(limitPrice / tickSize) 
+    else: 
+        rounded = floor(limitPrice / tickSize)
+
+    return rounded * tickSize
+
+
+def round_price_to_nearest_probability_tick_size(
+    limit_price: float,
+    direction: RoundingDirection = RoundingDirection.ROUND
+):
     """
-    Rounds price to the nearest tick size available
+    Rounds price to the nearest probability tick size available
 
     Args:
-        limit_price (float): Limit price
+        limit_price (float): Limit price (in probability format)
 
     Returns:
-        float: Rounded limit price
+        float: Rounded limit pricen (in probability format) and compliant with Probability price schema
     """
-    limit_price_decimal = 1 / limit_price
-    one_in_market_decimals = 10 ** 6
-    limit_price_6dp = one_in_market_decimals * limit_price
-
-    min_value_for_market = 1.01
-    max_value_for_market = 1000
-
-    if limit_price_decimal < min_value_for_market: 
-        return 1.0 / min_value_for_market
-    elif limit_price_decimal > max_value_for_market: 
-        return 1.0 / max_value_for_market
+    if limit_price < 0.001:
+        return 0.001
+    elif limit_price > 0.99:
+        return 0.99
     else:
-        limit_price_decimal_rounded = 0
+        factor = 10 ** 6
+        limit_price_to_6dp = limit_price * factor
+        tick_size  = calculate_probability_tick_size_for_price(
+            limit_price_to_6dp
+        )
+        rounded_limit_price_to_6dp = approximate_price(
+            tickSize = tick_size,
+            limitPrice = limit_price_to_6dp,
+            direction = direction
+        )
+        rounded_limit_price = rounded_limit_price_to_6dp / factor
 
-        if is_binary and limit_price_decimal > 2.0:
-            tick_size = calculate_tick_size_for_decimal_price(
-                    1.0 / ((one_in_market_decimals - limit_price_6dp)
-                        / one_in_market_decimals),
-                )
+        return rounded_limit_price
 
-            limit_price_decimal_rounded = approximate_price(
-                tick_size,
-                limit_price_decimal,
-                direction
-            )
-        else:
-            tick_size = calculate_tick_size_for_decimal_price(limit_price_decimal=limit_price_decimal)
 
-            limit_price_decimal_rounded = approximate_price(
-                tickSize=tick_size,
-                limitPrice=limit_price_decimal,
-                direction=direction
-            )
+def round_price_to_nearest_decimal_tick_size(
+    limit_price: float,
+    direction: RoundingDirection = RoundingDirection.ROUND,
+):
+    """
+    Rounds price to the nearest decimal schema tick size available
 
-        return 1.0 / limit_price_decimal_rounded
+    Args:
+        limit_price (float): Limit price (in probability format)
+
+    Returns:
+        float: Rounded limit price (in probability format) but compliant with Decimal price schema
+    """
+    if limit_price > 1/1.01:
+        return 1/1.01
+    if limit_price < 1/1000.0:
+        return 1/1000.0
+    else:
+        decimal_limit_price = 1/limit_price # Convert to decimal for bucketing in decimal schema
+        tick_size  = calculate_decimal_tick_size_for_price(
+            decimal_limit_price
+        )
+        rounded_decimal_limit_price = approximate_price(
+            tickSize = tick_size,
+            limitPrice = decimal_limit_price,
+            direction = direction
+        )
+        rounded_limit_price = 1/rounded_decimal_limit_price # Convert back to probability (as program still operates in prob)
+
+        return rounded_limit_price
+
+
 
 def parse_user_market_state(buffer: bytes, aver_client: AverClient, program: Program = None):
         """

@@ -2,8 +2,8 @@ import { Slab, Price, Side } from "@bonfida/aaob"
 import { BN } from "@project-serum/anchor"
 import { AccountInfo, Connection, PublicKey } from "@solana/web3.js"
 import { AVER_PROGRAM_IDS, CALLBACK_INFO_LEN } from "./ids"
-import { PriceAndSide, SlabOrder, UmaOrder } from "./types"
-import { chunkAndFetchMultiple, throwIfNull } from "./utils"
+import { PriceAndSide, RoundingFormat, SlabOrder, UmaOrder } from "./types"
+import { RoundingDirection, chunkAndFetchMultiple, roundDecimalPriceToNearestTickSize, roundPriceToNearestProbabilityTickSize, throwIfNull } from "./utils"
 
 /**
  * Orderbook class
@@ -100,6 +100,79 @@ export class Orderbook {
    */
   get slabBids(): Slab {
     return this._slabBids
+  }
+
+  static bucketPrice = (
+    p: Price,
+    priceSchema: RoundingFormat,
+    direction: RoundingDirection
+  ) => {
+    let bucketedPrice = p.price
+
+    if (priceSchema == RoundingFormat.Decimal) {
+      if ((direction == RoundingDirection.UP && p.price < (1 / 1000)) || (direction == RoundingDirection.DOWN && p.price > (1 / 1.01))) {
+        return null // OOB
+      }
+      else {
+        bucketedPrice = roundDecimalPriceToNearestTickSize(p.price, direction)
+      }
+    }
+    else {
+      if ((direction == RoundingDirection.DOWN && p.price < 0.001) || (direction == RoundingDirection.UP && p.price > 0.99)) {
+        return null
+      }
+      else {
+        bucketedPrice = roundDecimalPriceToNearestTickSize(p.price, direction)
+      }
+    }
+
+    if ((direction == RoundingDirection.DOWN && p.price < 0.001) || (direction == RoundingDirection.UP && p.price > 0.99)) {
+      return null // OOB
+    }
+    else {
+      bucketedPrice = roundPriceToNearestProbabilityTickSize(p.price, direction)
+    }
+
+    return {
+      price: bucketedPrice,
+      size: p.size
+    }
+  }
+
+  static bucketPriceAtomic = (
+    p: Price,
+    priceSchema: RoundingFormat,
+    direction: RoundingDirection
+  ) => {
+
+    const factor = Math.pow(2, 32)
+    let bucketedPrice = p.price / factor
+    
+    // Simple rounding to 8 DP for .7799999999...
+    const EIGHT_DP = Math.pow(10, 8)
+    bucketedPrice = Math.round(bucketedPrice * EIGHT_DP) / EIGHT_DP
+
+    if (priceSchema == RoundingFormat.Decimal) {
+      if ((direction == RoundingDirection.UP && bucketedPrice < (1 / 1000)) || (direction == RoundingDirection.DOWN && bucketedPrice > (1 / 1.01))) {
+        return null // OOB
+      }
+      else {
+        bucketedPrice = roundDecimalPriceToNearestTickSize(bucketedPrice, direction)
+      }
+    }
+    else {
+      if ((direction == RoundingDirection.DOWN && bucketedPrice < 0.001) || (direction == RoundingDirection.UP && bucketedPrice > 0.99)) {
+        return null
+      }
+      else {
+        bucketedPrice = roundPriceToNearestProbabilityTickSize(bucketedPrice, direction)
+      }
+    }
+
+    return {
+      price: bucketedPrice * factor,
+      size: p.size
+    }
   }
 
   /**
@@ -254,15 +327,77 @@ export class Orderbook {
     uiAmount?: boolean,
     isInverted?: boolean
   ) {
-    const l2Depth = isInverted
-      ? slab
-          .getL2DepthJS(depth, increasing)
-          .map((p) => Orderbook.invertPrice(p))
-      : slab.getL2DepthJS(depth, increasing)
 
-    return uiAmount
-      ? l2Depth.map((p) => Orderbook.convertPrice(p, decimals))
-      : l2Depth
+    const l2Depth = slab.getL2DepthJS(depth, increasing)
+
+    if (isInverted) {
+      return l2Depth.map((p) => Orderbook.invertPrice(p, uiAmount))
+    }
+
+    if (uiAmount) {
+      return l2Depth.map((p) => Orderbook.convertPrice(p, decimals))
+    }
+
+    return l2Depth
+  }
+
+  static getL2ForSlabWithBucketing(
+    slab: Slab,
+    depth: number,
+    increasing: boolean,
+    decimals: number,
+    priceSchema: RoundingFormat,
+    uiAmount: boolean = false,
+    isInverted: boolean = false
+  ) {
+    let l2Depth = slab.getL2DepthJS(depth, increasing)
+
+    if (isInverted) {
+      l2Depth = l2Depth.map((p) => Orderbook.invertPrice(p, false)) // not a UI amount as coming from slab...
+    }
+
+    let roundingDirection = RoundingDirection.ROUND
+
+    if (priceSchema == RoundingFormat.Decimal) {
+      if ((increasing && !isInverted) || (increasing && isInverted)) {
+        roundingDirection = RoundingDirection.UP
+      }
+      else {
+        roundingDirection = RoundingDirection.DOWN
+      }
+    }
+    else if (priceSchema == RoundingFormat.Probability) {
+      if ((increasing && !isInverted) || (!increasing && isInverted)) {
+        roundingDirection = RoundingDirection.DOWN
+      }
+      else {
+        roundingDirection = RoundingDirection.UP
+      }
+    } 
+    else {
+
+    }
+
+    if (isInverted) {
+      roundingDirection = roundingDirection == RoundingDirection.DOWN ? RoundingDirection.UP: RoundingDirection.DOWN
+    }
+
+    // BUCKET PRICES AND REMOVE ANY NULLs
+    let l2DepthBucketed: Price[] = []
+    let l2DepthBucketedNulls = l2Depth.map((price) => {
+      return Orderbook.bucketPriceAtomic(price, priceSchema, roundingDirection)
+    })
+    l2DepthBucketedNulls.forEach((priceOrNull) => {
+      if (priceOrNull != null) {
+        l2DepthBucketed.push(priceOrNull)
+      }
+    })
+
+    if (uiAmount) {
+      l2DepthBucketed = l2DepthBucketed.map((p) => Orderbook.convertPrice(p, decimals))
+    }
+
+    return l2DepthBucketed
   }
 
   /**
@@ -406,7 +541,7 @@ export class Orderbook {
    * @param {boolean} uiAmount - Converts prices based on decimal precision if true. Defaults to False.
    * @returns {Price} - Inverted Price object
    */
-  private static invertPrice(price: Price, uiAmount?: boolean): Price {
+  private static invertPrice(price: Price, uiAmount: boolean = false): Price {
     return {
       size: price.size,
       price: uiAmount ? 1 - price.price : Math.pow(2, 32) - price.price,
@@ -422,13 +557,15 @@ export class Orderbook {
    * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
    * @returns {Price[]} - Price object lists
    */
-  getBidsL2(depth: number, uiAmount?: boolean) {
+  getBidsL2(depth: number, uiAmount: boolean = false, roundingFormat: RoundingFormat = RoundingFormat.Probability) {
     const isIncreasing = this._isInverted ? true : false
-    return Orderbook.getL2ForSlab(
+    
+    return Orderbook.getL2ForSlabWithBucketing(
       this._slabBids,
       depth,
       isIncreasing,
       this.decimals,
+      roundingFormat,
       uiAmount,
       this._isInverted
     )
@@ -443,13 +580,14 @@ export class Orderbook {
    * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
    * @returns {Price[]} - Price object lists
    */
-  getAsksL2(depth: number, uiAmount?: boolean) {
+  getAsksL2(depth: number, uiAmount?: boolean, roundingFormat: RoundingFormat = RoundingFormat.Probability) {
     const isIncreasing = this._isInverted ? false : true
-    return Orderbook.getL2ForSlab(
+    return Orderbook.getL2ForSlabWithBucketing(
       this._slabAsks,
       depth,
       isIncreasing,
       this.decimals,
+      roundingFormat,
       uiAmount,
       this._isInverted
     )
@@ -754,3 +892,4 @@ const weightedAverage = (nums, weights) => {
   )
   return sum / weightSum
 }
+

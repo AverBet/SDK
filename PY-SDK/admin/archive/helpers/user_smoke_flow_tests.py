@@ -9,7 +9,7 @@ from pyaver.user_host_lifetime import UserHostLifetime
 from pyaver.constants import AVER_HOST_ACCOUNT
 from solana.rpc.types import TxOpts
 from pyaver.user_market import UserMarket
-from pyaver.utils import round_price_to_nearest_tick_size, sign_and_send_transaction_instructions
+from pyaver.utils import round_price_to_nearest_probability_tick_size, sign_and_send_transaction_instructions
 from pyaver.refresh import refresh_multiple_user_markets
 
 async def user_flow_smoke_tests(
@@ -125,7 +125,7 @@ async def user_flow_smoke_tests(
         refreshed_uma = (await refresh_multiple_user_markets(client, [loaded_user_market]))[0]
 
         bidL2 = refreshed_uma.market.orderbooks[outcome_number].get_bids_l2(1, True)
-        rounded_price = round_price_to_nearest_tick_size(price)
+        rounded_price = round_price_to_nearest_probability_tick_size(price)
         assert len(refreshed_uma.user_market_state.orders) == 1, 'Placed one order - UMA'
         assert len(bidL2) == 1, 'Bid l2'
         assert bidL2[0].price == rounded_price, 'price'
@@ -209,10 +209,10 @@ async def user_flow_smoke_tests(
     if(refreshed_uma.market.market_state.number_of_outcomes == 2):
         assert(len(refreshed_uma.user_market_state.orders) == 4), 'Placed multiple orders'
         
-        expected_bid1 = round_price_to_nearest_tick_size(bid1)
-        expected_bid2 = round_price_to_nearest_tick_size(1 - ask2)
-        expected_ask2 = round_price_to_nearest_tick_size(1 - bid2)
-        expected_ask1 = round_price_to_nearest_tick_size(ask1)
+        expected_bid1 = round_price_to_nearest_probability_tick_size(bid1)
+        expected_bid2 = round_price_to_nearest_probability_tick_size(1 - ask2)
+        expected_ask2 = round_price_to_nearest_probability_tick_size(1 - bid2)
+        expected_ask1 = round_price_to_nearest_probability_tick_size(ask1)
 
         bid_l2 = refreshed_uma.market.orderbooks[0].get_bids_l2(2, True)
         ask_l2 = refreshed_uma.market.orderbooks[0].get_asks_l2(2, True)
@@ -229,10 +229,10 @@ async def user_flow_smoke_tests(
         assert round(ask_l2[0].size) == size
 
         factor = 10 ** 6
-        expected_bid1 = round((1-round_price_to_nearest_tick_size(ask1)) * factor) / factor
-        expected_bid2 = round_price_to_nearest_tick_size(bid2)
-        expected_ask2 = round_price_to_nearest_tick_size(ask2)
-        expected_ask1 = round((1-round_price_to_nearest_tick_size(bid1)) * factor) / factor
+        expected_bid1 = round((1-round_price_to_nearest_probability_tick_size(ask1)) * factor) / factor
+        expected_bid2 = round_price_to_nearest_probability_tick_size(bid2)
+        expected_ask2 = round_price_to_nearest_probability_tick_size(ask2)
+        expected_ask1 = round((1-round_price_to_nearest_probability_tick_size(bid1)) * factor) / factor
 
         bid_l2 = refreshed_uma.market.orderbooks[1].get_bids_l2(2, True)
         ask_l2 = refreshed_uma.market.orderbooks[1].get_asks_l2(2, True)
@@ -253,28 +253,28 @@ async def user_flow_smoke_tests(
         assert(len(refreshed_uma.user_market_state.orders) == 4), 'Placed multiple orders'
 
         bidL2 = refreshed_uma.market.orderbooks[0].get_bids_l2(2, True)
-        rounded_bid_price = round_price_to_nearest_tick_size(bid1)
+        rounded_bid_price = round_price_to_nearest_probability_tick_size(bid1)
 
         assert len(bidL2) == 1
         assert bidL2[0].price == rounded_bid_price
         assert round(bidL2[0].size) == size
 
         askL2 = refreshed_uma.market.orderbooks[0].get_asks_l2(2, True)
-        rounded_ask_price = round_price_to_nearest_tick_size(ask1)
+        rounded_ask_price = round_price_to_nearest_probability_tick_size(ask1)
 
         assert len(askL2) == 1
         assert askL2[0].price == rounded_ask_price
         assert round(askL2[0].size) == size
 
         bidL2 = refreshed_uma.market.orderbooks[1].get_bids_l2(2, True)
-        rounded_bid_price = round_price_to_nearest_tick_size(bid2)
+        rounded_bid_price = round_price_to_nearest_probability_tick_size(bid2)
 
         assert len(bidL2) == 1
         assert bidL2[0].price == rounded_bid_price
         assert round(bidL2[0].size) == size
 
         askL2 = refreshed_uma.market.orderbooks[1].get_asks_l2(2, True)
-        rounded_ask_price = round_price_to_nearest_tick_size(ask2)
+        rounded_ask_price = round_price_to_nearest_probability_tick_size(ask2)
 
         assert len(askL2) == 1
         assert askL2[0].price == rounded_ask_price
