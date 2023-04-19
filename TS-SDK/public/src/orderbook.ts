@@ -359,7 +359,7 @@ export class Orderbook {
     let roundingDirection = RoundingDirection.ROUND
 
     if (priceSchema == RoundingFormat.Decimal) {
-      if ((increasing && !isInverted) || (increasing && isInverted)) {
+      if ((increasing == true && isInverted == false) || (increasing == false && isInverted == true)) {
         roundingDirection = RoundingDirection.UP
       }
       else {
@@ -367,7 +367,7 @@ export class Orderbook {
       }
     }
     else if (priceSchema == RoundingFormat.Probability) {
-      if ((increasing && !isInverted) || (!increasing && isInverted)) {
+      if ((increasing == true && isInverted == false) || (increasing == false && isInverted == true)) {
         roundingDirection = RoundingDirection.DOWN
       }
       else {
@@ -378,7 +378,7 @@ export class Orderbook {
 
     }
 
-    if (isInverted) {
+    if (isInverted == true) {
       roundingDirection = roundingDirection == RoundingDirection.DOWN ? RoundingDirection.UP: RoundingDirection.DOWN
     }
 
@@ -393,7 +393,7 @@ export class Orderbook {
       }
     })
 
-    if (uiAmount) {
+    if (uiAmount == true) {
       l2DepthBucketed = l2DepthBucketed.map((p) => Orderbook.convertPrice(p, decimals))
     }
 
