@@ -557,15 +557,14 @@ export class Orderbook {
    * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
    * @returns {Price[]} - Price object lists
    */
-  getBidsL2(depth: number, uiAmount: boolean = false, roundingFormat: RoundingFormat = RoundingFormat.Probability) {
+  getBidsL2(depth: number, uiAmount: boolean = false) {
     const isIncreasing = this._isInverted ? true : false
     
-    return Orderbook.getL2ForSlabWithBucketing(
+    return Orderbook.getL2ForSlab(
       this._slabBids,
       depth,
       isIncreasing,
       this.decimals,
-      roundingFormat,
       uiAmount,
       this._isInverted
     )
@@ -580,14 +579,13 @@ export class Orderbook {
    * @param {boolean} uiAmount - Converts prices based on decimal precision if true.
    * @returns {Price[]} - Price object lists
    */
-  getAsksL2(depth: number, uiAmount?: boolean, roundingFormat: RoundingFormat = RoundingFormat.Probability) {
+  getAsksL2(depth: number, uiAmount?: boolean) {
     const isIncreasing = this._isInverted ? false : true
-    return Orderbook.getL2ForSlabWithBucketing(
+    return Orderbook.getL2ForSlab(
       this._slabAsks,
       depth,
       isIncreasing,
       this.decimals,
-      roundingFormat,
       uiAmount,
       this._isInverted
     )
