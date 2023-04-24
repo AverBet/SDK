@@ -327,14 +327,14 @@ export class Orderbook {
     uiAmount?: boolean,
     isInverted?: boolean
   ) {
-    const l2Depth = slab.getL2DepthJS(depth, increasing)
-
-    if (uiAmount) {
-      return l2Depth.map((p) => Orderbook.convertPrice(p, decimals))
-    }
+    let l2Depth = slab.getL2DepthJS(depth, increasing)
 
     if (isInverted) {
-      return l2Depth.map((p) => Orderbook.invertPrice(p, uiAmount))
+      l2Depth = l2Depth.map((p) => Orderbook.invertPrice(p, false))
+    }
+
+    if (uiAmount) {
+      l2Depth = l2Depth.map((p) => Orderbook.convertPrice(p, decimals))
     }
 
     return l2Depth
