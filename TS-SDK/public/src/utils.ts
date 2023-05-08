@@ -170,17 +170,22 @@ export const calculateTickSizeForProbabilityPrice = (limitPrice: number) => {
 // Previously - roundPriceToNearestTickSize
 export const roundPriceToNearestProbabilityTickSize = (
   limitPrice: number,
-  direction: RoundingDirection = RoundingDirection.ROUND
+  direction: RoundingDirection = RoundingDirection.ROUND,
+  binaryFlag: boolean = false
 ) => {
   if (limitPrice < 0.001) {
     return 0.001
   }
-  else if (limitPrice > 0.99) {
-    return 0.99
+  else if (limitPrice > 0.999) {
+    return 0.999
   }
 
   const factor = Math.pow(10, 6)
-  const limitPriceTo6dp = limitPrice * factor
+  let limitPriceTo6dp = limitPrice * factor
+  if (binaryFlag && limitPriceTo6dp > 500000) {
+    limitPriceTo6dp = 1000000 - limitPriceTo6dp
+  }
+
   const tickSize = calculateTickSizeForProbabilityPrice(limitPriceTo6dp)
   const roundedLimitPriceTo6dp = approximatePrice(limitPriceTo6dp, tickSize, direction)
   
@@ -226,7 +231,7 @@ export const calculateTickSizeForDecimalPrice = (limitPriceDecimal: number) => {
 }
 
 const MAX_DECIMAL = 1 / 1.01
-const MIN_DECIMAL = 1 / 1000.0
+const MIN_DECIMAL = 1 / 1000
 
 /**
  * Rounds price to the nearest tick size available
@@ -237,7 +242,8 @@ const MIN_DECIMAL = 1 / 1000.0
  */
 export const roundDecimalPriceToNearestTickSize = (
   limitPrice: number,
-  direction: RoundingDirection = RoundingDirection.ROUND
+  direction: RoundingDirection = RoundingDirection.ROUND,
+  binaryFlag: boolean = false
 ) => {
   if (limitPrice > MAX_DECIMAL) {
     return MAX_DECIMAL
@@ -247,11 +253,26 @@ export const roundDecimalPriceToNearestTickSize = (
   }
 
   const limitPriceDecimal = 1 / limitPrice // convert to decimal
-  const tickSize = calculateTickSizeForDecimalPrice(limitPriceDecimal)
-  const limitPriceDecimalRounded = approximatePrice(limitPriceDecimal, tickSize, direction) // round in decimal
 
-  return (1.0 / limitPriceDecimalRounded) // convert back to probability before returning
+  if (binaryFlag && limitPriceDecimal < 2.0) {
+    const invertedLimitPriceDecimal = 1 / (1 - limitPrice)
+    const tickSize = calculateTickSizeForDecimalPrice(
+      invertedLimitPriceDecimal
+    )
+    const invertedLimitPriceDecimalRounded = approximatePrice(
+        invertedLimitPriceDecimal,
+        tickSize,
+        direction
+    )
+    const roundedDecimalLimitPrice = 1.0 / (1.0 - (1.0 / invertedLimitPriceDecimalRounded))
+    
+    return (1.0 / roundedDecimalLimitPrice) // convert back to probability before returning
+  } else {
+    const tickSize = calculateTickSizeForDecimalPrice(limitPriceDecimal)
+    const roundedDecimalLimitPrice = approximatePrice(limitPriceDecimal, tickSize, direction) // round in decimal
   
+    return (1.0 / roundedDecimalLimitPrice) // convert back to probability before returning
+  }  
 }
 
 /**

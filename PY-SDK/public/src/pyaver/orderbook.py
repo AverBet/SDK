@@ -209,9 +209,9 @@ class Orderbook:
         """
 
         l2_depth = Orderbook.__get_L2(slab, depth, decimals, increasing)
-        
+
         if(is_inverted):
-            l2_depth = [Orderbook.invert_price(p) for p in l2_depth]
+            l2_depth = [Orderbook.invert_price(p, 1 * (10 ** decimals)) for p in l2_depth]
 
         if(ui_amount):
             l2_depth = [Orderbook.convert_price(p, decimals) for p in l2_depth]
@@ -248,7 +248,7 @@ class Orderbook:
         l2_depth = Orderbook.__get_L2(slab, depth, decimals, increasing)
         
         if(is_inverted):
-            l2_depth = [Orderbook.invert_price(p) for p in l2_depth]
+            l2_depth = [Orderbook.invert_price(p, 1 * (10 ** decimals)) for p in l2_depth]
 
         if price_schema == PriceRoundingFormat.DECIMAL:
             # For DECIMAL, we want bids bucketed to the nearest UPPER (decimal) price
@@ -378,7 +378,7 @@ class Orderbook:
         )
 
     @staticmethod
-    def invert_price(p: Price):
+    def invert_price(p: Price, one_in_decimals: int = 1):
         """
         Inverts prices
 
@@ -394,8 +394,9 @@ class Orderbook:
         Returns:
             Price: Price object
         """
+
         return Price(
-            price=1-p.price, 
+            price=one_in_decimals-p.price, 
             size=p.size
         )
 

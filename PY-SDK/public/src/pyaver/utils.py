@@ -261,7 +261,8 @@ def approximate_price(
 
 def round_price_to_nearest_probability_tick_size(
     limit_price: float,
-    direction: RoundingDirection = RoundingDirection.ROUND
+    direction: RoundingDirection = RoundingDirection.ROUND,
+    binary_flag: bool = False
 ):
     """
     Rounds price to the nearest probability tick size available
@@ -274,11 +275,15 @@ def round_price_to_nearest_probability_tick_size(
     """
     if limit_price < 0.001:
         return 0.001
-    elif limit_price > 0.99:
-        return 0.99
+    elif limit_price > 0.999:
+        return 0.999
     else:
         factor = 10 ** 6
         limit_price_to_6dp = limit_price * factor
+
+        if binary_flag and limit_price_to_6dp > 500_000:
+            limit_price_to_6dp = 1_000_000 - limit_price_to_6dp
+        
         tick_size  = calculate_probability_tick_size_for_price(
             limit_price_to_6dp
         )
@@ -295,6 +300,7 @@ def round_price_to_nearest_probability_tick_size(
 def round_price_to_nearest_decimal_tick_size(
     limit_price: float,
     direction: RoundingDirection = RoundingDirection.ROUND,
+    binary_flag: bool = False
 ):
     """
     Rounds price to the nearest decimal schema tick size available
@@ -305,21 +311,35 @@ def round_price_to_nearest_decimal_tick_size(
     Returns:
         float: Rounded limit price (in probability format) but compliant with Decimal price schema
     """
-    if limit_price > 1/1.01:
-        return 1/1.01
-    if limit_price < 1/1000.0:
-        return 1/1000.0
+    if limit_price > 1 / 1.01:
+        return 1 / 1.01
+    if limit_price < 1 / 1_000:
+        return 1 / 1_000
     else:
-        decimal_limit_price = 1/limit_price # Convert to decimal for bucketing in decimal schema
-        tick_size  = calculate_decimal_tick_size_for_price(
-            decimal_limit_price
-        )
-        rounded_decimal_limit_price = approximate_price(
-            tickSize = tick_size,
-            limitPrice = decimal_limit_price,
-            direction = direction
-        )
-        rounded_limit_price = 1/rounded_decimal_limit_price # Convert back to probability (as program still operates in prob)
+        decimal_limit_price = 1 / limit_price # Convert to decimal for bucketing in decimal schema
+
+        if binary_flag and decimal_limit_price < 2.0:
+            inverted_limit_price_decimal = 1 / (1 - limit_price)
+            tick_size = calculate_decimal_tick_size_for_price(
+                inverted_limit_price_decimal
+            )
+            inverted_limit_price_decimal_rounded = approximate_price(
+                tick_size,
+                inverted_limit_price_decimal,
+                direction
+            )
+            rounded_decimal_limit_price = 1.0 / (1.0 - (1.0 / inverted_limit_price_decimal_rounded))
+        else:
+            tick_size  = calculate_decimal_tick_size_for_price(
+                decimal_limit_price
+            )
+            rounded_decimal_limit_price = approximate_price(
+                tickSize = tick_size,
+                limitPrice = decimal_limit_price,
+                direction = direction
+            )
+        
+        rounded_limit_price = 1 / rounded_decimal_limit_price # Convert back to probability (as program still operates in prob)
 
         return rounded_limit_price
 
