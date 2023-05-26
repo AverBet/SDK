@@ -1196,6 +1196,20 @@ export class Market {
       remainingAccounts: remainingAccounts,
     })
   }
+
+  getAvailableVolumeUsd() {
+    if (this.orderbooks == null || this.orderbooks.length == 0) {
+      return 0
+    }
+    
+    let totalVolumeAvailable = 0
+
+    this.orderbooks.forEach((orderbook) => {
+      totalVolumeAvailable += orderbook.getAvailableVolumeUsd()
+    })
+    
+    return totalVolumeAvailable
+  }
 }
 
 /**

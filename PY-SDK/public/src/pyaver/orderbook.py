@@ -670,6 +670,26 @@ class Orderbook:
             dict[str, float]: Dictionary containing `avg_price`, `worst_price`, `filled`
         """
         return self.__estimate_fill_for_qty(quote_qty, side, True, ui_amount)
+    
+    def get_available_volume_usd(self):
+        # SUM THE STAKE AVAILABLE ACCROSS THE BIDS AND ASKS
+        asks = self.get_asks_l2(100, True)
+        bids = self.get_bids_l2(100, True)
+
+        if len(asks) == 0 and len(bids) == 0:
+            return 0
+        
+        total_volume_available = 0
+
+        for bid in bids:
+            available_stake = bid.price * bid.size
+            total_volume_available += available_stake
+            
+        for ask in asks:
+            available_stake = ask.price * ask.size
+            total_volume_available += available_stake
+        
+        return total_volume_available
 
     def __estimate_fill_for_qty(self, qty: int, side: Side, quote: bool, ui_amount: bool):
         """

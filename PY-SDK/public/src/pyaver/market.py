@@ -665,6 +665,18 @@ class AverMarket():
         ),
     )
 
+    def get_available_volume_usd(self):
+        # LOOK ACCROSS EACH ORDERBOOK AND SUM THE AVAILABLE VOLUME
+        if self.orderbooks is None or len(self.orderbooks) == 0:
+            return 0
+        
+        total_volume_available = 0
+
+        for orderbook in self.orderbooks:
+            total_volume_available += orderbook.get_available_volume_usd()
+        
+        return total_volume_available
+
 
 
 

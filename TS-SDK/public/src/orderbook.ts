@@ -791,6 +791,28 @@ export class Orderbook {
     return this.estimateFillForQty(quoteQty, side, true, uiAmount)
   }
 
+  getAvailableVolumeUsd() {
+    // SUM THE STAKE AVAILABLE ACCROSS THE BIDS AND ASKS
+    const asks = this.getAsksL2(100, true)
+    const bids = this.getBidsL2(100, true)
+
+    if (asks.length == 0 && bids.length == 0) {
+      return 0
+    }
+    
+    let totalVolumeAvailable = 0
+
+    bids.forEach((bid) => {
+      totalVolumeAvailable += bid.price * bid.size
+    })
+
+    asks.forEach((ask) => {
+      totalVolumeAvailable += ask.price * ask.size
+    })
+    
+    return totalVolumeAvailable
+  }
+
   /**
    * Gets estimate of average fill price (probability format) given a base/payout quantity
    *
