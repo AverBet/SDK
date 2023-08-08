@@ -182,11 +182,8 @@ export const roundPriceToNearestProbabilityTickSize = (
 
   const factor = Math.pow(10, 6)
   let limitPriceTo6dp = limitPrice * factor
-  if (binaryFlag && limitPriceTo6dp > 500000) {
-    limitPriceTo6dp = 1000000 - limitPriceTo6dp
-  }
 
-  const tickSize = calculateTickSizeForProbabilityPrice(limitPriceTo6dp)
+  const tickSize = calculateTickSizeForProbabilityPrice(binaryFlag && limitPriceTo6dp > 500000 ? 1000000 - limitPriceTo6dp: limitPriceTo6dp)
   const roundedLimitPriceTo6dp = approximatePrice(limitPriceTo6dp, tickSize, direction)
   
   return roundedLimitPriceTo6dp / factor
