@@ -309,7 +309,9 @@ class AverMarket():
         Returns:
             bool: Market status closed
         """
-        return market_status in [MarketStatus.CEASED_CRANKED_CLOSED, MarketStatus.RESOLVED, MarketStatus.VOIDED]
+
+        # VOIDED MARKETS HAVE MARKET STORE AND ORDERBOOKS AT PRESENT 
+        return market_status in [MarketStatus.CEASED_CRANKED_CLOSED, MarketStatus.RESOLVED]
 
     @staticmethod
     async def get_orderbooks_from_orderbook_accounts(

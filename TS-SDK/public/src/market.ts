@@ -1220,11 +1220,11 @@ export class Market {
  * @param {MarketStatus} marketStatus - Market status (find in MarketState object)
  * @returns {boolean} - Market status closed
  */
+// VOIDED MARKETS HAVE STATE AND ORDERBOOKS CURRENTLY
 export const isMarketStatusClosed = (marketStatus: MarketStatus) =>
   [
     MarketStatus.CeasedCrankedClosed,
     MarketStatus.Resolved,
-    MarketStatus.Voided,
   ].includes(marketStatus)
 
 /**

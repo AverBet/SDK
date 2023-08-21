@@ -15,7 +15,7 @@ class build_py(build_py_orig):
 
 setup(
     name='pyaver',
-    version='0.0.29',
+    version='0.0.31',
     license='MIT',
     author="Aver Ramanujan",
     author_email='email@example.com',
@@ -26,9 +26,10 @@ setup(
     #package_data={'idl': ['*']},
     include_package_data=True,
     install_requires=[
-        'solana',
-        'anchorpy',
-        'pydash'
+        'solana<=0.23.2',
+        'anchorpy==0.9.0',
+        'pydash',
+        'base58'
       ],
 
 )

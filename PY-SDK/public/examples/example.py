@@ -75,9 +75,13 @@ async def main():
     # Gets Solana Airdrop 
     print('-'*10)
     print('Topping up SOL/Lamports...')
-    print(f' - Old SOL/Lamports balance: {await client.request_lamport_balance(owner_keypair.public_key)}')
-    await client.request_lamport_airdrop(1_000_000, owner_keypair.public_key)
-    print(f' - New SOL/Lamports balance: {await client.request_lamport_balance(owner_keypair.public_key)}')
+    lamport_balance = await client.request_lamport_balance(owner_keypair.public_key)
+    print(f' - Old SOL/Lamports balance: {lamport_balance}')
+
+    if lamport_balance < 500000:
+        await client.request_lamport_airdrop(1_000_000, owner_keypair.public_key)
+    
+    print(f' - New SOL/Lamports balance: {lamport_balance}')
 
     print('-'*10)
     print('Topping up USDC Tokens...')
@@ -87,12 +91,15 @@ async def main():
         owner_keypair,
     )
     token_balance = await client.request_token_balance(client.quote_token, owner_keypair.public_key)
-    print(f' - Old token balance: {token_balance}')
-    txn_signature = request_token_airdrop(api_endpoint(client.solana_network), client.quote_token,owner_keypair.public_key, 1_000_000_000)['signature']
-    # Wait to ensure transaction has been confirmed before moving on
-    await client.provider.connection.confirm_transaction(txn_signature, Confirmed) 
-    token_balance = await client.request_token_balance(client.quote_token, owner_keypair.public_key)
-    print(f' - New token balance: {token_balance}')
+    print(f' - Token balance: {token_balance}')
+
+    if token_balance < 50000:
+        txn_signature = request_token_airdrop('https://dev.api.aver.exchange/', client.quote_token, owner_keypair.public_key, 1_000_000_000)['signature']
+    
+        # Wait to ensure transaction has been confirmed before moving on
+        await client.provider.connection.confirm_transaction(txn_signature, Confirmed) 
+        token_balance = await client.request_token_balance(client.quote_token, owner_keypair.public_key)
+        print(f' - New token balance: {token_balance}')
 
 
 
@@ -102,12 +109,13 @@ async def main():
     # We can query the Aver API to provide a list of markets
     # Filters can be applied to load specific categories, status, etc
     # Here we simply load all markets and will select the first one in the section below
-    # To find out more, query https://dev.api.aver.exchange/v2/markets/ in your browser
+    # To find out more, query https://dev.api.aver.exchange/v3/markets/ in your browser
 
-    all_markets = get(api_endpoint(client.solana_network) + 'v2/markets')
+    all_markets = get(api_endpoint(client.solana_network) + 'v3/markets?active_only=true')
+    results = all_markets.json()['results']
     
     #Load all active markets from endpoint
-    market_pubkeys = [PublicKey(m['pubkey']) for m in all_markets.json() if m['internal_status'] == 'active']
+    market_pubkeys = [PublicKey(m['pubkey']) for m in results if m['internal_status'] == 'active']
 
     # ----------------------------------------------------
     #    LOAD THE AVERMARKET IN-MEMORY
@@ -115,6 +123,10 @@ async def main():
     # An AverMarket object can be initialized using only an AverClient and the PublicKey of a valid market
     # This must be awaited, as the class will autopopulate state from all of the related
     #  on-chain accounts which make up this market.
+
+    if len(market_pubkeys) == 0:
+        print('There are currently no active markets, returning.')
+        return
 
     #Loads market data from onchain
     loaded_markets = await AverMarket.load_multiple(client, market_pubkeys)
@@ -153,7 +165,7 @@ async def main():
     # There are some optional parameters to consider when initializing
     #  a UMA - for example, allocating a particular number of slots
     #  for how many unmatched orders can remain open in this market
-    #  at the same time. (e.g. a typicla user may only need a few,
+    #  at the same time. (e.g. a typical user may only need a few,
     #  while a market maker may wish to have capacity to place
     #  several orders per outcome and side.)
 
