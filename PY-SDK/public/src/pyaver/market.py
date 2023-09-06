@@ -18,6 +18,8 @@ from anchorpy import Context
 from spl.token.instructions import get_associated_token_address
 from spl.token.constants import TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
 from solana.rpc.types import TxOpts
+from pydash import chunk
+import asyncio
 
 class AverMarket():
     """
@@ -607,8 +609,6 @@ class AverMarket():
         if payer == None:
             payer = self.aver_client.owner
 
-        # refreshed_market = await refresh_market(self.aver_client, self)
-
         event_queues = [o.event_queue for o in self.market_store_state.orderbook_accounts]
         loaded_event_queues = await load_all_event_queues(
             self.aver_client.provider.connection,
@@ -628,20 +628,20 @@ class AverMarket():
                         user_accounts += [event.maker_user_market]
                     else:  # Out
                         user_accounts += [event.user_market]
-                    if j == max_iterations_for_consume_events:
-                        break
-                user_accounts = prepare_user_accounts_list(user_accounts)
-                events_to_crank = min(
-                    loaded_event_queues[idx]['header'].count, max_iterations_for_consume_events)
 
-                sig = await consume_events(
-                    market=self,
-                    outcome_idx=idx,
-                    max_iterations=events_to_crank,
-                    user_accounts=user_accounts,
-                    reward_target=reward_target,
-                    payer=payer
-                )
+                user_accounts_chunked = chunk(user_accounts, max_iterations_for_consume_events)
+
+                try:
+                    sigs = await asyncio.gather(*[consume_events(
+                                market=self,
+                                outcome_idx=idx,
+                                max_iterations=max_iterations_for_consume_events,
+                                user_accounts=prepare_user_accounts_list(user_accounts),
+                                reward_target=reward_target,
+                                payer=payer
+                            ) for user_accounts in user_accounts_chunked])
+                except Exception as e:
+                    print('Issue consuming events', e)
 
         return sig
 

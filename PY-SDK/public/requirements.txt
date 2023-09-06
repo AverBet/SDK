@@ -1,6 +1,7 @@
 anchorpy==0.9.0
 anyio==3.7.1
 apischema==0.16.6
+asyncio==3.4.3
 attrs==23.1.0
 base58==2.1.1
 based58==0.1.1
